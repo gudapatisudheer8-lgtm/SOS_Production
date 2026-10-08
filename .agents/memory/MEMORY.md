@@ -1,1 +1,2 @@
 - [Platform delivery](platform-delivery.md) — admin/accountant need web and mobile; partner starts on mobile web, with native dashboards delivered after browser development.
+- [Java toolchain](java-toolchain.md) — Maven can use an older JAVA_HOME than the Java executable on PATH; keep the compiler selection consistent.

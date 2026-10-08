@@ -1,0 +1,39 @@
+server:
+  address: 0.0.0.0
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+spring:
+  application:
+    name: syndicateos-api
+  datasource:
+    url: jdbc:postgresql://${SOS_DB_HOST}:${SOS_DB_PORT:5432}/${SOS_DB_NAME}?sslmode=verify-full&sslrootcert=${SOS_RDS_CA_FILE:certs/aws-rds-global-bundle.pem}&connectTimeout=3&socketTimeout=5&ApplicationName=SOS
+    username: ${SOS_DB_USERNAME}
+    password: ${SOS_DB_PASSWORD}
+    hikari:
+      pool-name: sos
+      maximum-pool-size: 4
+      minimum-idle: 0
+      initialization-fail-timeout: -1
+      connection-timeout: 5000
+      read-only: true
+  flyway:
+    # Gate stays closed until the owner approves this isolated development target.
+    enabled: false
+    clean-disabled: true
+    baseline-on-migrate: false
+    default-schema: sos
+    schemas: sos
+    create-schemas: true
+  sql:
+    init:
+      mode: never
+  jackson:
+    default-property-inclusion: non_null
+logging:
+  level:
+    root: INFO
+    com.zaxxer.hikari: WARN
+sos:
+  database-name: ${SOS_DB_NAME}

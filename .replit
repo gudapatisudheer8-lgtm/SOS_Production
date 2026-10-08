@@ -26,3 +26,7 @@ SOS_DB_HOST = "krishisetu-db.cpmomccww28x.ap-south-1.rds.amazonaws.com"
 SOS_DB_NAME = "SOS"
 SOS_DB_PORT = "5432"
 SOS_DB_SSL_MODE = "verify-full"
+
+[nix]
+channel = "stable-25_05"
+packages = ["jdk21_headless"]

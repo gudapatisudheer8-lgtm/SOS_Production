@@ -24,8 +24,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /readyz:
+    get:
+      operationId: readinessCheck
+      tags: [health]
+      summary: Read-only SOS database readiness check
+      responses:
+        "503":
+          description: Foundation setup or database connectivity is pending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessStatus"
 components:
   schemas:
+    ReadinessStatus:
+      type: object
+      required: [status, databaseReachable, targetVerified, reason]
+      properties:
+        status: { type: string }
+        databaseReachable: { type: boolean }
+        targetVerified: { type: boolean }
+        reason: { type: string }
     HealthStatus:
       type: object
       properties:
