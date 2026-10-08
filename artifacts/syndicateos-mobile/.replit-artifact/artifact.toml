@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "SyndicateOS"
+description = "A React Native mobile app for multi-partner ventures across real estate, construction, liquor retail, and infrastructure. Gives managing partners and field teams a shared view of projects, partner contributions, accounts, and sector-specific operations, with workflows assigned per client."
+version = "1.0.0"
+id = "artifacts/syndicateos-mobile"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 25578
+
+[services.development]
+run = "pnpm --filter @workspace/syndicateos-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/syndicateos-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/syndicateos-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "25578"
+BASE_PATH = "/"

@@ -1,0 +1,23 @@
+Application Description: SyndicateOS
+SyndicateOS is an enterprise-grade Multi-Tenant Business Syndicate & ERP Platform built specifically for multi-partner investment ventures, real-estate developers, builders, liquor syndicates, and infrastructure contractors across Andhra Pradesh (AP) and Telangana.
+Core Capabilities & Modules
+Syndicate & Multi-Partner Governance
+Dynamic Equity & Capital Ledgers: Real-time management of partner share percentages, capital commitments, cash/bank infusions, dynamic equity calls, and profit distributions.
+Internal Dispute Prevention: Transparent, role-based audit trails and ledger statements ensuring every rupee contributed or drawn is reconciled among co-investors and managing partners.
+Sector-Specific Venture Workflows
+Real Estate Open Plotting: Visual plan builders for layout plotting (East, North, West, South, Corner, and Commercial plots), Vastu compliance tagging, rate-per-sq.yard locks, LP/RERA sanction management, and live booking/inventory matrices.
+Residential Construction: Floor-by-floor unit matrices (2BHK, 3BHK, Penthouses), amenity sq.ft allocation, civil construction milestones, and RERA registration tracking.
+Liquor Vends & Retail Clusters: State excise gazette vend licensing (TGSBCL/APSBL), daily retail counter settlement registers, and partner stock draws.
+Turnkey Civil Infrastructure: BoQ measurement books, item-rate and EPC turnkey milestone schedules, retention deposits, and sub-contractor accounts.
+Dedicated Banking & Treasury (Project Accounts)
+Isolated Project Accounts: Every venture maps directly to its own dedicated banking facilities (RERA Statutory 70% Protected Escrows, Syndicate Capital Pools, Commercial Current Accounts, and Site Petty Cash).
+Double-Entry Transaction Flow: Clear tracking of customer booking advances, partner infusions, vendor payouts, and verified voucher uploads.
+Multi-Role Access & Operational Portals
+Dedicated views for Managing Partners, Auditors / Accountants, Site Engineers, and Field Sales Agents, with print-ready voucher slips, receipts, and ledger statements.
+Summary of Recent Form & Account Fixes
+Plot Limits & Defaults Removed:
+Cleared all hardcoded numeric constraints and fallback counts (including the previous 50-plot barrier).
+Inputs in the Physical Plan & Custom Layout Builder now permit zero (0) and empty / null values without unwanted fallbacks.
+Project Account Mapping:
+Accounts are created and mapped strictly to the designated Project rather than generic firm pools.
+Streamlined the account creation sub-modal, removing distracting highlight sections and ensuring smooth integration with venture setup.
