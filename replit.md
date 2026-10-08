@@ -18,7 +18,7 @@ SyndicateOS is a multi-tenant business syndicate and ERP platform for multi-part
 - React Native mobile frontend (Expo).
 - Java Spring Boot backend.
 - PostgreSQL database.
-- The user plans to supply the GitHub URL of the first version built in Google AI Studio. Inspect that source before migrating or connecting backend behavior.
+- The first version built in Google AI Studio is at https://github.com/gudapatisudheer8-lgtm/SOS. Its source has been reviewed: reuse its business workflows and domain models as reference, while retaining the required React Native, Java Spring Boot, and PostgreSQL product stack.
 - The current mobile build is a clearly labelled local demo. No Java API, PostgreSQL business data, authentication, financial posting, or server-side tenant isolation has been implemented.
 - The Express and Drizzle packages below are the initial workspace scaffold, not approval to substitute for the user's Java Spring Boot stack.
 
