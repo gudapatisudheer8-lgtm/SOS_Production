@@ -40,12 +40,16 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - Sector interfaces are created as reusable backend-managed workflow packages and assigned to clients, rather than shipping a separate application per sector.
 - Client-specific sector workflows share the governance, accounting, permissions, and audit core.
 - Accounts must be mapped to their designated project, not generic firm pools.
+- The user explicitly requires a different accountant interface AND a different partner interface for every sector.
+- All sector/business/interface configuration must live in PostgreSQL tables, not hardcoded sector enums, menus, forms, workflow branches, or dashboard components. The code supplies reusable components and trusted handlers; adding a sector using existing capabilities should require database configuration only.
+- Configuration must be versioned, validated, and explicitly published. Database-defined permissions must be enforced by Spring Boot, not just used to hide UI elements. Tenant isolation and balanced financial posting remain mandatory safety invariants.
+- See `docs/sector-configuration-design.md` for the proposed configuration tables and runtime design. This is a design specification, not an applied database schema or a live backend.
 
 ## Confirmed onboarding and access flow
 
 - The admin dashboard belongs to the product owner, who onboards clients/firms and assigns their required sectors.
 - Firm onboarding automatically provisions accountant access. Accountants use the client code provided by the admin to identify their firm.
-- Each sector has a distinct accountant dashboard, selected from the firm's assigned sectors.
+- Each sector has distinct accountant and partner interfaces, selected from assigned sectors and the user's firm/project permissions.
 - Accountants add projects and partners. Adding a partner automatically provisions that partner's login.
 - Partners log in with their mobile number and a default PIN, with a mandatory PIN/password change on first login.
 - The user intends to host the Java Spring Boot backend on AWS EC2 and use PostgreSQL on AWS. The PostgreSQL hosting option has not yet been selected.
