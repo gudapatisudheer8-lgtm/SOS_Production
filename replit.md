@@ -52,7 +52,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - Each sector has distinct accountant and partner interfaces, selected from assigned sectors and the user's firm/project permissions.
 - Accountants add projects and partners. Adding a partner automatically provisions that partner's login.
 - Partners log in with their mobile number and a default PIN, with a mandatory PIN/password change on first login.
-- The user intends to host the Java Spring Boot backend on AWS EC2 and use PostgreSQL on AWS. The PostgreSQL hosting option has not yet been selected.
+- The user reports creating AWS EC2 and a PostgreSQL database named SOS under the existing krishisetu instance. Database hosting details and connectivity remain unverified. Treat this as shared infrastructure: scope SOS setup to its own database and do not alter other applications' databases or instance configuration without explicit approval.
 
 ## Product
 
