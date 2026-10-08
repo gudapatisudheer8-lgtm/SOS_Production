@@ -41,6 +41,15 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - Client-specific sector workflows share the governance, accounting, permissions, and audit core.
 - Accounts must be mapped to their designated project, not generic firm pools.
 
+## Confirmed onboarding and access flow
+
+- The admin dashboard belongs to the product owner, who onboards clients/firms and assigns their required sectors.
+- Firm onboarding automatically provisions accountant access. Accountants use the client code provided by the admin to identify their firm.
+- Each sector has a distinct accountant dashboard, selected from the firm's assigned sectors.
+- Accountants add projects and partners. Adding a partner automatically provisions that partner's login.
+- Partners log in with their mobile number and a default PIN, with a mandatory PIN/password change on first login.
+- The user intends to host the Java Spring Boot backend on AWS EC2 and use PostgreSQL on AWS. The PostgreSQL hosting option has not yet been selected.
+
 ## Product
 
 The intended sectors are real-estate open plotting, residential construction, liquor vends and retail clusters, and turnkey infrastructure.
