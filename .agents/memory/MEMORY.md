@@ -1,0 +1,1 @@
+- [Platform delivery](platform-delivery.md) — admin/accountant need web and mobile; partner starts on mobile web, with native dashboards delivered after browser development.
