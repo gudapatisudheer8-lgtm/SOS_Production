@@ -279,7 +279,7 @@ export function VentureCard({
           {venture.operationalMetric}
         </Text>
       </View>
-      <View style={styles.progressTrack}>
+      <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
         <View
           style={[
             styles.progressFill,
@@ -551,7 +551,6 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 5,
     borderRadius: 6,
-    backgroundColor: '#e8eee8',
     overflow: 'hidden',
   },
   progressFill: {

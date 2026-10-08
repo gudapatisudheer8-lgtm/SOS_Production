@@ -187,7 +187,7 @@ export default function LedgerScreen() {
       <View style={[styles.auditNote, { backgroundColor: colors.secondary }]}>
         <Feather name="check-circle" size={16} color={colors.primary} />
         <Text style={[styles.auditText, { color: colors.secondaryForeground }]}>
-          Sample activity shows the double-entry view. Verified vouchers and a full audit trail need the live backend connection.
+          Sample receipt and payout activity only. Double-entry posting, verified vouchers, and a full audit trail need the live backend connection.
         </Text>
       </View>
     </PageScroll>

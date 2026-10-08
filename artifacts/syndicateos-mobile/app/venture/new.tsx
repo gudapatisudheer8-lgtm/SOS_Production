@@ -2,12 +2,14 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { tapHaptic } from '@/components/Shared';
 import { SectorId, SECTORS, useSyndicate } from '@/context/SyndicateContext';
@@ -15,6 +17,7 @@ import { useColors } from '@/hooks/useColors';
 
 export default function NewVentureScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { enabledSectors, addVenture } = useSyndicate();
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
@@ -83,7 +86,10 @@ export default function NewVentureScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.formContent,
-        { paddingTop: 24, paddingBottom: 40 },
+        {
+          paddingTop: Platform.OS === 'web' ? 67 : insets.top + 20,
+          paddingBottom: Platform.OS === 'web' ? 34 : insets.bottom + 24,
+        },
       ]}
       bottomOffset={72}
       keyboardShouldPersistTaps="handled"

@@ -148,7 +148,7 @@ export const SAMPLE_ACCOUNTS: VentureAccount[] = [
     name: 'Syndicate capital pool',
     type: 'Capital pool',
     balance: 8460000,
-    note: 'Shared venture capital',
+    note: 'South Valley · Package 03',
   },
   {
     id: 'operations',

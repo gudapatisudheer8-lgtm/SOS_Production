@@ -1,6 +1,6 @@
-# [Project name]
+# SyndicateOS (SOS)
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+SyndicateOS is a multi-tenant business syndicate and ERP platform for multi-partner ventures across Andhra Pradesh and Telangana.
 
 ## Run & Operate
 
@@ -12,6 +12,17 @@ _Replace the heading above with the project's name, and this line with one sente
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
+
+### Required product stack
+
+- React Native mobile frontend (Expo).
+- Java Spring Boot backend.
+- PostgreSQL database.
+- The user plans to supply the GitHub URL of the first version built in Google AI Studio. Inspect that source before migrating or connecting backend behavior.
+- The current mobile build is a clearly labelled local demo. No Java API, PostgreSQL business data, authentication, financial posting, or server-side tenant isolation has been implemented.
+- The Express and Drizzle packages below are the initial workspace scaffold, not approval to substitute for the user's Java Spring Boot stack.
+
+### Initial workspace tooling
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - API: Express 5
@@ -26,11 +37,17 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Sector interfaces are created as reusable backend-managed workflow packages and assigned to clients, rather than shipping a separate application per sector.
+- Client-specific sector workflows share the governance, accounting, permissions, and audit core.
+- Accounts must be mapped to their designated project, not generic firm pools.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The intended sectors are real-estate open plotting, residential construction, liquor vends and retail clusters, and turnkey infrastructure.
+
+The shared core includes partner equity and capital ledgers, project treasury and double-entry accounting, role-specific access, vouchers, receipts, and auditable statements.
+
+Preserve the first version's form behavior: no hardcoded plot-count limits; zero and empty/null input values must not be replaced by unwanted defaults.
 
 ## User preferences
 
