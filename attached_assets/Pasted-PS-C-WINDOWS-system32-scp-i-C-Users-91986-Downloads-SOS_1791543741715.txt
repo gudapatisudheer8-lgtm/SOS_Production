@@ -1,0 +1,72 @@
+PS C:\WINDOWS\system32> scp -i "C:\Users\91986\Downloads\SOS.pem" "C:\Users\91986\Downloads\sos-pin-login-update.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
+sos-pin-login-update.tar.gz                                                           100%   31MB   2.6MB/s   00:11
+PS C:\WINDOWS\system32> ssh -i "C:\Users\91986\Downloads\SOS.pem" ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1006-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Oct  9 11:01:29 UTC 2026
+
+  System load:  0.0               Temperature:           -273.1 C
+  Usage of /:   46.5% of 6.61GB   Processes:             126
+  Memory usage: 51%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+ * Ubuntu Pro delivers the most comprehensive open source security and
+   compliance features.
+
+   https://ubuntu.com/aws/pro
+
+Expanded Security Maintenance for Applications is not enabled.
+
+189 updates can be applied immediately.
+148 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Fri Oct  9 10:27:33 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$
+ubuntu@ip-172-31-13-52:~$ set -e
+
+cd /home/ubuntu
+
+echo "ed7be9910acf302f6023bad6097f882124431b492ad7278fc7ab88453a742949  sos-pin-login-update.tar.gz" | sha256sum -c -
+
+stage=$(mktemp -d /home/ubuntu/sos-pin-update.XXXXXX)
+tar -xzf sos-pin-login-update.tar.gz -C "$stage"
+
+backup="/opt/syndicateos/backups/pin-$(date +%Y%m%d-%H%M%S)"
+sudo install -d -m 700 "$backup"
+
+sudo cp -a /opt/syndicateos/sos-api.jar "$backup/sos-api.jar"
+
+sudo systemctl stop syndicateos-api
+
+sudo mv /opt/syndicateos/web "$backup/web"
+
+sudo install -o root -g sos-api -m 640 \
+  "$stage/sos-api.jar" /opt/syndicateos/sos-api.jar
+
+sudo cp -a "$stage/web" /opt/syndicateos/web
+sudo chown -R root:root /opt/syndicateos/web
+sudo find /opt/syndicateos/web -type d -exec chmod 755 {} +
+sudo find /opt/syndicateos/web -type f -exec chmod 644 {} +
+
+sudo systemctl start syndicateos-api
+
+echo "Backup saved at: $backup"
+
+curl --fail --show-error --retry 5 --retry-delay 3 \
+  --retry-connrefused http://127.0.0.1:8090/api/readyz
+sos-pin-login-update.tar.gz: OK
+Backup saved at: /opt/syndicateos/backups/pin-20261009-110149
+curl: (7) Failed to connect to 127.0.0.1 port 8090 after 0 ms: Could not connect to server
+Warning: Problem : connection refused. Will retry in 3 seconds. 5 retries left.
+curl: (7) Failed to connect to 127.0.0.1 port 8090 after 0 ms: Could not connect to server
+Warning: Problem : connection refused. Will retry in 3 seconds. 4 retries left.
+{"status":"ready","databaseReachable":true,"targetVerified":true,"reason":"READY"}ubuntu@ip-172-31-13-52:~$
