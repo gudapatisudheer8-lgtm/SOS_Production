@@ -1,0 +1,87 @@
+PS C:\WINDOWS\system32> scp -i "C:\Users\91986\Downloads\SOS.pem" "C:\Users\91986\Downloads\sos-portal-update.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
+sos-portal-update.tar.gz                                                                                                sos-portal-update.tar.gz                                                                                                sos-portal-update.tar.gz                                                                                                                                                         100%   31MB   3.1MB/s   00:09
+PS C:\WINDOWS\system32> ssh -i "C:\Users\91986\Downloads\SOS.pem" ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1006-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Oct  9 09:28:06 UTC 2026
+
+  System load:  0.0               Temperature:           -273.1 C
+  Usage of /:   45.2% of 6.61GB   Processes:             127
+  Memory usage: 49%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+ * Ubuntu Pro delivers the most comprehensive open source security and
+   compliance features.
+
+   https://ubuntu.com/aws/pro
+
+Expanded Security Maintenance for Applications is not enabled.
+
+189 updates can be applied immediately.
+148 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Fri Oct  9 08:21:48 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$
+ubuntu@ip-172-31-13-52:~$ bash <<'DEPLOY'
+set -euo pipefail
+
+archive="$HOME/sos-portal-update.tar.gz"
+
+# Stop immediately if the download is incomplete or different.
+printf '%s  %s\n' \
+  'ad092b31f455b3dabf83e9be68e1a3a17228ed559166711b4defe0b25f7c695d' \
+  "$archive" | sha256sum --check -
+
+# Extract and validate the package before stopping the API.
+stage=$(mktemp -d /tmp/sos-portal-update.XXXXXX)
+tar -xzf "$archive" -C "$stage"
+
+test -f "$stage/sos-api.jar"
+test -f "$stage/web/index.html"
+
+stamp=$(date +%Y%m%d-%H%M%S)
+backup="/opt/syndicateos/backups/$stamp"
+next="/opt/syndicateos/web-next-$stamp"
+
+# Preserve the current JAR and prepare the new web files.
+sudo mkdir -p "$backup"
+sudo cp -a /opt/syndicateos/sos-api.jar "$backup/sos-api.jar"
+
+sudo cp -a "$stage/web" "$next"
+sudo chown -R root:root "$next"
+sudo find "$next" -type d -exec chmod 755 {} \;
+sudo find "$next" -type f -exec chmod 644 {} \;
+
+# Replace only the application files.
+sudo systemctl stop syndicateos-api
+
+sudo install -o root -g sos-api -m 640 \
+  "$stage/sos-api.jar" /opt/syndicateos/sos-api.jar
+
+sudo mv /opt/syndicateos/web "$backup/web"
+sudo mv "$next" /opt/syndicateos/web
+
+sudo systemctl start syndicateos-api
+sudo systemctl is-active syndicateos-api
+
+echo "Application backup: $backup"
+echo "Update installed. Continue with the readiness check."
+DEPLOY
+/home/ubuntu/sos-portal-update.tar.gz: OK
+active
+Application backup: /opt/syndicateos/backups/20261009-092835
+Update installed. Continue with the readiness check.
+ubuntu@ip-172-31-13-52:~$
+ubuntu@ip-172-31-13-52:~$
+ubuntu@ip-172-31-13-52:~$ curl --fail --silent --show-error \
+  https://sos.krishisetu9.in/api/readyz
+{"status":"ready","databaseReachable":true,"targetVerified":true,"reason":"READY"}ubuntu@ip-172-31-13-52:~$

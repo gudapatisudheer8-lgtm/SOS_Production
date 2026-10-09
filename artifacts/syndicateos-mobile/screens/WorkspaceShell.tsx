@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandLogo } from '@/components/Brand';
 import { Banner, Btn, Skeleton } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { errMessage, isUnavailable, useAuth } from '@/lib/session';
@@ -57,9 +58,9 @@ export function WorkspaceShell({ mode }: { mode: 'owner' | 'client' }) {
 
   const head = (
     <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Feather name="layers" size={18} color={c.accent} />
-        <Text numberOfLines={1} style={{ color: c.heroForeground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{firm ? firm.name : 'SyndicateOS'}</Text>
+      <BrandLogo width={wide ? 150 : 116} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+        <Text numberOfLines={1} style={{ color: c.heroForeground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{firm ? firm.name : owner ? 'Owner console' : 'Workspace'}</Text>
       </View>
       <Text style={{ color: c.heroForeground, opacity: 0.65, fontSize: 12, marginTop: 4 }}>
         {account?.displayName}{firm ? ` · ${firm.clientCode}` : company ? ` · ${company}` : owner ? ' · Owner' : ''}

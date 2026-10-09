@@ -189,3 +189,51 @@ Refresh the browser with Ctrl+F5:
 The existing SPA fallback serves `/owner`. Preserve the explicit
 `location ^~ /assets/ { try_files $uri =404; }` before the hidden-file deny rule
 so exported `.pnpm` font paths continue working.
+
+## Branding-only web update
+
+Use `releases/sos-branding-web.tar.gz` after the portal update above has already
+been installed. It contains only `web/`: the supplied official logo, navy/ivory
+theme, favicon and compiled frontend. No JAR, database or environment changes
+are needed. No API restart or Nginx configuration change is required.
+
+SHA-256: `5c19941487eb59182f0b13ee1c52b174cf3c728f01e497d2e81012ec17a8672b`
+
+Download the archive to Windows Downloads and upload:
+
+```powershell
+scp -i "$env:USERPROFILE\Downloads\SOS.pem" "$env:USERPROFILE\Downloads\sos-branding-web.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
+ssh -i "$env:USERPROFILE\Downloads\SOS.pem" ubuntu@3.111.185.116
+```
+
+Then run on EC2:
+
+```bash
+bash <<'DEPLOY'
+set -euo pipefail
+archive="$HOME/sos-branding-web.tar.gz"
+printf '%s  %s\n' \
+  '5c19941487eb59182f0b13ee1c52b174cf3c728f01e497d2e81012ec17a8672b' \
+  "$archive" | sha256sum --check -
+stage=$(mktemp -d /tmp/sos-branding.XXXXXX)
+tar -xzf "$archive" -C "$stage"
+test -f "$stage/web/index.html"
+stamp=$(date +%Y%m%d-%H%M%S)
+backup="/opt/syndicateos/backups/branding-$stamp"
+next="/opt/syndicateos/web-branding-$stamp"
+sudo mkdir -p /opt/syndicateos/backups
+sudo mkdir "$backup"
+sudo cp -a "$stage/web" "$next"
+sudo chown -R root:root "$next"
+sudo find "$next" -type d -exec chmod 755 {} \;
+sudo find "$next" -type f -exec chmod 644 {} \;
+sudo mv /opt/syndicateos/web "$backup/web"
+sudo mv "$next" /opt/syndicateos/web
+echo "Branding installed. Previous website: $backup/web"
+DEPLOY
+```
+
+Keep the existing `/assets/` hidden-font-path exception and SPA fallback.
+Verify readiness with `curl --fail --silent --show-error https://sos.krishisetu9.in/api/readyz`.
+Hard refresh the client `/` and owner `/owner` pages. The API, credentials and
+company/role authorization behavior are unchanged.

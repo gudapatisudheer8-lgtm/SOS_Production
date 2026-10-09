@@ -1,7 +1,7 @@
-import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { changeCredential, getMe, login, useReadinessCheck, type LoginInput } from '@workspace/api-client-react';
+import { BrandBackdrop, BrandLogo } from '@/components/Brand';
 import { Banner, Btn, Card, Field } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { errMessage, httpStatus, isUnavailable, reportError, useAuth } from '@/lib/session';
@@ -16,17 +16,15 @@ function utf8Len(v: string) {
 }
 
 function Frame({ children }: { children: React.ReactNode }) {
-  const c = useColors();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: c.hero }} contentContainerStyle={st.frame} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
-      <View style={st.brand}>
-        <View style={[st.mark, { backgroundColor: c.accent }]}>
-          <Feather name="layers" size={18} color={c.accentForeground} />
+    <BrandBackdrop>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={st.frame} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
+        <View style={st.brand}>
+          <BrandLogo width={240} />
         </View>
-        <Text style={{ color: c.heroForeground, fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.4 }}>SyndicateOS</Text>
-      </View>
-      <View style={{ width: '100%', maxWidth: 440 }}>{children}</View>
-    </ScrollView>
+        <View style={{ width: '100%', maxWidth: 440 }}>{children}</View>
+      </ScrollView>
+    </BrandBackdrop>
   );
 }
 
@@ -48,8 +46,8 @@ function Heading({ title, text }: { title: string; text: string }) {
   const c = useColors();
   return (
     <>
-      <Text style={{ color: c.heroForeground, fontSize: 30, fontFamily: 'Inter_700Bold', letterSpacing: -0.8, marginBottom: 6 }}>{title}</Text>
-      <Text style={{ color: c.heroForeground, opacity: 0.7, marginBottom: 22, lineHeight: 20 }}>{text}</Text>
+      <Text style={{ color: c.foreground, fontSize: 30, fontFamily: 'Inter_700Bold', letterSpacing: -0.8, marginBottom: 6 }}>{title}</Text>
+      <Text style={{ color: c.mutedForeground, marginBottom: 22, lineHeight: 20 }}>{text}</Text>
     </>
   );
 }
@@ -219,5 +217,4 @@ export function ResetGate() {
 const st = StyleSheet.create({
   frame: { flexGrow: 1, padding: 20, paddingVertical: 40, justifyContent: 'center', alignItems: 'center', gap: 26 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'center' },
-  mark: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 });

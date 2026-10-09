@@ -14,3 +14,17 @@ mtime_ms = 1791535952857
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/af18bc25-6dd0-48f1-8bfb-c3f075d704a8/d519048d-0cda-497b-a1dd-73b7ecf0c4ea"
 storage_version_token = "1791537408735833"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "09oLvGstgPqg5GRSyD64c"
+uri = "file://releases/sos-branding-web.tar.gz"
+type = "unspecified"
+title = "SOS branded website update"
+description = "Web-only release with your official logo, navy styling, ivory/pale-blue background and branded favicon. Approximately 5.9 MB. Existing API, database and credentials are unchanged."
+logical_id = "06f857f1-5812-4db4-a94b-5a094bc44c16"
+content_hash = "sha256:5c19941487eb59182f0b13ee1c52b174cf3c728f01e497d2e81012ec17a8672b"
+size = 6120274
+mtime_ms = 1791541012647
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/06f857f1-5812-4db4-a94b-5a094bc44c16/15f422e6-f355-442d-8578-83b680b5caed"
+storage_version_token = "1791541303332541"
+content_type = "application/octet-stream"

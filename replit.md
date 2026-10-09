@@ -15,6 +15,12 @@ SyndicateOS is a multi-tenant business syndicate and ERP platform for multi-part
 
 ## Stack
 
+### Branding
+
+- The user supplied the official SOS/SyndicateOS logo ZIP. Use this artwork rather than the former generic layers icon; the navy wordmark needs a pale surface, including in dark mode.
+- The frontend now uses navy styling and ivory/pale-blue login backgrounds. Logo/icon sources are in the mobile artifact's `assets/brand/`.
+- The user confirmed the portal release is installed on EC2 and returned `READY`. The subsequent branding-only package is `releases/sos-branding-web.tar.gz`; it requires only a web-directory update, with no API, database or Nginx changes. See `docs/sos-ec2-release.md`.
+
 ### Required product stack
 
 - React Native mobile frontend (Expo).

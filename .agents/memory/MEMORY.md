@@ -3,3 +3,4 @@
 - [Session delivery](auth-delivery.md) — bearer sessions support cross-origin Expo previews and native clients; cookie adoption requires a deliberate CSRF review.
 - [Configuration field bindings](configuration-field-bindings.md) — the same API field key can have different meanings across project and partner forms.
 - [Expo static assets](expo-static-assets.md) — pnpm exports can contain hidden-looking paths; serve public assets explicitly without disabling other hidden-file protection.
+- [Expo preview settling](expo-preview-verification.md) — quick mobile captures can stop at font loading; verify the settled page before diagnosing a broken login.
