@@ -13,6 +13,7 @@ export interface LoginInput {
   /** @maxLength 24 */
   mobile: string;
   /**
+     * Six-digit client PIN or owner password. Legacy client credentials are accepted only to enter mandatory PIN conversion.
      * @minLength 1
      * @maxLength 72
      */

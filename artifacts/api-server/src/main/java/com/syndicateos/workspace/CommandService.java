@@ -64,6 +64,8 @@ public class CommandService {
         jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended(?,0))",Object.class,"SOS:identity:"+mobile);
         List<Map<String,Object>> rows=jdbc.queryForList("SELECT id,enabled FROM sos.identities WHERE mobile=? FOR UPDATE",mobile);
         if (!rows.isEmpty()) {
+            if (jdbc.queryForObject("SELECT count(*) FROM sos.owner_memberships WHERE identity_id=?",Integer.class,rows.getFirst().get("id"))>0)
+                throw ApiProblem.invalid("Use a separate mobile number for client access. Owner accounts keep their owner password.");
             if (!Boolean.TRUE.equals(rows.getFirst().get("enabled"))) throw ApiProblem.invalid("This identity is disabled. Contact the product owner.");
             return Map.of("id",rows.getFirst().get("id"),"access",Map.of("mobile",mobile,"reused",true));
         }

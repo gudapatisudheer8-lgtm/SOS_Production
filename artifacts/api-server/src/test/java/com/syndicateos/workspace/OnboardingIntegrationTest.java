@@ -45,6 +45,9 @@ class OnboardingIntegrationTest {
         String owner=login("OWNER","9888880000","Owner-integration-123","",200).path("token").asText();
         request("GET","/workspace",null,owner,403);
         owner=change(owner,"Owner-integration-123","Owner-updated-123");
+        request("POST","/auth/credential",Map.of("currentCredential","Owner-updated-123","newCredential","123456"),owner,400);
+        request("POST","/auth/company",Map.of("clientCode","MISSING"),null,404);
+        request("POST","/auth/company",Map.of("clientCode",""),null,400);
         JsonNode workspace=request("GET","/workspace",null,owner,200);
         assertEquals(2,workspace.path("sectors").size());
         JsonNode sector=workspace.path("sectors").get(0), other=workspace.path("sectors").get(1);
@@ -55,6 +58,9 @@ class OnboardingIntegrationTest {
         JsonNode created=command("firm.create",Map.of("name","Test firm A","clientCode","TEST-A","accountantName","Test accountant",
             "accountantMobile","9888880001","assignments",java.util.List.of(assignment)),owner,200);
         String firmA=created.path("entity").path("id").asText();
+        JsonNode company=request("POST","/auth/company",Map.of("clientCode"," test-a "),null,200);
+        assertEquals("Test firm A",company.path("name").asText());
+        assertEquals(2,company.size());
         String temporary=created.path("access").path("temporaryCredential").asText();
         login("CLIENT","9888880001",temporary,"WRONG",401);
         login("CLIENT","9888880001",temporary,"",400);
@@ -65,7 +71,18 @@ class OnboardingIntegrationTest {
         assertEquals(firmA,accountantLogin.path("account").path("firmId").asText());
         String accountant=accountantLogin.path("token").asText();
         command("project.create",Map.of("sectorId",sectorId,"name","Blocked before reset"),accountant,403);
-        accountant=change(accountant,temporary,"Accountant-updated-123");
+        assertTrue(temporary.matches("[0-9]{6}"));
+        for (String invalid : new String[]{"12345","1234567","abcdef","12a456"})
+            request("POST","/auth/credential",Map.of("currentCredential",temporary,"newCredential",invalid),accountant,400);
+        accountant=change(accountant,temporary,"012345");
+        // A valid old credential remains usable only for mandatory conversion.
+        jdbc.update("UPDATE sos.identities SET credential_hash=?,must_change_credential=false,credential_version=credential_version+1 WHERE mobile=?",
+            new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("Legacy-accountant-123"),"+919888880001");
+        JsonNode legacy=login("CLIENT","9888880001","Legacy-accountant-123","TEST-A",200);
+        assertTrue(legacy.path("account").path("mustChangeCredential").asBoolean());
+        request("GET","/workspace",null,legacy.path("token").asText(),403);
+        accountant=change(legacy.path("token").asText(),"Legacy-accountant-123","012345");
+        login("CLIENT","9888880001","Legacy-accountant-123","TEST-A",401);
         String detailKey="construction".equals(sector.path("code").asText())?"unitCount":"plotCount";
         Map<String,Object> details=Map.of(detailKey,0);
         String projectA=command("project.create",Map.of("sectorId",sectorId,"name","Zero count project","location","","details",details),accountant,200).path("entity").path("id").asText();
@@ -84,7 +101,8 @@ class OnboardingIntegrationTest {
         assertEquals(firmA,partnerLogin.path("account").path("firmId").asText());
         String partner=partnerLogin.path("token").asText();
         request("GET","/workspace",null,partner,403);
-        partner=change(partner,partnerPin,"Partner-updated-123");
+        assertTrue(partnerPin.matches("[0-9]{6}"));
+        partner=change(partner,partnerPin,"654321");
         workspace=request("GET","/workspace",null,partner,200);
         assertEquals(1,workspace.path("projects").size());
         assertFalse(workspace.path("projects").get(0).path("partners").get(0).has("mobile"));
@@ -94,7 +112,7 @@ class OnboardingIntegrationTest {
             "accountantMobile","9888880001","assignments",java.util.List.of(assignment)),owner,200);
         assertTrue(firmB.path("access").path("reused").asBoolean());
         assertFalse(firmB.path("access").has("temporaryCredential"));
-        JsonNode secondLogin=login("CLIENT","9888880001","Accountant-updated-123","TEST-B",200);
+        JsonNode secondLogin=login("CLIENT","9888880001","012345","TEST-B",200);
         assertFalse(secondLogin.path("account").path("mustChangeCredential").asBoolean());
         String accountantB=secondLogin.path("token").asText();
         String projectB=command("project.create",Map.of("sectorId",sectorId,"name","Firm B project","details",details),accountantB,200).path("entity").path("id").asText();
@@ -105,14 +123,15 @@ class OnboardingIntegrationTest {
         assertFalse(reused.path("access").has("temporaryCredential"));
         // A shared identity must not bring another company's projects into this session.
         assertEquals(1,request("GET","/workspace",null,partner,200).path("projects").size());
-        JsonNode partnerBLogin=login("CLIENT","9888880002","Partner-updated-123","TEST-B",200);
+        JsonNode partnerBLogin=login("CLIENT","9888880002","654321","TEST-B",200);
         String partnerB=partnerBLogin.path("token").asText();
         assertEquals(firmB.path("entity").path("id").asText(),partnerBLogin.path("account").path("firmId").asText());
         assertEquals(projectB,request("GET","/workspace",null,partnerB,200).path("projects").get(0).path("id").asText());
         // Role precedence applies only to memberships actually granted by the database.
         command("partner.add",Map.of("projectId",projectA,"name","Accountant also participating","mobile","9888880001"),accountant,200);
-        assertEquals("ACCOUNTANT",login("CLIENT","9888880001","Accountant-updated-123","TEST-A",200).path("account").path("role").asText());
+        assertEquals("ACCOUNTANT",login("CLIENT","9888880001","012345","TEST-A",200).path("account").path("role").asText());
         command("firm.update",Map.of("firmId",firmA,"name","Test firm A","status","SUSPENDED","revision",1),owner,200);
+        request("POST","/auth/company",Map.of("clientCode","TEST-A"),null,404);
         request("GET","/workspace",null,accountant,401);
         request("GET","/workspace",null,partner,401);
         assertEquals(1,request("GET","/workspace",null,partnerB,200).path("projects").size());

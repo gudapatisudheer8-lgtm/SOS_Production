@@ -20,6 +20,7 @@ SyndicateOS is a multi-tenant business syndicate and ERP platform for multi-part
 - The user supplied the official SOS/SyndicateOS logo ZIP. Use this artwork rather than the former generic layers icon; the navy wordmark needs a pale surface, including in dark mode.
 - The frontend now uses navy styling and ivory/pale-blue login backgrounds. Logo/icon sources are in the mobile artifact's `assets/brand/`.
 - The user confirmed the portal release is installed on EC2 and returned `READY`. The subsequent branding-only package is `releases/sos-branding-web.tar.gz`; it requires only a web-directory update, with no API, database or Nginx changes. See `docs/sos-ec2-release.md`.
+- The user confirmed the branding is deployed. The next application-only release, `releases/sos-pin-login-update.tar.gz`, adds public active-firm-name resolution, ten-digit Indian client login and six-digit numeric client PIN setup. It requires both JAR and web replacement, but no SQL or bootstrap. Owner passwords stay longer; owner identities cannot be reused as client PIN identities because credentials are identity-wide. No new PIN policy has been applied to AWS by the agent.
 
 ### Required product stack
 

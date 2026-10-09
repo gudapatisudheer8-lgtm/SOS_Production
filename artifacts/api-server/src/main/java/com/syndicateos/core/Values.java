@@ -39,7 +39,11 @@ public final class Values {
         return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
     public static String temporaryCredential() {
-        return String.format("%010d", RANDOM.nextLong(10_000_000_000L));
+        return String.format(java.util.Locale.ROOT, "%06d", RANDOM.nextInt(1_000_000));
+    }
+    public static void pin(String value) {
+        if (value == null || !value.matches("[0-9]{6}"))
+            throw ApiProblem.invalid("Use exactly 6 digits for your PIN.");
     }
     public static void credential(String value) {
         if (value == null || value.length() < 8 || value.getBytes(StandardCharsets.UTF_8).length > 72)

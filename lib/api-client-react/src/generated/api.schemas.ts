@@ -29,6 +29,7 @@ export interface LoginInput {
   /** @maxLength 24 */
   mobile: string;
   /**
+     * Six-digit client PIN or owner password. Legacy client credentials are accepted only to enter mandatory PIN conversion.
      * @minLength 1
      * @maxLength 72
      */
@@ -41,10 +42,24 @@ export interface CredentialInput {
   /** @maxLength 72 */
   currentCredential: string;
   /**
-     * @minLength 8
+     * Exactly six ASCII digits for accountant/partner; at least eight characters for OWNER. Validated by the server role.
+     * @minLength 6
      * @maxLength 72
      */
   newCredential: string;
+}
+
+export interface CompanyLookupInput {
+  /**
+     * @minLength 1
+     * @maxLength 32
+     */
+  clientCode: string;
+}
+
+export interface CompanyLookupResult {
+  clientCode: string;
+  name: string;
 }
 
 export type SessionAccountRole = typeof SessionAccountRole[keyof typeof SessionAccountRole];

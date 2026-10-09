@@ -8,6 +8,23 @@
 import * as zod from 'zod';
 
 
+/**
+ * Resolve an active company code to its public firm name only. No identity or membership data is returned.
+ */
+export const resolveCompanyBodyClientCodeMax = 32;
+
+
+
+export const ResolveCompanyBody = zod.object({
+  "clientCode": zod.string().min(1).max(resolveCompanyBodyClientCodeMax)
+})
+
+export const ResolveCompanyResponse = zod.object({
+  "clientCode": zod.string(),
+  "name": zod.string()
+})
+
+
 export const loginBodyMobileMax = 24;
 
 export const loginBodyCredentialMax = 72;
@@ -19,7 +36,7 @@ export const loginBodyClientCodeMax = 32;
 export const LoginBody = zod.object({
   "role": zod.enum(['OWNER', 'CLIENT', 'ACCOUNTANT', 'PARTNER']).describe('CLIENT resolves accountant or partner membership within the supplied company code. OWNER is used only by the separate owner portal.'),
   "mobile": zod.string().max(loginBodyMobileMax),
-  "credential": zod.string().min(1).max(loginBodyCredentialMax),
+  "credential": zod.string().min(1).max(loginBodyCredentialMax).describe('Six-digit client PIN or owner password. Legacy client credentials are accepted only to enter mandatory PIN conversion.'),
   "clientCode": zod.string().max(loginBodyClientCodeMax).optional()
 })
 
@@ -51,14 +68,14 @@ export const GetMeResponse = zod.object({
 
 export const changeCredentialBodyCurrentCredentialMax = 72;
 
-export const changeCredentialBodyNewCredentialMin = 8;
+export const changeCredentialBodyNewCredentialMin = 6;
 export const changeCredentialBodyNewCredentialMax = 72;
 
 
 
 export const ChangeCredentialBody = zod.object({
   "currentCredential": zod.string().max(changeCredentialBodyCurrentCredentialMax),
-  "newCredential": zod.string().min(changeCredentialBodyNewCredentialMin).max(changeCredentialBodyNewCredentialMax)
+  "newCredential": zod.string().min(changeCredentialBodyNewCredentialMin).max(changeCredentialBodyNewCredentialMax).describe('Exactly six ASCII digits for accountant/partner; at least eight characters for OWNER. Validated by the server role.')
 })
 
 export const ChangeCredentialResponse = zod.object({

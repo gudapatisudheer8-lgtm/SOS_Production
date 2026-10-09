@@ -28,3 +28,17 @@ mtime_ms = 1791541012647
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/06f857f1-5812-4db4-a94b-5a094bc44c16/15f422e6-f355-442d-8578-83b680b5caed"
 storage_version_token = "1791541303332541"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "9nsKHxeDW-EK8ZlurT7lo"
+uri = "file://releases/sos-pin-login-update.tar.gz"
+type = "unspecified"
+title = "SOS — six-digit PIN login update"
+description = "Full compiled Spring Boot API and branded web application. Automatic +91, real firm name after company code, and masked six-digit client PINs. No SQL migration required."
+logical_id = "f59303c7-32f4-4742-8555-b0dc6e0fb71a"
+content_hash = "sha256:ed7be9910acf302f6023bad6097f882124431b492ad7278fc7ab88453a742949"
+size = 32599759
+mtime_ms = 1791542899226
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/f59303c7-32f4-4742-8555-b0dc6e0fb71a/449ce7fb-6321-48a8-8e06-f3524ba83dcb"
+storage_version_token = "1791543283945881"
+content_type = "application/octet-stream"

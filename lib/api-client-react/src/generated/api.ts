@@ -23,6 +23,8 @@ import type {
   ApiFailureResponse,
   CommandInput,
   CommandResult,
+  CompanyLookupInput,
+  CompanyLookupResult,
   CredentialInput,
   HealthStatus,
   LoginInput,
@@ -59,6 +61,91 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getResolveCompanyUrl = () => {
+
+
+
+
+  return `/api/auth/company`
+}
+
+/**
+ * Resolve an active company code to its public firm name only. No identity or membership data is returned.
+ */
+export const resolveCompany = async (companyLookupInput: CompanyLookupInput, options?: Parameters<typeof customFetch>[1]): Promise<CompanyLookupResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CompanyLookupResult>(getResolveCompanyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyLookupInput)
+  }
+);}
+
+
+
+
+
+export const getResolveCompanyMutationKey = () => ['resolveCompany'] as const;
+
+export const getResolveCompanyMutationOptions = <TError = ErrorType<ApiFailureResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveCompany>>, TError,ResolveCompanyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveCompany>>, TError,ResolveCompanyMutationVariables, TContext> => {
+
+const mutationKey = getResolveCompanyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveCompany>>, ResolveCompanyMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  resolveCompany(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveCompanyMutationResult = NonNullable<Awaited<ReturnType<typeof resolveCompany>>>
+    export type ResolveCompanyMutationBody = BodyType<CompanyLookupInput>
+    export type ResolveCompanyMutationError = ErrorType<ApiFailureResponse>
+    export type ResolveCompanyMutationVariables = {data: BodyType<CompanyLookupInput>}
+
+    export const useResolveCompany = <TError = ErrorType<ApiFailureResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveCompany>>, TError,ResolveCompanyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveCompany>>,
+        TError,
+        ResolveCompanyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResolveCompanyMutationOptions(options));
+    }
 
 export const getLoginUrl = () => {
 

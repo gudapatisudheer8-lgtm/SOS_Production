@@ -21,7 +21,7 @@ public class BearerFilter extends OncePerRequestFilter {
         throws ServletException, IOException {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")
-            && !List.of("/api/auth/login","/api/healthz","/api/readyz").contains(request.getRequestURI())) {
+            && !List.of("/api/auth/login","/api/auth/company","/api/healthz","/api/readyz").contains(request.getRequestURI())) {
             try {
                 SessionAccount account = auth.authenticate(header.substring(7));
                 SecurityContextHolder.getContext().setAuthentication(

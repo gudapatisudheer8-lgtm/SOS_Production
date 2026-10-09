@@ -13,8 +13,14 @@ class ValuesTest {
     @Test void opaqueCredentialsAndHashes() {
         String first=Values.token(),second=Values.token();
         assertNotEquals(first,second); assertEquals(43,first.length()); assertEquals(64,Values.hash(first).length());
-        assertTrue(Values.temporaryCredential().matches("[0-9]{10}"));
+        assertTrue(Values.temporaryCredential().matches("[0-9]{6}"));
         assertThrows(ApiProblem.class,()->Values.credential("short"));
         assertThrows(ApiProblem.class,()->Values.credential("ह".repeat(30))); // bcrypt limit is bytes, not characters.
+    }
+    @Test void numericPinPolicy() {
+        Values.pin("012345");
+        for (String bad : new String[]{"12345","1234567","abcdef","12a456","１２３４５６","123 56"})
+            assertThrows(ApiProblem.class,()->Values.pin(bad));
+        assertThrows(ApiProblem.class,()->Values.pin(null));
     }
 }

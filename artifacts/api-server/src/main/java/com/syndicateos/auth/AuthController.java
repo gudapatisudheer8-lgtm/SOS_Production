@@ -11,6 +11,7 @@ public class AuthController {
     private final AuthService auth;
     public AuthController(AuthService auth) { this.auth=auth; }
     @PostMapping("/login") public AuthService.LoginResult login(@RequestBody AuthService.LoginInput input) { return auth.login(input); }
+    @PostMapping("/company") public AuthService.CompanyResult company(@RequestBody AuthService.CompanyInput input) { return auth.company(input); }
     @GetMapping("/me") public SessionAccount me(@AuthenticationPrincipal SessionAccount account) { return account; }
     public record CredentialInput(String currentCredential, String newCredential) {}
     @PostMapping("/credential") public AuthService.LoginResult change(@AuthenticationPrincipal SessionAccount account,

@@ -11,6 +11,23 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /auth/company:
+    post:
+      operationId: resolveCompany
+      tags: [auth]
+      description: Resolve an active company code to its public firm name only. No identity or membership data is returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyLookupInput" }
+      responses:
+        "200":
+          description: Active company branding
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanyLookupResult" }
+        default: { $ref: "#/components/responses/ApiFailure" }
   /auth/login:
     post:
       operationId: login
@@ -165,14 +182,33 @@ components:
           enum: [OWNER, CLIENT, ACCOUNTANT, PARTNER]
           description: CLIENT resolves accountant or partner membership within the supplied company code. OWNER is used only by the separate owner portal.
         mobile: { type: string, maxLength: 24 }
-        credential: { type: string, minLength: 1, maxLength: 72 }
+        credential:
+          type: string
+          minLength: 1
+          maxLength: 72
+          description: Six-digit client PIN or owner password. Legacy client credentials are accepted only to enter mandatory PIN conversion.
         clientCode: { type: string, maxLength: 32 }
     CredentialInput:
       type: object
       required: [currentCredential, newCredential]
       properties:
         currentCredential: { type: string, maxLength: 72 }
-        newCredential: { type: string, minLength: 8, maxLength: 72 }
+        newCredential:
+          type: string
+          minLength: 6
+          maxLength: 72
+          description: Exactly six ASCII digits for accountant/partner; at least eight characters for OWNER. Validated by the server role.
+    CompanyLookupInput:
+      type: object
+      required: [clientCode]
+      properties:
+        clientCode: { type: string, minLength: 1, maxLength: 32 }
+    CompanyLookupResult:
+      type: object
+      required: [clientCode, name]
+      properties:
+        clientCode: { type: string }
+        name: { type: string }
     SessionAccount:
       type: object
       required: [identityId, role, displayName, mobile, mustChangeCredential]

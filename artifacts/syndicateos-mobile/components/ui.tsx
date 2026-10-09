@@ -323,7 +323,7 @@ export function CredentialSheet({
   const [ack, setAck] = useState(false);
   if (!access) return null;
   return (
-    <Sheet visible title={access.reused ? 'Existing login retained' : 'Temporary credential'}>
+    <Sheet visible title={access.reused ? 'Existing login retained' : 'Temporary PIN'}>
       <Text style={{ color: c.mutedForeground, marginBottom: 10 }}>Mobile {access.mobile}</Text>
       {access.reused || !access.temporaryCredential ? (
         <Text style={{ color: c.foreground, lineHeight: 20, marginBottom: 14 }}>
@@ -337,12 +337,12 @@ export function CredentialSheet({
             </Text>
           </View>
           <Text style={{ color: c.warning, fontSize: 13, lineHeight: 18, marginVertical: 10 }}>
-            Shown once. It is not stored and cannot be retrieved again. Share it privately; the user must set a new credential at first login.
+            Shown once. It is not stored and cannot be retrieved again. Share this six-digit PIN privately; the user must set their own six-digit PIN at first login.
             {access.expiresAt ? ` Expires ${new Date(access.expiresAt).toLocaleString()}.` : ''}
           </Text>
           <Pressable onPress={() => setAck(!ack)} style={[s.row, { marginBottom: 14, justifyContent: 'flex-start' }]}>
             <Feather name={ack ? 'check-square' : 'square'} size={20} color={c.primary} />
-            <Text style={{ color: c.foreground, flex: 1 }}>I have copied this credential and understand it will not be shown again.</Text>
+            <Text style={{ color: c.foreground, flex: 1 }}>I have copied this PIN and understand it will not be shown again.</Text>
           </Pressable>
         </>
       )}

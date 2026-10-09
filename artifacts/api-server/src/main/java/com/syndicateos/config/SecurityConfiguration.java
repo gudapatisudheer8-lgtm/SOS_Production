@@ -51,7 +51,7 @@ public class SecurityConfiguration {
             .httpBasic(basic -> basic.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/healthz", "/api/readyz", "/api/auth/login").permitAll()
+                .requestMatchers("/api/healthz", "/api/readyz", "/api/auth/login", "/api/auth/company").permitAll()
                 .requestMatchers("/api/auth/**", "/api/workspace", "/api/commands/**", "/api/configuration/**").authenticated()
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors

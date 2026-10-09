@@ -192,6 +192,22 @@ so exported `.pnpm` font paths continue working.
 
 ## Branding-only web update
 
+For the newer six-digit PIN and firm-name login changes, use the **full**
+`releases/sos-pin-login-update.tar.gz` instead. Its SHA-256 is
+`ed7be9910acf302f6023bad6097f882124431b492ad7278fc7ab88453a742949`.
+Install both its JAR and `web/` using the application-only portal upgrade
+procedure, substituting this filename and checksum. The branding-only package
+below does not include the new backend company-lookup endpoint.
+
+This PIN update needs no database migration or bootstrap. Owner passwords stay
+at least eight characters. New accountant/partner temporary and private PINs
+use exactly six ASCII digits. Existing long client credentials remain usable
+for verified conversion, which blocks business access until PIN setup completes.
+Owner mobile identities cannot be provisioned as client PIN accounts, to avoid
+weakening an owner password through a client reset. Keep owner/client mobile
+identities separate. Existing saved client sessions are not bulk-invalidated;
+legacy conversion is required on their next credential-based login.
+
 Use `releases/sos-branding-web.tar.gz` after the portal update above has already
 been installed. It contains only `web/`: the supplied official logo, navy/ivory
 theme, favicon and compiled frontend. No JAR, database or environment changes

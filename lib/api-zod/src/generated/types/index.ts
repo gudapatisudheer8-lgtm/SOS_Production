@@ -13,6 +13,8 @@ export * from './commandInputData';
 export * from './commandResult';
 export * from './commandResultAccess';
 export * from './commandResultEntity';
+export * from './companyLookupInput';
+export * from './companyLookupResult';
 export * from './configComponent';
 export * from './configComponentActionsItem';
 export * from './configComponentKey';

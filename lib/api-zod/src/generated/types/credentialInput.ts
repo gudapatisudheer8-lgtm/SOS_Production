@@ -10,7 +10,8 @@ export interface CredentialInput {
   /** @maxLength 72 */
   currentCredential: string;
   /**
-     * @minLength 8
+     * Exactly six ASCII digits for accountant/partner; at least eight characters for OWNER. Validated by the server role.
+     * @minLength 6
      * @maxLength 72
      */
   newCredential: string;

@@ -23,6 +23,17 @@ public class AuthService {
     }
     public record LoginInput(String role, String mobile, String credential, String clientCode) {}
     public record LoginResult(String token, Instant expiresAt, SessionAccount account) {}
+    public record CompanyInput(String clientCode) {}
+    public record CompanyResult(String clientCode, String name) {}
+    public CompanyResult company(CompanyInput input) {
+        gate.requireReady();
+        String code = Objects.toString(input.clientCode(), "").trim().toUpperCase(Locale.ROOT);
+        if (code.isEmpty() || code.length() > 32) throw ApiProblem.invalid("Enter your company code.");
+        List<CompanyResult> firms = jdbc.query("SELECT client_code,name FROM sos.firms WHERE upper(client_code)=? AND status='ACTIVE'",
+            (rs,n) -> new CompanyResult(rs.getString("client_code"),rs.getString("name")), code);
+        if (firms.isEmpty()) throw new ApiProblem(404,"COMPANY_NOT_FOUND","Company code not found. Check the code with your administrator.");
+        return firms.getFirst();
+    }
     public LoginResult login(LoginInput input) {
         gate.requireReady();
         String mobile = Values.mobile(input.mobile());
@@ -52,6 +63,8 @@ public class AuthService {
                 UUID id = (UUID)identity.get("id");
                 if ("OWNER".equals(input.role())) allowed = exists("SELECT count(*) FROM sos.owner_memberships WHERE identity_id=?", id);
                 else {
+                    // A shared owner identity must never be weakened to a client PIN.
+                    allowed = !exists("SELECT count(*) FROM sos.owner_memberships WHERE identity_id=?", id);
                     // Role and tenant come only from active database memberships.
                     // An explicitly granted accountant membership takes precedence
                     // when one identity is also a partner in the same firm.
@@ -68,7 +81,7 @@ public class AuthService {
                         ORDER BY CASE m.role_code WHEN 'ACCOUNTANT' THEN 0 ELSE 1 END
                         LIMIT 1
                         """, clientCode, id, input.role(), input.role());
-                    allowed = !firms.isEmpty();
+                    allowed = allowed && !firms.isEmpty();
                     if (allowed) {
                         firm = (UUID)firms.getFirst().get("id");
                         resolvedRole = (String)firms.getFirst().get("role_code");
@@ -80,6 +93,10 @@ public class AuthService {
                 return new ApiProblem(401, "INVALID_CREDENTIALS", "Check your login details or contact your administrator.");
             }
             jdbc.update("DELETE FROM sos.signin_limits WHERE key_hash=?", key);
+            // Preserve legacy client credentials for one verified login, then
+            // require a six-digit replacement before any business access.
+            if (!"OWNER".equals(resolvedRole) && !input.credential().matches("[0-9]{6}"))
+                jdbc.update("UPDATE sos.identities SET must_change_credential=true WHERE id=?", identity.get("id"));
             return issue((UUID)identity.get("id"), resolvedRole, firm);
         });
         if (result instanceof ApiProblem error) throw error; // Failure counters commit before throwing.
@@ -117,8 +134,13 @@ public class AuthService {
         return rows.getFirst();
     }
     public LoginResult change(SessionAccount account, String current, String replacement) {
-        gate.requireReady(); Values.credential(replacement);
-        if (current == null || current.length() > 72) throw ApiProblem.invalid("The current credential is required.");
+        gate.requireReady();
+        if ("OWNER".equals(account.role())) Values.credential(replacement);
+        else {
+            if (exists("SELECT count(*) FROM sos.owner_memberships WHERE identity_id=?", account.identityId())) throw ApiProblem.denied();
+            Values.pin(replacement);
+        }
+        if (current == null || current.isEmpty() || current.getBytes(StandardCharsets.UTF_8).length > 72) throw ApiProblem.invalid("The current credential is required.");
         return tx.execute(status -> {
             String hash = jdbc.queryForObject("SELECT credential_hash FROM sos.identities WHERE id=? FOR UPDATE", String.class, account.identityId());
             if (!encoder.matches(current, hash)) throw new ApiProblem(401,"INVALID_CREDENTIALS","The current credential is incorrect.");
