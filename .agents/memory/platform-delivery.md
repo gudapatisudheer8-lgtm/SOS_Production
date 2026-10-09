@@ -16,3 +16,9 @@ Accountant and partner login should accept the ten-digit Indian mobile number an
 **Why:** The user revised the owner requirement to web-only and explicitly requested a separate owner link and company-code-first, role-free client entry.
 
 **How to apply:** Keep owner management out of client entry and native access. Make accountant web responsive and partner web mobile-first. Preserve distinct sector-specific interfaces for both roles. Native releases remain a later milestone requiring device testing, not an automatic consequence of finishing a browser implementation.
+
+Accountant and partner dashboards must be ported from the user's Google AI Studio GitHub application, not replaced with a newly designed generic workspace or project form. The repository is the requirements source; the user should not have to explain every existing feature again.
+
+**Why:** The user tried the deployed accountant dashboard and explicitly corrected that the extensive dashboard work already done in Google AI Studio was missing.
+
+**How to apply:** Inspect and migrate the source dashboards and their complete dependencies, preserving recognizable layouts and workflows while adapting to React Native, Spring Boot and PostgreSQL. Maintain a parity inventory; do not equate finished onboarding with finished client dashboards.
