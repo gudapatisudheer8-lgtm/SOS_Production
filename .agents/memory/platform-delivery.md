@@ -22,3 +22,11 @@ Accountant and partner dashboards must be ported from the user's Google AI Studi
 **Why:** The user tried the deployed accountant dashboard and explicitly corrected that the extensive dashboard work already done in Google AI Studio was missing.
 
 **How to apply:** Inspect and migrate the source dashboards and their complete dependencies, preserving recognizable layouts and workflows while adapting to React Native, Spring Boot and PostgreSQL. Maintain a parity inventory; do not equate finished onboarding with finished client dashboards.
+
+The accountant workspace needs an Add Project button beside a dropdown of projects under its firm.
+All operational information entered belongs to an individual project; firms link projects, not shared business data.
+The Add Project form is the comprehensive initial setup, including sector details, plans, documents, partners/equity and project accounts.
+
+**Why:** The user explicitly clarified this ownership rule and provided the original multi-section project setup screenshots.
+
+**How to apply:** Treat partner participation, banking, inventory and finance as project-specific. Reusable login identities and tenant-security/configuration relations do not imply shared capital or balances. Never replace comprehensive setup with a minimal name/location form.

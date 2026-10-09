@@ -84,3 +84,17 @@ mtime_ms = 1791551893023
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/80a07af4-dc1a-47e2-a6d1-0613bf7b410e/12249550-6105-4f9e-abdd-dc5da7702eb4"
 storage_version_token = "1791551895358409"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "3SlGFiFmja_a0p1K3G_kb"
+uri = "file://docs/sos-project-first-accountant-plan.md"
+type = "text"
+title = "SOS project-first accountant workspace plan"
+description = "Reviewed all 18 screenshots and the original Add Project source. Covers the complete setup form, project-scoped tabs, PostgreSQL extensions, API workflow and acceptance checks. Planning only; no deployment or database changes."
+logical_id = "b41e9227-190a-4b7b-b3ed-1606c539649a"
+content_hash = "sha256:db8f18169f36387b43c99fa4dccc812d6fefe17bb2f7e5759057f8dab42e71e4"
+size = 15558
+mtime_ms = 1791558899653
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/b41e9227-190a-4b7b-b3ed-1606c539649a/648196c4-1f0b-476c-84c0-5ed9502576fb"
+storage_version_token = "1791558936096038"
+content_type = "text/markdown"
