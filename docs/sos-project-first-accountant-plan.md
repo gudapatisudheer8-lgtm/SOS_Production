@@ -1,12 +1,13 @@
-# SOS project-first accountant workspace — proposed plan
+# SOS consolidated project workspace and integration plan
 
 ## Status and scope
 This is a design and implementation plan, not an implemented feature or a database migration.
 No AWS data or deployed application is changed by this document.
 
-Reviewed all 18 supplied screenshots and the original repository:
+Reviewed all 23 supplied screenshots and the original repository:
 https://github.com/gudapatisudheer8-lgtm/SOS
-In particular: AddProjectModal, Project/ProjectPartnerShare types, accountant dashboard, and their plan-builder dependencies.
+In particular: AddProjectModal, Project/ProjectPartnerShare types, accountant dashboard, plan-builder
+dependencies, AddFirmAccountModal, CustomerPlotBookingModal and EnrollExpenseModal.
 The screenshots are the visual baseline; the repository supplies the remaining dialogs and workflows.
 Prototype numbers, account details, partners, PINs, plot dimensions and amenities are not production seed data.
 
@@ -21,6 +22,9 @@ Firm → Projects → all operational records.
   remain specific to each project.
 - Firm identifiers on child records are tenant-security checks, not a second ownership model.
 - No firm-level pooled balance or automatic mixing of different projects.
+- Bank-account ownership is genuinely project-specific, not a cosmetic rename of a firm account.
+  Different projects may use different banks/accounts. A source label or component name containing
+  "Firm Account" does not permit its bank balance to be shared across projects.
 - Configuration/reference tables are shared definitions, not business transactions.
 
 ## 2. Accountant workspace
@@ -39,7 +43,8 @@ Top area:
 - Warn before switching away from unsaved work; avoid showing stale previous-project results.
 - No projects: show a useful empty state with Add Project, not an always-visible generic project form.
 - After successful creation, select the new project and show its saved details.
-- Rename Firm Accounts to Project Accounts throughout the accountant dashboard.
+- Bank-account cards, choices and balances come only from the selected project's registered accounts.
+  Labels explain that ownership; changing a label alone does not satisfy this requirement.
 - No firm picker exposing other tenants. Only offer another firm when independently authorized.
 
 Visual baseline: white/off-white cards, dark navy text/active tabs, amber primary actions,
@@ -135,7 +140,119 @@ JavaScript or SQL stored in configuration.
 - Finalization saves the complete bundle and returns project ID, saved counts and provisioned access.
 - Show the saved project immediately; do not report success while subordinate records failed.
 
-## 4. Dashboard and tab parity
+## 4. Detailed internal forms
+
+All forms show project name/code in the header, preserve entries on validation errors, prevent
+double submission, and use database-configured options appropriate to the project's sector/release.
+In an existing project, the header's selection determines the project; it is not freely changed inside
+an unfinished booking/expense/account form. In Add Project setup, child forms attach to that draft.
+
+### A. Add partner / project equity allocation
+- Select an existing authorized partner or add name/mobile for a new login identity.
+- Project role, fixed equity percentage and capital estimated/committed investment value.
+- Show share total out of 100%, per-partner commitment and total project commitments.
+- Split Equity Equally, Sync Capital from Cost, and Sync Cost from Capital are explicit actions
+  with a preview/confirmation before overwriting entered values.
+- Maintain project-specific participation even when the same identity joins another project.
+- Adding a partner updates the partner strip, equity table and authorized partner project list.
+- Removing a draft row is allowed; removing participation with posted history means controlled
+  access deactivation, not deletion of contributions or transactions.
+- Commitment/share updates do not post deposits or recalculate historical distributions silently.
+
+### B. Add project bank/cash account
+- Designated project: selected project or new-project draft; never a tenant-wide unallocated account.
+- Account type and bank/depository institution.
+- Account display name, account number and confirmation, IFSC, branch/city.
+- Opening ledger balance and effective date, optional UPI ID, primary-account flag, signatories and notes.
+- Confirmed number is a validation input, not a duplicate stored account-number field.
+- Bank-specific fields are conditional; petty cash is a real project ledger account without fake bank details.
+- Mask account numbers in cards/statements; expose full details only to authorized roles.
+- On save, use the same account ID in Accounts & Treasury, booking receipts, partner contributions,
+  expense payments and account-specific statements.
+- Opening balance is recorded once as an audited balanced opening transaction; never repeatedly
+  applied when account metadata is edited.
+- RERA/escrow names and restrictions are configured policy. A screenshot's "70% protected" label
+  must not be presented as proof that statutory compliance or bank enforcement has been implemented.
+- MVP uses separate project ledgers. Reusing one physical bank account across projects, if requested
+  later, needs an explicit shared-bank reconciliation model; do not infer or silently pool it.
+
+### C. Plot tap → customer booking
+- Tap a plot card to open the correct project's booking form.
+- Read-only plot context: number, facing, area (square yards/square feet), dimensions, road approach.
+- Buyer name/mobile; optional Aadhaar/PAN where justified for the registration workflow.
+- Rate per square yard, protected floor rate, calculated total price.
+- Token/advance amount; configurable quick amounts and full-payment shortcut.
+- Payment mode, cheque/UTR/reference and receiving account chosen only from this project.
+- Calculated outstanding balance, booking status, agreement/payment stage, terms/notes.
+- Confirm Booking & Generate Token Slip, plus authorized later payments, release/cancellation and
+  refund/correction flows from the source.
+- Persist customer and booking linked to project/inventory; later payments append receipts rather
+  than replacing advanceReceived and posting the whole amount again.
+- Lock/check plot revision and availability during confirmation so two sessions cannot book it twice.
+- Below-floor prices follow a configured approval workflow, not an editable bypass.
+- Receipt verification is separate from reservation: a plot may be reserved while payment is pending,
+  but uncleared receipts do not increase bank balance.
+- Token acknowledgement may show pending verification; a cleared-money receipt is issued only after
+  the required confirmation. Slips use saved IDs/values and support authorized print/download.
+- Customer identifiers are optional/minimized, protected at rest, masked in UI and excluded from
+  public marketing pages, ordinary exports, logs and unnecessary partner views.
+
+### D. Enroll project expense
+- Project Bank Account versus Individual/Partner Funds payment source.
+- For project-bank spending: this project's debit account and current cleared balance.
+- For individual spending: actual payer/partner associated with this project.
+- Expense date, spender, configured cost category and amount.
+- Vendor/contractor, bill/voucher/invoice number, payment mode/reference.
+- Approval workflow choice allowed by policy; narration/work details and optional bill/photo/voice evidence.
+- The actual submitting identity comes from the session. Recording a different spender is an explicit
+  on-behalf-of field, not impersonating that person as the submitting or approving user.
+- Pending submission updates pending-review counters, not cleared account balance.
+- Approved project-bank expense produces exactly one expense and one linked settlement, with balanced
+  postings; it updates account passbook, statement, category totals and dashboard spend.
+- Approved personally paid expense records the expense and a project obligation to the payer.
+  It does not debit a project bank account that did not pay it.
+- Later reimbursement settles that obligation once; it is not a second expense.
+- Treating personal payment as capital instead of reimbursement is an explicit authorized classification,
+  never an automatic increase in equity or invested capital.
+- "Fast Approve" cannot bypass independent approval by changing a dropdown. Only authorized independent
+  reviewers can use the permitted expedited path; record their real identities.
+
+## 5. Automatic integration across tabs and dashboards
+
+One saved record/workflow is the authoritative source. Views refer to it by project and entity IDs;
+do not copy editable totals or ask users to repeat the same transaction in another tab.
+
+| Action | Automatic effects within that project |
+|---|---|
+| Finalize project | Dropdown, context card, sector module, saved plan/documents, initial partners/accounts/inventory |
+| Add partner / edit commitment | Partner strip, equity table, commitment totals; authorized partner project list |
+| Register account | Treasury card, booking/investment receipt choices, expense debit choices, account passbook |
+| Enter verified opening balance | Account/treasury balance and opening entry in statement; no duplicate income |
+| Reserve/book plot | Plot status and availability counters, buyer/booking details, acknowledgement and due schedule |
+| Clear customer payment | Linked booking outstanding amount, chosen account/passbook, inflow statement and dashboards |
+| Clear partner contribution | Project account balance, actual-invested totals, partner ledger and statement |
+| Submit expense | Expense list and authorized pending-approval counters |
+| Approve and settle bank expense | Spend/category totals, debit-account passbook, treasury, statement and dashboard |
+| Approve personally paid expense | Project spend, payer obligation and authorized partner view; bank balance unchanged |
+| Reimburse payer | Payer obligation and bank/passbook/statement; expense total unchanged |
+| Correct/refund approved money | New linked reversal/refund entries and recomputed balances; original history retained |
+| Add/update blueprint or plan | Authorized document views, layout/blueprint tabs and validated plan summaries |
+
+Automatic integration does not mean automatic approval or visibility of private accountant data to everyone.
+Partner screens consume the same authorized project data, not separate independently maintained balances.
+Source calculations must distinguish commitments, approved investment, customer receipts, revenue recognition,
+expenses, reimbursements, drawings and projected profit; bookings are not automatically earned revenue.
+
+Frontend/API synchronization:
+- After successful save, refresh/invalidate all affected project-specific queries, not just the active tab.
+- Return committed entity IDs/status/revisions so UI success reflects persistence, not a local browser mutation.
+- Fetch current data on tab activation, session restore and focus.
+- For other open sessions/dashboards, use revision-based background refresh while online; expose sync/error state.
+  Continuous push updates can be added later if immediate cross-device refresh is required.
+- Cache keys include tenant, project and authorized role/identity. Cancel obsolete requests on project switch.
+- Offline drafts never masquerade as successful bookings, approved payments or settled expenses.
+
+## 6. Dashboard and tab parity
 
 Dashboard:
 - Selected venture identity, code, stage, survey/approval summary and sector metrics.
@@ -169,7 +286,7 @@ Project Statement:
 Nested dialogs and actions must be reviewed from source for every tab. A matching top bar is not
 proof of parity. Maintain a checklist of each action, its fields, API, persistence and role checks.
 
-## 5. PostgreSQL plan — additive, not a replacement
+## 7. PostgreSQL plan — additive, not a replacement
 
 Reuse existing SOS tables:
 
@@ -196,6 +313,15 @@ Proposed additions/extensions, to be finalized against the API contract:
   hardcoded project form.
 - all business child relations require project identity and cross-project reference checks.
   Keep existing firm IDs needed for authorization/composite foreign keys.
+- account, inventory, booking, customer and partner references are checked within the same project.
+  Forms cannot rely on display names or a client-supplied firm/project identifier for authorization.
+- preserve receipt-to-booking, settlement-to-expense and reimbursement-to-payer-obligation links with
+  uniqueness constraints and revision checks. These are what prevent duplicated financial effects.
+- store approval/clearing state separately from booking and agreement stage.
+- partner identity/access membership is distinct from the project equity/commitment profile;
+  neither is a substitute for actual cleared contribution records.
+- sensitive customer and banking fields require selective read permissions and protected storage;
+  confirm the retention/encryption approach before collecting full registration identifiers.
 - money remains exact PostgreSQL numeric/Java decimal; no browser-authoritative totals.
 - preserve existing project IDs, users, balances and records. Legacy project codes require a reviewed
   transition; do not silently fabricate codes or mark old projects unusable.
@@ -203,7 +329,7 @@ Proposed additions/extensions, to be finalized against the API contract:
 Do not introduce parallel project_accounts/plots/expense tables duplicating working ERP storage
 without a demonstrated relational need and migration plan.
 
-## 6. Spring Boot/API workflow
+## 8. Spring Boot/API workflow
 
 Contract-first operations:
 - List firm-authorized projects; fetch assigned setup definition.
@@ -213,6 +339,10 @@ Contract-first operations:
 - Validate and preview the complete bundle and inventory.
 - Finalize once with an idempotency key; return project, records/counts and new-login access.
 - Fetch/update project details and run all tab operations with an explicit authorized project ID.
+- Add/update participation; register account and one-time opening entry.
+- Reserve/book inventory, submit/verify additional receipts, produce saved booking/token documents.
+- Submit/review/settle expenses, record personal-pay obligations and reimbursements.
+- Return shared project summaries/passbooks/partner ledgers from committed records, not client-maintained totals.
 
 Drafts are project-owned and visible as drafts, not operational ventures. Uploading cannot bypass
 the existing attachment API's required project relation.
@@ -229,13 +359,13 @@ partial inventory in independent batches.
 Owner sector-release changes must validate against existing project data. Preserve the project setup
 schema/calculation version and report incompatible changes; do not reinterpret saved values silently.
 
-## 7. Delivery order and acceptance
+## 9. Delivery order and acceptance
 
 1. Complete source-action/field inventory and UI/schema contracts.
 2. Build the project selector and complete Add Project flow, including draft/edit/review.
 3. Implement setup persistence, one-time finalization and safe additive migration.
-4. Connect the dashboard and all tabs consistently to the selected project.
-5. Finish nested dialogs, plotting presentation/marketing workflows and source visual details.
+4. Build and integrate partner, bank-account, booking and expense forms across accountant/partner views.
+5. Finish all tab actions, plotting presentation/marketing workflows and source visual details.
 6. Verify with disposable data, then prepare the EC2 package and activation instructions.
 
 Acceptance:
@@ -246,6 +376,15 @@ Acceptance:
 - Complete creation, draft recovery, cancel, edit and retry behavior are exercised.
 - Invalid code/equity/area/account/file input cannot leave an activated partial project.
 - Budget/commitment changes cannot manufacture cash.
+- Save an account once and verify it appears in that project's booking/expense forms without re-entry.
+- Book a plot from its card; verify reservation, outstanding amount, payment status and saved token slip.
+- Confirm a payment twice/retry a request; verify the account was credited only once.
+- Submit/approve a bank-paid expense; verify pending versus cleared totals and one account debit.
+- Submit a personal-paid expense then reimburse it; verify one expense and one reimbursement, not two expenses.
+- Edit an account label; verify its opening balance is not applied again.
+- Verify actor versus actual spender, independent approval and above/below-floor booking paths.
+- Verify permitted partner totals refresh from the same project records without exposing customer identifiers.
+- Verify other open sessions refresh, and project switching cannot apply a late response to the wrong project.
 - Partner access is project-specific; another firm and own-review attempts are denied.
 - Original source dialogs/actions are checked individually, including their result after reload.
 - Verification of assigned release and visible UI precedes any claim of completed dashboard parity.

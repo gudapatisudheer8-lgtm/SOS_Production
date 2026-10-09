@@ -30,3 +30,10 @@ The Add Project form is the comprehensive initial setup, including sector detail
 **Why:** The user explicitly clarified this ownership rule and provided the original multi-section project setup screenshots.
 
 **How to apply:** Treat partner participation, banking, inventory and finance as project-specific. Reusable login identities and tenant-security/configuration relations do not imply shared capital or balances. Never replace comprehensive setup with a minimal name/location form.
+
+Project bank accounts may differ project by project; this is actual ownership, not merely renaming "Firm Accounts."
+Data must automatically integrate between the relevant tabs and authorized dashboards within its respective project.
+
+**Why:** The user corrected the label-only interpretation and explicitly required integration when supplying the partner, banking, booking and expense screenshots.
+
+**How to apply:** Keep one authoritative project-scoped record and reuse its IDs in downstream workflows/views. Saving a bank account must populate that project's receipt/debit choices without re-entry; automatic synchronization never implies bypassing financial approval or permissions.
