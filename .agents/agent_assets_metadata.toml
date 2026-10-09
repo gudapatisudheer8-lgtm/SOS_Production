@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "KNCGQDw9GIzlcsbvZn4MW"
+uri = "file://releases/sos-portal-update.tar.gz"
+type = "unspecified"
+title = "SOS portal update — EC2 deployment archive"
+description = "Compiled Spring Boot API and Expo web build, with separate /owner portal and company-code-first client login. Approximately 31 MB. No credentials or database migration required."
+logical_id = "af18bc25-6dd0-48f1-8bfb-c3f075d704a8"
+content_hash = "sha256:ad092b31f455b3dabf83e9be68e1a3a17228ed559166711b4defe0b25f7c695d"
+size = 32421247
+mtime_ms = 1791535952857
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/af18bc25-6dd0-48f1-8bfb-c3f075d704a8/d519048d-0cda-497b-a1dd-73b7ecf0c4ea"
+storage_version_token = "1791537408735833"
+content_type = "application/octet-stream"
