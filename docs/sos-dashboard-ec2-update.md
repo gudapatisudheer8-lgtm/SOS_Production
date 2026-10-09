@@ -76,7 +76,7 @@ FROM sos.sectors s JOIN sos.sector_releases r ON r.sector_id=s.id
 ORDER BY s.code,r.version;
 ```
 Existing owner count should be unchanged and migrations 1–5 successful.
-The new releases are labelled **Original dashboard parity**.
+The new releases are labelled **Original dashboard · [sector name]** (for example, **Original dashboard · Open plotting**).
 
 ## 4. Grant the existing runtime role access to the additive tables
 
@@ -118,7 +118,7 @@ Do not paste its contents into chat.
 
 1. Open **https://sos.krishisetu9.in/owner** and sign in.
 2. Find your firm in **Firms**.
-3. For its sector, select the latest published release labelled **Original dashboard parity**, then save the assignment.
+3. Click **Assign sector**, select its existing sector, and select the latest published release labelled **Original dashboard · [sector name]**. Keep **Enabled**, click **Review assignment**, then **Apply**.
 4. Use the existing client link **https://sos.krishisetu9.in/**. Hard-refresh with Ctrl+Shift+R.
 5. Enter the company code, then the accountant's 10-digit mobile and six-digit PIN.
 
