@@ -23,7 +23,7 @@ SyndicateOS is a multi-tenant business syndicate and ERP platform for multi-part
 - The first version built in Google AI Studio is at https://github.com/gudapatisudheer8-lgtm/SOS. Its source has been reviewed: reuse its business workflows and domain models as reference, while retaining the required React Native, Java Spring Boot, and PostgreSQL product stack.
 - The Expo frontend now implements browser-first role login/reset, owner firm/sector onboarding, configuration editing/preview/publication, accountant projects and partner provisioning, and read-only partner interfaces. Demo persistence and financial balances have been removed. It uses generated API clients and reports unavailable setup explicitly.
 - The Java 21 / Spring Boot API implements hashed credentials, persisted opaque sessions, attempt limits, required credential changes, owner bootstrap, tenant-scoped onboarding commands and normalized configuration resolution. Default workspace settings keep database writes and automatic migrations disabled.
-- The relational migrations and the API provisioning/isolation journey have passed tests against a disposable localhost PostgreSQL instance. These tests did not touch AWS. No tables or application accounts have been created by the agent in RDS; live AWS and browser journey verification are still pending.
+- The relational migrations and the API provisioning/isolation journey passed disposable localhost PostgreSQL tests. On 2026-10-09, the user executed guarded setup from EC2 against AWS SOS and verified both migrations, owner bootstrap with mandatory reset, and initial published releases. The user also confirmed runtime-role grants. Permanent service, HTTPS and browser journey verification remain pending; do not repeat initial setup or drop/reset the database.
 - See `docs/sos-ec2-release.md` for build outputs and guarded setup/release instructions. Do not mark the onboarding foundation complete before approved AWS persistence and full browser journeys are verified.
 
 ### Initial workspace tooling
@@ -47,7 +47,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - The user explicitly requires a different accountant interface AND a different partner interface for every sector.
 - All sector/business/interface configuration must live in PostgreSQL tables, not hardcoded sector enums, menus, forms, workflow branches, or dashboard components. The code supplies reusable components and trusted handlers; adding a sector using existing capabilities should require database configuration only.
 - Configuration must be versioned, validated, and explicitly published. Database-defined permissions must be enforced by Spring Boot, not just used to hide UI elements. Tenant isolation and balanced financial posting remain mandatory safety invariants.
-- See `docs/sector-configuration-design.md` for the configuration design and `artifacts/api-server/src/main/resources/db/migration/` for the draft relational migration. Neither indicates a migration has been applied.
+- See `docs/sector-configuration-design.md` for the configuration design and `artifacts/api-server/src/main/resources/db/migration/` for the versioned relational migrations. Initial AWS application was confirmed by the user; future changes require review and the appropriate migration approval.
 
 ## Confirmed onboarding and access flow
 

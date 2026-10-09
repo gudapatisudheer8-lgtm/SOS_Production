@@ -45,7 +45,7 @@ If the test fails, review the RDS-associated security group, EC2 security group,
 6. Take the appropriate backup before applying changes. Enabling schema creation in Flyway must never be mistaken for approval to create another database.
 7. Apply reviewed migrations in the SOS schema only, then verify constraints and cross-firm isolation.
 
-The migrations and initial configurations have been tested against a disposable local PostgreSQL instance, not RDS. They have not been applied to the approved AWS target. Local test success is not a production migration approval.
+The migrations and initial configurations passed disposable local PostgreSQL tests. On 2026-10-09, the user ran guarded setup from EC2 against the approved AWS SOS target and verified migration history, owner provisioning, mandatory reset and the initial published releases. Runtime-role grants were also confirmed. The workspace itself remains read-only and network-blocked; service/HTTPS/browser verification is still pending. This does not authorize a reset or future production migrations.
 
 ## EC2 release checklist — deployment deferred
 
