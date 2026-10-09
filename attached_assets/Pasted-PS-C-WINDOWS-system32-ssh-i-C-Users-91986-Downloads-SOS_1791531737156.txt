@@ -1,0 +1,158 @@
+PS C:\WINDOWS\system32> ssh -i "C:\Users\91986\Downloads\SOS.pem" ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1006-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Oct  9 07:38:57 UTC 2026
+
+  System load:  0.0               Temperature:           -273.1 C
+  Usage of /:   40.4% of 6.61GB   Processes:             127
+  Memory usage: 47%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+
+Expanded Security Maintenance for Applications is not enabled.
+
+189 updates can be applied immediately.
+148 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Fri Oct  9 07:18:25 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$ if getent passwd sos-api >/dev/null; then
+  echo "STOP: sos-api already exists. Tell me before continuing."
+else
+  sudo useradd \
+    --system \
+    --user-group \
+    --no-create-home \
+    --shell /usr/sbin/nologin \
+    sos-api
+fi
+ubuntu@ip-172-31-13-52:~$ sudo -u sos-api test -r /opt/syndicateos/sos-api.jar &&
+sudo -u sos-api test -r /opt/syndicateos/certs/aws-rds-global-bundle.pem &&
+echo "Application files are readable"
+Application files are readable
+ubuntu@ip-172-31-13-52:~$
+ubuntu@ip-172-31-13-52:~$ sudo python3 - <<'PY'
+import getpass
+import os
+import sys
+
+path = "/etc/syndicateos/sos.env"
+
+if os.path.lexists(path):
+    sys.exit("STOP: runtime configuration already exists. Do not overwrite it.")
+
+password = getpass.getpass("sos_app database password: ")
+confirmation = getpass.getpass("Confirm sos_app database password: ")
+
+if not password:
+    sys.exit("Password cannot be empty. Nothing was saved.")
+
+if password != confirmation:
+    sys.exit("Passwords did not match. Nothing was saved.")
+
+if any(c in password for c in ("\n", "\r", "\x00")):
+    sys.exit("Invalid password characters. Nothing was saved.")
+
+settings = {
+    "SOS_DB_HOST": "krishisetu-db.cpmomccww28x.ap-south-1.rds.amazonaws.com",
+    "SOS_DB_PORT": "5432",
+    "SOS_DB_NAME": "SOS",
+    "SOS_DB_USERNAME": "sos_app",
+    "SOS_DB_PASSWORD": password,
+    "SOS_RDS_CA_FILE": "/opt/syndicateos/certs/aws-rds-global-bundle.pem",
+    "SOS_DB_READ_ONLY": "false",
+    "SOS_ENABLE_WRITES": "true",
+    "SOS_ALLOWED_ORIGINS": "https://sos.krishisetu9.in",
+}
+
+def quote(value):
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+os.makedirs("/etc/syndicateos", mode=0o700, exist_ok=True)
+os.chmod("/etc/syndicateos", 0o700)
+
+fd = os.open(
+    path,
+    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+    0o600
+)
+
+with os.fdopen(fd, "w", encoding="utf-8") as file:
+    for key, value in settings.items():
+        file.write(key + "=" + quote(value) + "\n")
+
+print("Protected runtime configuration saved.")
+PY
+sos_app database password:
+Confirm sos_app database password:
+Protected runtime configuration saved.
+ubuntu@ip-172-31-13-52:~$ sudo stat -c '%a %U:%G %n' /etc/syndicateos/sos.env
+600 root:root /etc/syndicateos/sos.env
+ubuntu@ip-172-31-13-52:~$ sudo sh -c 'set -C; cat > /etc/systemd/system/syndicateos-api.service' <<'UNIT'
+[Unit]
+Description=SyndicateOS Spring Boot API
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=sos-api
+Group=sos-api
+WorkingDirectory=/opt/syndicateos
+EnvironmentFile=/etc/syndicateos/sos.env
+ExecStart=/usr/bin/java -Xms64m -Xmx256m -Xss512k -XX:MaxDirectMemorySize=64m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -jar /opt/syndicateos/sos-api.jar --server.address=127.0.0.1 --server.port=8090 --sos.database-name=SOS --sos.setup-approved=false --spring.flyway.enabled=false --server.tomcat.threads.max=32 --server.tomcat.threads.min-spare=2
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+ubuntu@ip-172-31-13-52:~$ sudo systemctl daemon-reload
+sudo systemctl enable --now syndicateos-api
+sleep 10
+sudo systemctl status syndicateos-api --no-pager -l
+Created symlink '/etc/systemd/system/multi-user.target.wants/syndicateos-api.service' → '/etc/systemd/system/syndicateos-api.service'.
+● syndicateos-api.service - SyndicateOS Spring Boot API
+     Loaded: loaded (/etc/systemd/system/syndicateos-api.service; enabled; preset: enabled)
+     Active: activating (auto-restart) (Result: exit-code) since Fri 2026-10-09 07:41:22 UTC; 3s ago
+ Invocation: 1524a0d77de6416f8586c1b3eff5b0f2
+    Process: 4290 ExecStart=/usr/bin/java -Xms64m -Xmx256m -Xss512k -XX:MaxDirectMemorySize=64m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -jar /opt/syndicateos/sos-api.jar --server.address=127.0.0.1 --server.port=8090 --sos.database-name=SOS --sos.setup-approved=false --spring.flyway.enabled=false --server.tomcat.threads.max=32 --server.tomcat.threads.min-spare=2 (code=exited, status=1/FAILURE)
+   Main PID: 4290 (code=exited, status=1/FAILURE)
+   Mem peak: 159.5M
+        CPU: 11.725s
+
+Oct 09 07:41:22 ip-172-31-13-52 systemd[1]: syndicateos-api.service: Failed with result 'exit-code'.
+Oct 09 07:41:22 ip-172-31-13-52 systemd[1]: syndicateos-api.service: Consumed 11.725s CPU time over 6.395s wall clock time, 159.5M memory peak.
+ubuntu@ip-172-31-13-52:~$ curl -i --max-time 15 http://127.0.0.1:8090/api/readyz
+HTTP/1.1 503
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: 0
+X-Frame-Options: DENY
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Fri, 09 Oct 2026 07:41:52 GMT
+Connection: close
+
+{"status":"not_ready","databaseReachable":true,"targetVerified":true,"reason":"ONBOARDING_SETUP_PENDING"}ubuntu@ip-172-31-13-52:~$
