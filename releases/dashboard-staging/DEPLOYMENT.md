@@ -1,4 +1,4 @@
-# SOS original-dashboard update — EC2
+# SOS project-first workspace update — EC2
 
 This update ports the accountant and partner modules from your SOS GitHub application.
 It **does not reset the SOS database, owner, firm, users, PINs or existing projects**.
@@ -11,12 +11,12 @@ In AWS RDS, take a snapshot of the shared Krishisetu instance. Alternatively use
 Do not continue until the backup is successful. Never run these migrations against the other application's database.
 Use a short maintenance window; the API is stopped while updating.
 
-Download `sos-original-dashboards.tar.gz` and its checksum into your Windows Downloads folder.
+Download `sos-project-workspace-v7-documents.tar.gz` and its checksum into your Windows Downloads folder. This corrects document categories in project setup and replaces both earlier project-workspace packages. Do not install the earlier archives.
 
 **Windows PowerShell**
 ```powershell
-Get-FileHash "$env:USERPROFILE\Downloads\sos-original-dashboards.tar.gz" -Algorithm SHA256
-scp -i "$env:USERPROFILE\Downloads\SOS.pem" "$env:USERPROFILE\Downloads\sos-original-dashboards.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
+Get-FileHash "$env:USERPROFILE\Downloads\sos-project-workspace-v7-documents.tar.gz" -Algorithm SHA256
+scp -i "$env:USERPROFILE\Downloads\SOS.pem" "$env:USERPROFILE\Downloads\sos-project-workspace-v7-documents.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
 ssh -i "$env:USERPROFILE\Downloads\SOS.pem" ubuntu@3.111.185.116
 ```
 Compare the hash against the downloaded `.sha256` file.
@@ -26,10 +26,10 @@ Compare the hash against the downloaded `.sha256` file.
 **EC2 terminal**
 ```bash
 cd /home/ubuntu
-sha256sum sos-original-dashboards.tar.gz
-mkdir -p sos-original-dashboards
-tar -xzf sos-original-dashboards.tar.gz -C sos-original-dashboards
-cd sos-original-dashboards
+sha256sum sos-project-workspace-v7-documents.tar.gz
+UPDATE_DIR="$(mktemp -d /home/ubuntu/sos-project-workspace-XXXXXX)"
+tar -xzf sos-project-workspace-v7-documents.tar.gz -C "$UPDATE_DIR"
+cd "$UPDATE_DIR"
 sha256sum -c FILES.sha256
 sudo systemctl stop syndicateos-api
 sudo ss -ltnp 'sport = :8090'
@@ -62,9 +62,11 @@ Enter the **sos_migrator** password at its hidden prompt—not the sos_app passw
 The script verifies the exact database name **SOS**, requires an existing migration history and owner,
 uses TLS, runs additive migrations, validates configuration, then exits automatically.
 It never enables normal business writes or creates demo data.
-Expected Flyway version after this package: **5**.
+Expected Flyway version after this package: **7**.
 
 If it reports an error, **stop here**. Do not manually insert Flyway history, run `clean`, delete tables or change old migrations.
+
+Migration 7 reconciles pending booking reservations without changing money or booking records. If it reports conflicting historical pending bookings for the same inventory, stop and reconcile those bookings through the application; do not delete migration history or silently choose a winner.
 
 **pgAdmin → Query Tool connected to SOS**
 ```sql
@@ -75,8 +77,8 @@ SELECT s.code,r.version,r.label,r.state
 FROM sos.sectors s JOIN sos.sector_releases r ON r.sector_id=s.id
 ORDER BY s.code,r.version;
 ```
-Existing owner count should be unchanged and migrations 1–5 successful.
-The new releases are labelled **Original dashboard parity**.
+Existing owner count should be unchanged and migrations 1–7 successful.
+The new releases are labelled **Project workspace · [sector name]**. Do not select the older **Original dashboard parity** release.
 
 ## 4. Grant the existing runtime role access to the additive tables
 
@@ -114,12 +116,16 @@ Leave setup approval, upgrade-only, setup-exit and preview-fixture **disabled in
 The existing environment file should continue using sos_app, writable connections, enabled business writes and the AWS CA certificate.
 Do not paste its contents into chat.
 
-## 6. Assign the original dashboard release
+## 6. Activate the project-first workspace release
 
 1. Open **https://sos.krishisetu9.in/owner** and sign in.
 2. Find your firm in **Firms**.
-3. For its sector, select the latest published release labelled **Original dashboard parity**, then save the assignment.
+3. For its sector, select the latest published release labelled **Project workspace · [sector name]**, then save the assignment. Repeat only for sectors you want enabled. Existing assignments are deliberately not changed by migration.
 4. Use the existing client link **https://sos.krishisetu9.in/**. Hard-refresh with Ctrl+Shift+R.
+5. Sign out and sign in again. The accountant header should show a project dropdown and **Add Project** beside it. Selecting a project from another enabled sector switches the interface automatically.
+6. Complete project setup or save a draft. Drafts are private to accountants and cannot accept operational or financial entries. Creation saves the project, partner memberships, accounts, uploaded-document links and generated inventory in one transaction.
+
+Full customer registration identifiers remain disabled: this package does not collect or store unencrypted Aadhaar/PAN values. Native device uploads and safe SVG handling remain separate work; PDF/PNG/JPEG/WebP uploads are supported on web.
 5. Enter the company code, then the accountant's 10-digit mobile and six-digit PIN.
 
 You should now see the original-style dashboard tabs—not the old generic Workspace.

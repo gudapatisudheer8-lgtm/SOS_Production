@@ -18,6 +18,8 @@ export interface ErpRecord {
   votes: string[];
 }
 
+export type ErpFieldVisibleWhen = { [key: string]: unknown };
+
 export type ErpFieldKind = typeof ErpFieldKind[keyof typeof ErpFieldKind];
 
 
@@ -34,6 +36,11 @@ export const ErpFieldKind = {
 } as const;
 
 export interface ErpField {
+  default?: unknown;
+  unit?: string;
+  integer?: boolean;
+  maxLength?: number;
+  visibleWhen?: ErpFieldVisibleWhen;
   key: string;
   label: string;
   kind: ErpFieldKind;
@@ -51,6 +58,8 @@ export interface ErpResource {
   canManage: boolean;
   canReview: boolean;
 }
+
+export type ProjectErpProjectSetup = { [key: string]: unknown };
 
 export type ProjectErpBalancesItem = {
   accountId: string;
@@ -77,6 +86,7 @@ export type ProjectErpAuditItem = {
 export type ProjectErpSettings = {[key: string]: unknown};
 
 export interface ProjectErp {
+  projectSetup?: ProjectErpProjectSetup;
   projectId: string;
   records: ErpRecord[];
   resources: ErpResource[];
@@ -248,6 +258,16 @@ export const ProjectStatus = {
 
 export type ProjectDetails = { [key: string]: unknown };
 
+export type ProjectSetupState = typeof ProjectSetupState[keyof typeof ProjectSetupState];
+
+
+export const ProjectSetupState = {
+  DRAFT: 'DRAFT',
+  READY: 'READY',
+} as const;
+
+export type ProjectSetupData = { [key: string]: unknown };
+
 export type ProjectPartnersItem = {
   identityId: string;
   displayName: string;
@@ -264,6 +284,8 @@ export interface Project {
   status: ProjectStatus;
   revision: number;
   details: ProjectDetails;
+  setupState?: ProjectSetupState;
+  setupData?: ProjectSetupData;
   partners: ProjectPartnersItem[];
 }
 
@@ -328,6 +350,8 @@ export interface ConfigComponent {
   actions: ConfigComponentActionsItem[];
 }
 
+export type SectorConfigurationProjectSetup = { [key: string]: unknown };
+
 export type SectorConfigurationResourcesItem = { [key: string]: unknown };
 
 export type SectorConfigurationState = typeof SectorConfigurationState[keyof typeof SectorConfigurationState];
@@ -381,6 +405,7 @@ export type SectorConfigurationGrantsItem = {
 };
 
 export interface SectorConfiguration {
+  projectSetup?: SectorConfigurationProjectSetup;
   resources?: SectorConfigurationResourcesItem[];
   releaseId: string;
   sectorId: string;

@@ -10,9 +10,11 @@ import type { ErpResource } from './erpResource';
 import type { ProjectErpAuditItem } from './projectErpAuditItem';
 import type { ProjectErpBalancesItem } from './projectErpBalancesItem';
 import type { ProjectErpPartnersItem } from './projectErpPartnersItem';
+import type { ProjectErpProjectSetup } from './projectErpProjectSetup';
 import type { ProjectErpSettings } from './projectErpSettings';
 
 export interface ProjectErp {
+  projectSetup?: ProjectErpProjectSetup;
   projectId: string;
   records: ErpRecord[];
   resources: ErpResource[];

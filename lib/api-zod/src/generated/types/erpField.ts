@@ -6,8 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ErpFieldKind } from './erpFieldKind';
+import type { ErpFieldVisibleWhen } from './erpFieldVisibleWhen';
 
 export interface ErpField {
+  default?: unknown;
+  unit?: string;
+  integer?: boolean;
+  maxLength?: number;
+  visibleWhen?: ErpFieldVisibleWhen;
   key: string;
   label: string;
   kind: ErpFieldKind;

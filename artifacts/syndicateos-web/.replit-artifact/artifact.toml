@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/syndicateos-web/"
+title = "SyndicateOS — Original Web"
+description = "The source-faithful SyndicateOS web application for preview and approval before EC2 deployment, reusing the original Google AI Studio interfaces."
+version = "1.0.0"
+id = "artifacts/syndicateos-web"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/syndicateos-web/" ]
+localPort = 23940
+
+[services.development]
+run = "pnpm --filter @workspace/syndicateos-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/syndicateos-web", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/syndicateos-web/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23940"
+BASE_PATH = "/syndicateos-web/"

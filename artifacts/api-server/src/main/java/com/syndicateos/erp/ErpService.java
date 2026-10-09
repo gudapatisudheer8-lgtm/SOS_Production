@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.syndicateos.auth.SessionAccount;
 import com.syndicateos.core.*;
+import com.syndicateos.workspace.CapitalAllocation;
 import java.math.*;
 import java.sql.Array;
 import java.time.LocalDate;
@@ -47,8 +48,16 @@ public class ErpService {
                     "canReview",writable&&role(r,"review_roles",actor.role())));
             List<Map<String,Object>> records=new ArrayList<>();
             for(var r:jdbc.queryForList("SELECT * FROM sos.erp_records WHERE project_id=? AND status<>'deleted' ORDER BY created_at DESC",project)) {
+                ObjectNode recordData=(ObjectNode)parse(r.get("data"));
+                if("PARTNER".equals(actor.role())&&"accounts".equals(r.get("kind"))&&recordData.hasNonNull("accountNumber")) {
+                    String number=recordData.path("accountNumber").asText();
+                    recordData.put("accountNumber","••••"+number.substring(Math.max(0,number.length()-4)));
+                }
+                if(Set.of("plots","units").contains(r.get("kind"))&&jdbc.queryForObject(
+                    "SELECT count(*) FROM sos.erp_inventory_reservations WHERE inventory_id=? AND state='active'",Integer.class,r.get("id"))>0)
+                    recordData.put("status","plots".equals(r.get("kind"))?"reserved":"booked");
                 records.add(Map.of("id",r.get("id"),"kind",r.get("kind"),"status",r.get("status"),"revision",r.get("revision"),
-                    "createdBy",r.get("created_by"),"createdAt",r.get("created_at").toString(),"data",parse(r.get("data")),
+                    "createdBy",r.get("created_by"),"createdAt",r.get("created_at").toString(),"data",recordData,
                     "votes",jdbc.queryForList("SELECT actor_id::text FROM sos.erp_approvals WHERE record_id=? AND decision='approved'",String.class,r.get("id"))));
             }
             var balances=jdbc.queryForList("""
@@ -64,8 +73,12 @@ public class ErpService {
                 WHERE a.project_id=? ORDER BY a.created_at DESC LIMIT 500
                 """,project);
             return Map.of("projectId",project,"resources",resources,"records",records,"balances",balances,
-                "partners",partners,"audit",audit,"settings",settings);
+                "partners",partners,"audit",audit,"settings",settings,"projectSetup",projectPolicy(release));
         });
+    }
+    private JsonNode projectPolicy(UUID release) {
+        var rows=jdbc.queryForList("SELECT definition FROM sos.project_setup_definitions WHERE release_id=?",release);
+        return rows.isEmpty()?json.createObjectNode():parse(rows.getFirst().get("definition"));
     }
     private Map<String,Object> settings(UUID project) {
         var rows=jdbc.queryForList("SELECT revision,data FROM sos.erp_project_settings WHERE project_id=?",project);
@@ -108,7 +121,7 @@ public class ErpService {
             var scope=access.project(actor,project,permission,true);
             UUID release=(UUID)scope.get("release_id");
             if("erp.settings".equals(action)) return updateSettings(actor,project,input);
-            if("erp.inventory-stage".equals(action)) return inventoryStage(actor,project,input);
+            if("erp.inventory-stage".equals(action)) return inventoryStage(actor,project,release,input);
             if("erp.save".equals(action)) return save(actor,project,release,input);
             if("erp.bulk-save".equals(action)) {
                 String kind=Values.text(input,"kind",40);
@@ -134,6 +147,8 @@ public class ErpService {
                 if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE (account_id=? OR inventory_id=?) AND status<>'deleted'",Integer.class,record.get("id"),record.get("id"))>0)
                     throw ApiProblem.invalid("This record is referenced. Keep its history instead of deleting it.");
                 jdbc.update("UPDATE sos.erp_records SET status='deleted',revision=revision+1 WHERE id=?",record.get("id"));
+                if("bookings".equals(record.get("kind")))
+                    jdbc.update("UPDATE sos.erp_inventory_reservations SET state='released' WHERE booking_id=? AND state='active'",record.get("id"));
                 audit(actor,project,(UUID)record.get("id"),"RECORD_REMOVED");
                 return ok(record.get("id"));
             }
@@ -185,6 +200,14 @@ public class ErpService {
                 throw ApiProblem.invalid("This partner already has an equity profile. Edit that profile.");
             BigDecimal other=jdbc.queryForObject("SELECT coalesce(sum((data->>'fixedEquityPercent')::numeric),0) FROM sos.erp_records WHERE project_id=? AND kind='partner-profiles' AND status='approved' AND id<>?",BigDecimal.class,project,id);
             if(other.add(decimal(data.path("fixedEquityPercent"),false)).compareTo(new BigDecimal("100"))>0) throw ApiProblem.invalid("Total fixed equity cannot exceed 100%.");
+            JsonNode policy=projectPolicy(release);
+            JsonNode values=parse(jdbc.queryForObject("SELECT details FROM sos.projects WHERE id=? FOR UPDATE",Object.class,project));
+            CapitalAllocation.validate(policy,values,List.of(data),false);
+            List<JsonNode> allocations=new ArrayList<>(jdbc.queryForList(
+                "SELECT data FROM sos.erp_records WHERE project_id=? AND kind='partner-profiles' AND status='approved' AND id<>?",project,id)
+                .stream().map(p->parse(p.get("data"))).toList());
+            allocations.add(data);
+            CapitalAllocation.validate(policy,values,allocations,false,false);
         }
         if(account!=null) {
             var a=record(project,account);
@@ -195,6 +218,8 @@ public class ErpService {
             var item=record(project,inventory);
             if(!Set.of("plots","units").contains(item.get("kind"))) throw ApiProblem.invalid("Choose valid project inventory.");
             if(!"available".equals(parse(item.get("data")).path("status").asText())) throw ApiProblem.conflict();
+            if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_inventory_reservations WHERE inventory_id=? AND state='active' AND booking_id<>?",Integer.class,inventory,id)>0)
+                throw new ApiProblem(409,"INVENTORY_RESERVED","This inventory is already reserved by a pending booking.");
         }
         BigDecimal amount=switch(kind) {
             case "stock-draws"->decimal(data.path("retailValuation"),true);
@@ -220,7 +245,56 @@ public class ErpService {
         }
         if("bookings".equals(kind)&&decimal(data.path("advanceReceived"),false).signum()>0 && account==null)
             throw ApiProblem.invalid("Choose the exact receiving project account for this customer advance.");
+        if("expenses".equals(kind)&&"individual".equals(data.path("paymentSource").asText())) {
+            if(account!=null) throw ApiProblem.invalid("An individual-paid expense must not debit a project bank account.");
+            if(partner==null) throw ApiProblem.invalid("Choose the actual partner who funded this expense.");
+        }
+        if("bookings".equals(kind)&&data.hasNonNull("buyerRegistrationId")&&!data.path("buyerRegistrationId").asText().isBlank())
+            throw new ApiProblem(503,"PROTECTED_STORAGE_REQUIRED","Full registration identifiers cannot be collected until encrypted storage is configured.");
+        if("reimbursements".equals(kind)) {
+            var expense=record(project,Values.id(data,"expenseId"));
+            if(!"expenses".equals(expense.get("kind"))||!"approved".equals(expense.get("status"))
+                ||!"individual".equals(parse(expense.get("data")).path("paymentSource").asText()))
+                throw ApiProblem.invalid("Choose an approved individual-paid expense in this project.");
+            BigDecimal committed=jdbc.queryForObject("SELECT coalesce(sum(amount),0) FROM sos.erp_records WHERE project_id=? AND kind='reimbursements' AND status IN ('pending','approved') AND data->>'expenseId'=? AND id<>?",
+                BigDecimal.class,project,expense.get("id").toString(),id);
+            if(committed.add(amount).compareTo((BigDecimal)expense.get("amount"))>0) throw ApiProblem.invalid("Reimbursement exceeds the unsettled individual expense.");
+            if(account==null) throw ApiProblem.invalid("Choose the paying project account.");
+            partner=(UUID)expense.get("partner_id");
+            if("PARTNER".equals(actor.role())&&!actor.identityId().equals(partner)) throw ApiProblem.denied();
+        }
+        if("accounts".equals(kind)) {
+            if(previous!=null&&parse(previous.get("data")).hasNonNull("openingBalanceDate")
+                &&!parse(previous.get("data")).path("openingBalanceDate").equals(data.path("openingBalanceDate")))
+                throw ApiProblem.invalid("The opening-balance effective date is immutable.");
+            if(data.path("isPrimary").asBoolean()) {
+                for(var a:jdbc.queryForList("SELECT id,data FROM sos.erp_records WHERE project_id=? AND kind='accounts' AND status='approved' AND id<>?",project,id)) {
+                    ObjectNode old=(ObjectNode)parse(a.get("data"));
+                    if(old.path("isPrimary").asBoolean()) {
+                        old.put("isPrimary",false);
+                        jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",old.toString(),a.get("id"));
+                    }
+                }
+            }
+        }
+        if("bookings".equals(kind)&&inventory!=null) {
+            data.put("buyerPhone",Values.mobile(data.path("buyerPhone").asText()));
+            var item=record(project,inventory);
+            JsonNode inventoryData=parse(item.get("data"));
+            if("plots".equals(item.get("kind"))) {
+                BigDecimal proposed=data.hasNonNull("ratePerSqYard")?decimal(data.path("ratePerSqYard"),true):decimal(inventoryData.path("ratePerSqYard"),true);
+                JsonNode details=parse(jdbc.queryForObject("SELECT details::text FROM sos.projects WHERE id=?",String.class,project));
+                if(details.hasNonNull("floorRatePerSqYard")&&proposed.compareTo(details.path("floorRatePerSqYard").decimalValue())<0)
+                    throw ApiProblem.invalid("This rate is below the protected project floor. A price exception must be approved before booking.");
+                data.put("ratePerSqYard",proposed);
+                BigDecimal total=proposed.multiply(decimal(inventoryData.path("areaSqYards"),true));
+                data.put("totalValue",total);
+                if(decimal(data.path("advanceReceived"),false).compareTo(total)>0) throw ApiProblem.invalid("The token exceeds the agreed sale value.");
+            }
+        }
         if(Set.of("plots","units").contains(kind)) {
+            if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_inventory_reservations WHERE inventory_id=? AND state='active'",Integer.class,id)>0)
+                throw ApiProblem.invalid("Inventory with a pending reservation cannot be changed.");
             String numberKey="plots".equals(kind)?"plotNumber":"unitNumber";
             if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=? AND kind=? AND data->>?=? AND status<>'deleted' AND id<>?",
                 Integer.class,project,kind,numberKey,data.path(numberKey).asText(),id)>0) throw ApiProblem.invalid("This inventory number already exists in the project.");
@@ -242,6 +316,10 @@ public class ErpService {
             BigDecimal opening=decimal(data.path("openingBalance"),false);
             if(opening.signum()>0) { post(id,project,id,"bank",opening,true); post(id,project,null,"opening-capital",opening,false); }
         }
+        if("bookings".equals(kind)) {
+            jdbc.update("INSERT INTO sos.erp_inventory_reservations(project_id,inventory_id,booking_id,state) VALUES (?,?,?,'active') ON CONFLICT(booking_id) DO UPDATE SET inventory_id=excluded.inventory_id,state='active'",
+                project,inventory,id);
+        }
         audit(actor,project,id,previous==null?"RECORD_CREATED":"RECORD_UPDATED");
         return ok(id);
     }
@@ -251,6 +329,14 @@ public class ErpService {
         Set<String> allowed=new HashSet<>();
         for(JsonNode field:parse(definition.get("fields"))) {
             String key=field.path("key").asText(); allowed.add(key);
+            JsonNode condition=field.path("visibleWhen");
+            if(condition.isObject()) {
+                boolean visible=false;
+                for(JsonNode choice:condition.path("values"))
+                    if(choice.asText().equals(input.path(condition.path("field").asText()).asText())) visible=true;
+                if(!visible) {data.remove(key);continue;}
+            }
+            if(!data.has(key)&&field.has("default")) data.set(key,field.path("default"));
             JsonNode v=data.path(key);
             boolean absent=v.isMissingNode()||v.isNull()||v.isTextual()&&v.asText().isBlank();
             if(absent) { if(field.path("required").asBoolean()) throw ApiProblem.invalid(field.path("label").asText()+" is required."); continue; }
@@ -265,7 +351,13 @@ public class ErpService {
             else if("select".equals(kind)) {
                 boolean found=false; for(JsonNode option:field.path("options")) if(option.asText().equals(v.asText())) found=true;
                 if(!found) throw ApiProblem.invalid("Choose a configured "+field.path("label").asText()+".");
-            } else if(!v.isTextual() || v.asText().length()>4000) throw ApiProblem.invalid(key+" must be bounded text.");
+            } else {
+                if(!v.isTextual() || v.asText().length()>field.path("maxLength").asInt(4000)) throw ApiProblem.invalid(key+" must be bounded text.");
+                String text=v.asText().trim();
+                if(field.path("uppercase").asBoolean()) text=text.toUpperCase(Locale.ROOT);
+                if(field.has("pattern")&&!text.matches(field.path("pattern").asText())) throw ApiProblem.invalid("Enter a valid "+field.path("label").asText()+".");
+                data.put(key,text);
+            }
         }
         data.fieldNames().forEachRemaining(k->{if(!allowed.contains(k)) throw ApiProblem.invalid("Unconfigured record field: "+k);});
         return data;
@@ -283,7 +375,7 @@ public class ErpService {
     }
     private Map<String,Object> review(SessionAccount actor,UUID project,Map<String,Object> definition,Map<String,Object> row,JsonNode input) {
         if(!role(definition,"review_roles",actor.role()) || !"pending".equals(row.get("status"))) throw ApiProblem.denied();
-        if("PARTNER".equals(actor.role()) && (actor.identityId().equals(row.get("created_by")) || actor.identityId().equals(row.get("partner_id"))))
+        if(Boolean.TRUE.equals(definition.get("financial")) && (actor.identityId().equals(row.get("created_by")) || actor.identityId().equals(row.get("partner_id"))))
             throw ApiProblem.invalid("You cannot approve your own submission.");
         String decision=Values.text(input,"decision",16);
         if(!Set.of("approved","rejected").contains(decision)) throw ApiProblem.invalid("Choose approved or rejected.");
@@ -299,6 +391,8 @@ public class ErpService {
         int approvals=jdbc.queryForObject("SELECT count(*) FROM sos.erp_approvals WHERE record_id=? AND decision='approved'",Integer.class,id);
         String state="rejected".equals(decision)?"rejected":approvals>=needed?"approved":"pending";
         if("approved".equals(state)) applyPosting(project,row);
+        if("bookings".equals(row.get("kind"))&&!"pending".equals(state))
+            jdbc.update("UPDATE sos.erp_inventory_reservations SET state=? WHERE booking_id=?","approved".equals(state)?"cleared":"released",id);
         jdbc.update("UPDATE sos.erp_records SET status=?,revision=revision+1 WHERE id=?",state,id);
         audit(actor,project,id,"REVIEW_"+decision.toUpperCase(Locale.ROOT));
         return Map.of("status","ok","entity",Map.of("id",id,"status",state,"approvals",approvals,"requiredApprovals",needed));
@@ -321,6 +415,13 @@ public class ErpService {
             amount=decimal(data.path("advanceReceived"),false);
         }
         if(amount.signum()==0) return;
+        if("reimbursements".equals(kind)) {
+            BigDecimal balance=jdbc.queryForObject("SELECT coalesce(sum(debit-credit),0) FROM sos.erp_postings WHERE account_id=?",BigDecimal.class,account);
+            if(balance.compareTo(amount)<0) throw ApiProblem.invalid("Insufficient cleared balance to reimburse.");
+            post(id,project,account,"bank",amount,false);
+            post(id,project,null,"partner-payable",amount,true);
+            return;
+        }
         boolean inflow=Set.of("investments","settlements","bookings").contains(kind) || "transactions".equals(kind)&&"credit".equals(data.path("type").asText());
         if(account!=null) {
             var a=record(project,account);
@@ -377,7 +478,7 @@ public class ErpService {
         audit(actor,project,null,"SETTINGS_UPDATED");
         return ok(project);
     }
-    private Map<String,Object> inventoryStage(SessionAccount actor,UUID project,JsonNode input) {
+    private Map<String,Object> inventoryStage(SessionAccount actor,UUID project,UUID release,JsonNode input) {
         if(!"ACCOUNTANT".equals(actor.role())) throw ApiProblem.denied();
         UUID id=Values.id(input,"recordId");
         var record=record(project,id);
@@ -394,8 +495,13 @@ public class ErpService {
         data.put("status",next);
         for(String key:List.of("paymentMilestone","currentMilestone")) if(input.hasNonNull(key)) {
             String value=input.path(key).asText();
-            if(!Set.of("Token Advance","Sale Agreement","Registration Pending","Registered / Cleared",
-                "Plinth Level","1st Slab","Brickwork","Plastering & Electrical","Flooring","Handover").contains(value))
+            Set<String> milestones=new HashSet<>();
+            if(plot) {
+                JsonNode bookingFields=parse(resource(release,"bookings").get("fields"));
+                for(JsonNode field:bookingFields) if("paymentMilestone".equals(field.path("key").asText()))
+                    for(JsonNode option:field.path("options")) milestones.add(option.asText());
+            } else for(JsonNode milestone:projectPolicy(release).path("rules").path("milestones")) milestones.add(milestone.path("name").asText());
+            if(!milestones.contains(value))
                 throw ApiProblem.invalid("Choose a valid milestone.");
             data.put(key,value);
         }

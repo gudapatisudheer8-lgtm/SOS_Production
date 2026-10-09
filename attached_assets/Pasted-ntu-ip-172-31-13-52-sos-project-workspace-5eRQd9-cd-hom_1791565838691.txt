@@ -1,0 +1,51 @@
+ntu@ip-172-31-13-52:~/sos-project-workspace-5eRQd9$ cd /home/ubuntu/sos-project-workspace-5eRQd9
+
+sudo systemctl stop syndicateos-api
+
+sudo ss -ltnp 'sport = :8090'
+sudo ss -ltnp 'sport = :8091'
+State        Recv-Q        Send-Q               Local Address:Port               Peer Address:Port       Process
+State        Recv-Q        Send-Q               Local Address:Port               Peer Address:Port       Process
+ubuntu@ip-172-31-13-52:~/sos-project-workspace-5eRQd9$ BACKUP="/opt/syndicateos/backups/project-workspace-$(date +%Y%m%d-%H%M%S)"
+
+sudo mkdir -p "$BACKUP"
+
+sudo cp -a /opt/syndicateos/sos-api.jar /opt/syndicateos/web "$BACKUP/"
+
+sudo install -d -m 700 -o sos-api -g sos-api /var/lib/syndicateos/uploads
+
+sudo cp -a /var/lib/syndicateos/uploads "$BACKUP/"
+
+echo "Application backup: $BACKUP"
+Application backup: /opt/syndicateos/backups/project-workspace-20261009-170653
+ubuntu@ip-172-31-13-52:~/sos-project-workspace-5eRQd9$ python3 upgrade.py
+sos_migrator password (hidden):
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.16)
+
+2026-10-09T17:07:44.710Z  INFO 9303 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Starting SosApplication v0.1.0 using Java 21.0.12.1 with PID 9303 (/home/ubuntu/sos-project-workspace-5eRQd9/sos-api.jar started by ubuntu in /home/ubuntu/sos-project-workspace-5eRQd9)
+2026-10-09T17:07:44.714Z  INFO 9303 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-10-09T17:07:47.068Z  INFO 9303 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8091 (http)
+2026-10-09T17:07:47.095Z  INFO 9303 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-10-09T17:07:47.095Z  INFO 9303 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-10-09T17:07:47.136Z  INFO 9303 --- [syndicateos-api] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-10-09T17:07:47.138Z  INFO 9303 --- [syndicateos-api] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2306 ms
+2026-10-09T17:07:48.669Z  INFO 9303 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8091 (http) with context path '/'
+2026-10-09T17:07:48.710Z  INFO 9303 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Started SosApplication in 5.055 seconds (process running for 5.969)
+2026-10-09T17:07:50.108Z  INFO 9303 --- [syndicateos-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://krishisetu-db.cpmomccww28x.ap-south-1.rds.amazonaws.com:5432/SOS?sslmode=verify-full&sslrootcert=/opt/syndicateos/certs/aws-rds-global-bundle.pem&connectTimeout=3&socketTimeout=5&ApplicationName=SOS (PostgreSQL 16.12)
+2026-10-09T17:07:50.205Z  INFO 9303 --- [syndicateos-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 8 migrations (execution time 00:00.062s)
+2026-10-09T17:07:50.408Z  INFO 9303 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "sos": 5
+2026-10-09T17:07:50.491Z  INFO 9303 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "sos" to version "6 - complete project setup"
+2026-10-09T17:07:50.651Z  INFO 9303 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "sos" to version "7 - reconcile booking reservations"
+2026-10-09T17:07:50.689Z  INFO 9303 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 2 migrations to schema "sos", now at version v7 (execution time 00:00.144s)
+2026-10-09T17:07:51.395Z  INFO 9303 --- [syndicateos-api] [           main] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-09T17:07:51.399Z  INFO 9303 --- [syndicateos-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+Guarded migration finished and exited. Continue with the runtime installation in DEPLOYMENT.md.
+ubuntu@ip-172-31-13-52:~/sos-project-workspace-5eRQd9$

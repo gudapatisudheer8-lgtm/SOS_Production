@@ -150,7 +150,8 @@ export function AttachmentView({ projectId, id, label: lab }: { projectId: strin
 
 /* ---------- record form (server field definitions) ---------- */
 type Opt = { value: string; label: string };
-export function RecordForm({ erp, res, rec, ctx, onDone }: { erp: ProjectErp; res: ErpResource; rec?: ErpRecord; ctx: ErpCtx; onDone: () => void }) {
+type XField = ErpField & { ui?: string; readOnly?: boolean; optionLabels?: Record<string, string>; decimalPlaces?: number };
+export function RecordForm({ erp, res, rec, ctx, onDone, fixed }: { erp: ProjectErp; res: ErpResource; rec?: ErpRecord; ctx: ErpCtx; onDone: () => void; fixed?: Record<string, string> }) {
   const c = useColors();
   const fields = useMemo<ErpField[]>(() => res.kind === 'expenses' ? [...res.fields, ...(['receiptAttachmentId', 'voiceAttachmentId'] as const).filter((k) => !res.fields.some((x) => x.key === k)).map((k) => ({ key: k, label: k === 'receiptAttachmentId' ? 'Photo voucher / bill' : 'Voice memo', kind: 'text' as const, required: false }))] : res.fields, [res]);
   const cmd = useErpCommands(erp.projectId);
@@ -158,9 +159,10 @@ export function RecordForm({ erp, res, rec, ctx, onDone }: { erp: ProjectErp; re
     const o: Record<string, string> = {};
     fields.forEach((f) => {
       const v = rec?.data[f.key];
-      o[f.key] = v === undefined || v === null ? (f.kind === 'partner' && !rec ? ctx.account.identityId : f.kind === 'date' && !rec && f.required ? new Date().toISOString().slice(0, 10) : '') : String(v);
+      const dv = !rec && f.default !== undefined && f.default !== null ? String(f.default) : '';
+      o[f.key] = v === undefined || v === null ? (f.kind === 'partner' && !rec ? ctx.account.identityId : f.kind === 'date' && !rec && f.required ? new Date().toISOString().slice(0, 10) : dv) : String(v);
     });
-    return o;
+    return { ...o, ...(fixed ?? {}) };
   });
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -171,21 +173,48 @@ export function RecordForm({ erp, res, rec, ctx, onDone }: { erp: ProjectErp; re
     if (f.kind === 'account') return live_.filter((r) => r.kind === 'accounts').map((r) => ({ value: r.id, label: label(r) }));
     if (f.kind === 'partner') return erp.partners.map((p) => ({ value: p.id, label: p.name }));
     if (f.kind === 'inventory') return live_.filter((r) => r.kind === 'plots' || r.kind === 'units').map((r) => ({ value: r.id, label: `${label(r)} (${r.kind === 'plots' ? 'plot' : 'unit'})` }));
-    if (f.kind === 'select') return (f.options ?? []).map((o) => ({ value: o, label: o }));
+    if (f.kind === 'select') return (f.options ?? []).map((o) => ({ value: o, label: (f as XField).optionLabels?.[o] ?? o }));
     if (f.kind === 'boolean') return [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }];
     return [];
   };
+  const [confirmNo, setConfirmNo] = useState('');
+  const hidden = (f: ErpField) => { const w = (f as ErpField & { visibleWhen?: { field: string; values: string[] } }).visibleWhen; return !!w && !w.values.includes((vals[w.field] ?? '').trim()); };
+  const KNOWN = ['text', 'number', 'date', 'select', 'boolean', 'multiline', 'account', 'partner', 'inventory'];
+  const badField = fields.find((f) => !KNOWN.includes(f.kind) && !/attachmentid$/i.test(f.key)) ?? fields.find((f) => f.kind === 'select' && !(f.options && f.options.length));
+  const psRules = ((erp.projectSetup as { rules?: Record<string, unknown> } | undefined)?.rules ?? {}) as Record<string, unknown>;
+  const needsConfirm = res.kind === 'accounts' && fields.some((f) => f.key === 'accountNumber') && psRules.accountNumberConfirmation !== false;
+  const alloc = res.kind === 'partner-profiles' ? (psRules.capitalAllocation as { budgetField?: string; capitalField?: string; equityField?: string; totalPercent?: number; currencyScale?: number } | undefined) : undefined;
+  const eqKey = alloc?.equityField ?? 'fixedEquityPercent';
+  const capKey = alloc?.capitalField ?? 'initialCapital';
+  const budget = alloc?.budgetField ? Number((ctx.project?.details as Record<string, unknown> | undefined)?.[alloc.budgetField]) : NaN;
+  const pctNow = Number(vals[eqKey]);
+  const factor = typeof alloc?.currencyScale === 'number' ? 10 ** alloc.currencyScale : NaN;
+  const capNow = alloc && Number.isFinite(budget) && Number.isFinite(pctNow) && Number.isFinite(factor) && alloc.totalPercent
+    ? Math.round(budget * pctNow / alloc.totalPercent * factor) / factor : null;
+  const othersPct = alloc ? erp.records.filter((r) => r.kind === 'partner-profiles' && live(r) && r.status === 'approved' && r.id !== rec?.id).reduce((n, r) => n + (Number(r.data[eqKey]) || 0), 0) : 0;
+  const totalPct = alloc?.totalPercent ?? 100;
   const submit = async () => {
     const e: Record<string, string> = {};
     const data: Record<string, unknown> = {};
+    if (needsConfirm && (vals.accountNumber ?? '').trim() !== confirmNo.trim()) e.confirmAccountNumber = 'Account numbers do not match.';
+    if (alloc) {
+      if (!Number.isFinite(budget) || budget <= 0) e[eqKey] = 'The project budget is not set, so capital cannot be calculated.';
+      else if (Number.isFinite(pctNow) && othersPct + pctNow > totalPct + 0.001) e[eqKey] = `Equity would total ${Math.round((othersPct + pctNow) * 100) / 100}%, above ${totalPct}%. ${Math.max(0, Math.round((totalPct - othersPct) * 100) / 100)}% remains.`;
+      const otherCapital = erp.records.filter((r) => r.kind === 'partner-profiles' && live(r) && r.status === 'approved' && r.id !== rec?.id).reduce((sum, r) => sum + (Number(r.data[capKey]) || 0), 0);
+      if (capNow !== null && otherCapital + capNow > budget) e[eqKey] = 'Combined planned capital exceeds the project cost.';
+    }
     for (const f of fields) {
+      if (hidden(f)) continue;
+      if (alloc && f.key === capKey) { if (capNow !== null) data[f.key] = capNow; continue; }
       const t = (vals[f.key] ?? '').trim();
-      if (!t) { if (f.required) e[f.key] = `${f.label} is required.`; continue; }
+      if (!t) { if (f.required && (f as XField).ui !== 'hidden') e[f.key] = `${f.label} is required.`; continue; }
       if (f.kind === 'number') {
         const n = Number(t);
         if (!Number.isFinite(n)) { e[f.key] = `${f.label} must be a number.`; continue; }
         if (f.min !== undefined && n < f.min) { e[f.key] = `At least ${f.min}.`; continue; }
         if (f.max !== undefined && n > f.max) { e[f.key] = `At most ${f.max}.`; continue; }
+        const places = (f as XField).decimalPlaces;
+        if (places !== undefined && Math.abs(n - Number(n.toFixed(places))) > Number.EPSILON * Math.max(1, Math.abs(n))) { e[f.key] = `Use at most ${places} decimal places.`; continue; }
         data[f.key] = n;
       } else if (f.kind === 'date') {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) { e[f.key] = 'Use YYYY-MM-DD.'; continue; }
@@ -201,10 +230,15 @@ export function RecordForm({ erp, res, rec, ctx, onDone }: { erp: ProjectErp; re
       onDone();
     } catch (x) { setMsg(errMessage(x)); } finally { setBusy(false); }
   };
+  if (badField) return <Banner tone="error" title="Configuration error" text={`Field "${badField.label}" is ${badField.kind === 'select' ? 'a select with no options defined' : `of unsupported kind "${badField.kind}"`}. This form cannot be used until the configuration is fixed.`} />;
   return (
     <View>
       {FINANCIAL.includes(res.kind) && !rec ? <Banner tone="warn" title="Starts as pending" text="Financial records are reviewed before they count. Approved financial records cannot be edited or deleted." /> : null}
-      {fields.map((f) => {
+      {fixed ? <Banner tone="warn" title="Linked record" text={`This entry is tied to ${Object.keys(fixed).map((k) => fields.find((f) => f.key === k)?.label ?? k).join(', ')} and cannot be changed here.`} /> : null}
+      {alloc ? <Banner tone="warn" title={`Equity remaining: ${Math.max(0, Math.round((totalPct - othersPct) * 100) / 100)}% of ${totalPct}%`} text={Number.isFinite(budget) ? `Capital is calculated from the project budget of ${money(budget)}. It cannot exceed the budget.` : 'Project budget is not set.'} /> : null}
+      {fields.filter((f) => !hidden(f) && (f as XField).ui !== 'hidden' && !(fixed && f.key in fixed)).map((f) => {
+        if (alloc && f.key === capKey) return <View key={f.key} style={{ marginBottom: 10 }}><Label>{f.label} (calculated)</Label><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', backgroundColor: c.muted, borderRadius: 10, padding: 10 }}>{capNow !== null ? money(capNow) : '-'}</Text></View>;
+        if ((f as XField).readOnly) return <View key={f.key} style={{ marginBottom: 10 }}><Label>{f.label}</Label><Text style={{ color: c.foreground, backgroundColor: c.muted, borderRadius: 10, padding: 10 }}>{vals[f.key] || '-'}</Text></View>;
         if (/attachmentid$/i.test(f.key)) return <View key={f.key}><AttachmentField projectId={erp.projectId} label={f.label + (f.required ? ' *' : '')} value={vals[f.key] ?? ''} voice={/voice/i.test(f.key)} onChange={(v) => setVals((s) => ({ ...s, [f.key]: v }))} />{errs[f.key] ? <Text style={{ color: c.destructive, fontSize: 12 }}>{errs[f.key]}</Text> : null}</View>;
         const o = optsFor(f);
         const lab = f.label + (f.required ? ' *' : '');
@@ -218,11 +252,15 @@ export function RecordForm({ erp, res, rec, ctx, onDone }: { erp: ProjectErp; re
         }
         return <Field key={f.key} label={lab} value={vals[f.key] ?? ''} onChangeText={(v) => setVals((s) => ({ ...s, [f.key]: v }))} multiline={f.kind === 'multiline'} keyboardType={f.kind === 'number' ? 'numeric' : 'default'} error={errs[f.key]} hint={f.kind === 'date' ? 'YYYY-MM-DD' : undefined} />;
       })}
+      {needsConfirm ? <Field label="Confirm account number *" value={confirmNo} onChangeText={setConfirmNo} error={errs.confirmAccountNumber} hint="Used only to check for typing mistakes; it is not stored." /> : null}
+      {res.kind === 'expenses' && vals.accountId && !hidden({ key: 'accountId', visibleWhen: fields.find((f) => f.key === 'accountId')?.visibleWhen } as ErpField) ? (() => { const b = erp.balances.find((x) => x.accountId === vals.accountId); return <Banner tone="warn" title={`Cleared balance: ${b ? money(Number(b.balance)) : 'not available'}`} text="Only cleared money is counted. This expense stays pending until independently approved and does not change the balance now." />; })() : null}
       {msg ? <Banner tone="error" title="Not saved" text={msg} /> : null}
       <Btn label={rec ? 'Save changes' : `Create ${res.title}`} onPress={submit} loading={busy} />
     </View>
   );
 }
+
+const nice = (r: ErpResource) => (r.kind === 'accounts' ? 'project bank account' : r.kind === 'partner-profiles' ? 'partner allocation' : r.title);
 
 /* ---------- record detail with review / delete ---------- */
 export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: ProjectErp; res: ErpResource; rec: ErpRecord; ctx: ErpCtx; onClose: () => void; footer?: React.ReactNode }) {
@@ -245,16 +283,17 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
     if (f.kind === 'account' || f.kind === 'inventory') return recLabel(erp.records, v);
     if (f.kind === 'partner') return erp.partners.find((p) => p.id === v)?.name ?? str(v);
     if (f.kind === 'boolean') return v ? 'Yes' : 'No';
+    if (f.kind === 'select') return (f as XField).optionLabels?.[str(v)] ?? str(v);
     return str(v);
   };
-  if (edit) return <Dialog title={`Edit ${res.title}`} onClose={() => setEdit(false)}><RecordForm erp={erp} res={res} rec={rec} ctx={ctx} onDone={onClose} /></Dialog>;
+  if (edit) return <Dialog title={`Edit ${nice(res)}`} onClose={() => setEdit(false)}><RecordForm erp={erp} res={res} rec={rec} ctx={ctx} onDone={onClose} /></Dialog>;
   const pending = rec.status === 'pending';
   const own = rec.createdBy === ctx.account.identityId || (ctx.account.role === 'PARTNER' && str(rec.data.partnerId) === ctx.account.identityId);
   const canRev = res.canReview && pending && !own;
   return (
     <Dialog title={`${res.title}: ${label(rec)}`} onClose={onClose}>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}><Badge text={rec.status} tone={tone(rec.status)} />{rec.data.status ? <Badge text={str(rec.data.status)} tone={tone(str(rec.data.status))} /> : null}</View>
-      {res.fields.filter((f) => !/attachmentid$/i.test(f.key)).map((f) => (
+      {res.fields.filter((f) => !/attachmentid$/i.test(f.key) && (f as XField).ui !== 'hidden').map((f) => (
         <View key={f.key} style={{ marginBottom: 10 }}>
           <Label>{f.label}</Label>
           <Text style={{ color: c.foreground, fontSize: 15 }}>{show(f)}</Text>
@@ -302,7 +341,7 @@ export function ResourceView({ erp, kind, ctx }: { erp: ProjectErp; kind: string
     return !q.trim() || JSON.stringify(r.data).toLowerCase().includes(q.trim().toLowerCase());
   }), [erp.records, kind, q, st, inventory]);
   if (!res) return <Empty icon="slash" title="Not available" text={`"${kind}" is not exposed to your role for this project.`} />;
-  const statuses = inventory ? (kind === 'plots' ? ['available', 'blocked', 'reserved', 'sold'] : ['available', 'booked', 'registered']) : ['pending', 'approved', 'rejected'];
+  const statuses = inventory ? (res.fields.find((f) => f.key === 'status')?.options ?? Array.from(new Set(erp.records.filter((r) => r.kind === kind).map((r) => str(r.data.status)).filter(Boolean)))) : ['pending', 'approved', 'rejected'];
   const cur = rows.find((r) => r.id === sel) ?? erp.records.find((r) => r.id === sel) ?? null;
   const exportCsv = () => {
     const head = ['id', 'status', ...res.fields.map((f) => f.label)];
@@ -349,7 +388,7 @@ export function ResourceView({ erp, kind, ctx }: { erp: ProjectErp; kind: string
           </Card>
         </Pressable>
       ))}
-      {creating ? <Dialog title={`New ${res.title}`} onClose={() => setCreating(false)}><RecordForm erp={erp} res={res} ctx={ctx} onDone={() => setCreating(false)} /></Dialog> : null}
+      {creating ? <Dialog title={res.kind === 'accounts' ? 'New project bank account' : res.kind === 'partner-profiles' ? 'Partner allocation' : `New ${res.title}`} onClose={() => setCreating(false)}><RecordForm erp={erp} res={res} ctx={ctx} onDone={() => setCreating(false)} /></Dialog> : null}
       {cur ? <RecordDetail erp={erp} res={res} rec={cur} ctx={ctx} onClose={() => setSel(null)} /> : null}
     </View>
   );
@@ -363,7 +402,6 @@ export function Dashboard({ erp }: { erp: ProjectErp }) {
   const plots = live_.filter((r) => r.kind === 'plots');
   const sum = (k: 'invested' | 'drawings' | 'expenses') => erp.partners.reduce((n, p) => n + (Number(p[k]) || 0), 0);
   const pend = live_.filter((r) => r.status === 'pending').length;
-  const pendBy = erp.resources.map((r) => [r.title, live_.filter((x) => x.kind === r.kind && x.status === 'pending').length] as const).filter((x) => x[1] > 0);
   return (
     <View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
@@ -373,10 +411,6 @@ export function Dashboard({ erp }: { erp: ProjectErp }) {
         <Stat l="Pending review" v={String(pend)} />
         <Stat l={t('totalPlots')} v={String(plots.length)} sub={`${plots.filter((p) => p.data.status === 'sold').length} sold · ${plots.filter((p) => p.data.status === 'available').length} available`} />
       </View>
-      <Card>
-        <Label>AWAITING REVIEW BY RESOURCE</Label>
-        {pendBy.length === 0 ? <Text style={{ color: c.mutedForeground }}>Nothing is pending.</Text> : pendBy.map(([n, k]) => <View key={n} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}><Text style={{ color: c.foreground }}>{n}</Text><Badge text={String(k)} tone="warn" /></View>)}
-      </Card>
       <Card>
         <Label>PENDING APPROVALS</Label>
         {live_.filter((r) => r.status === 'pending').length === 0 ? <Text style={{ color: c.mutedForeground }}>Nothing is pending.</Text> : live_.filter((r) => r.status === 'pending').slice(0, 12).map((r) => {

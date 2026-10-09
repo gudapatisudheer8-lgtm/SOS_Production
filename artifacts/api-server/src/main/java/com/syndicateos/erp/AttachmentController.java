@@ -45,7 +45,7 @@ public class AttachmentController {
         Path target=directory.resolve(id.toString());
         try {
             return tx.execute(status -> {
-                access.project(actor,projectId,"erp.submit",true);
+                access.attachmentProject(actor,projectId,"erp.submit",true);
                 try {
                     Files.createDirectories(directory);
                     Files.write(target,bytes,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE);
@@ -61,7 +61,7 @@ public class AttachmentController {
     @GetMapping("/{id}")
     public ResponseEntity<FileSystemResource> download(@AuthenticationPrincipal SessionAccount actor,@PathVariable UUID projectId,@PathVariable UUID id) {
         Map<String,Object> metadata=tx.execute(status -> {
-            access.project(actor,projectId,"erp.read",false);
+            access.attachmentProject(actor,projectId,"erp.read",false);
             var rows=jdbc.queryForList("SELECT * FROM sos.erp_attachments WHERE id=? AND project_id=?",id,projectId);
             if(rows.isEmpty()) throw ApiProblem.denied();
             return rows.getFirst();

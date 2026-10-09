@@ -3,6 +3,22 @@ name: Role platforms and delivery order
 description: Confirmed browser and mobile delivery requirements for SOS roles.
 ---
 
+## Current delivery priority: original replica first
+
+The user now requests the complete Google AI Studio application's interfaces and connected workflows as they are, before any further changes. Earlier requests for simplification or customized screens are deferred until that replica is complete, not prerequisites for the baseline.
+
+The user confirmed that their supplied GitHub SOS repository contains the same version as the linked Google AI Studio application. Use it as the authoritative replica source rather than requesting the screen requirements again.
+
+Develop and show the application in the right-side Preview first. The user will review it there and explicitly confirm when to prepare EC2 deployment instructions.
+
+**Why:** The user explicitly requested the same preview-first delivery approach as their Krishisetu application.
+
+**How to apply:** Do not prepare or suggest an EC2 deployment handoff before that confirmation; keep the existing EC2 installation untouched during preview development.
+
+**Why:** The user explicitly said they will give changes after receiving the replica, having repeatedly rejected partial or redesigned substitutes.
+
+**How to apply:** Use the original application source as the baseline and establish that it matches the current AI Studio version. Do not limit the deliverable to an initial accountant flow or silently apply earlier UI modifications. Do not delete the existing EC2 installation or database merely to resolve UI differences.
+
 Owner is web-only, with a separate entry link and no owner option on client login. Accountant needs web and mobile access. Partner is intended as a mobile application, but initially must work as mobile web. Complete browser development before preparing the native accountant and partner dashboards.
 
 Client entry must show SyndicateOS branding and company code first, then username/mobile and PIN. Do not ask the user to choose accountant or partner: resolve their authorized dashboard from credentials and firm membership.

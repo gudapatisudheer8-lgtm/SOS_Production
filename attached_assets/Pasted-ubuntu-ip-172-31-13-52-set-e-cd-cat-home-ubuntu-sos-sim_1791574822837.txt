@@ -1,0 +1,193 @@
+ubuntu@ip-172-31-13-52:~$ (
+  set -e
+  cd "$(cat /home/ubuntu/sos-simple-open-plotting-update.path)"
+
+  STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+
+  sudo cp -a /opt/syndicateos/web \
+    "/opt/syndicateos/web.before-simple-plots-$STAMP"
+
+  sudo cp -a /opt/syndicateos/sos-api.jar \
+    "/opt/syndicateos/sos-api.jar.before-simple-plots-$STAMP"
+
+  sudo nginx -t
+  sudo systemctl stop syndicateos-api
+
+  if sudo ss -H -ltnp 'sport = :8090' | grep -q .; then
+    echo "STOP: Port 8090 is still occupied. Do not continue."
+    sudo ss -ltnp 'sport = :8090'
+    exit 1
+  fi
+
+  python3 upgrade.py
+)
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+sos_migrator password (hidden):
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.16)
+
+2026-10-09T19:36:36.336Z  INFO 11347 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Starting SosApplication v0.1.0 using Java 21.0.12.1 with PID 11347 (/home/ubuntu/sos-simple-plots-dhwjsq/sos-api.jar started by ubuntu in /home/ubuntu/sos-simple-plots-dhwjsq)
+2026-10-09T19:36:36.342Z  INFO 11347 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-10-09T19:36:39.189Z  INFO 11347 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8091 (http)
+2026-10-09T19:36:39.212Z  INFO 11347 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-10-09T19:36:39.213Z  INFO 11347 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-10-09T19:36:39.251Z  INFO 11347 --- [syndicateos-api] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-10-09T19:36:39.252Z  INFO 11347 --- [syndicateos-api] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2761 ms
+2026-10-09T19:36:40.950Z  INFO 11347 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8091 (http) with context path '/'
+2026-10-09T19:36:40.971Z  INFO 11347 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Started SosApplication in 5.729 seconds (process running for 6.767)
+2026-10-09T19:36:42.093Z  INFO 11347 --- [syndicateos-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://krishisetu-db.cpmomccww28x.ap-south-1.rds.amazonaws.com:5432/SOS?sslmode=verify-full&sslrootcert=/opt/syndicateos/certs/aws-rds-global-bundle.pem&connectTimeout=3&socketTimeout=5&ApplicationName=SOS (PostgreSQL 16.12)
+2026-10-09T19:36:42.202Z  INFO 11347 --- [syndicateos-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 9 migrations (execution time 00:00.064s)
+2026-10-09T19:36:42.404Z  INFO 11347 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "sos": 7
+2026-10-09T19:36:42.464Z  INFO 11347 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "sos" to version "8 - simple open plotting forms"
+2026-10-09T19:36:42.558Z  INFO 11347 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 1 migration to schema "sos", now at version v8 (execution time 00:00.065s)
+2026-10-09T19:36:43.308Z  INFO 11347 --- [syndicateos-api] [           main] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-09T19:36:43.312Z  INFO 11347 --- [syndicateos-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+Guarded migration finished and exited. Continue with the runtime installation in DEPLOYMENT.md.
+ubuntu@ip-172-31-13-52:~$ cd "$(cat /home/ubuntu/sos-simple-open-plotting-update.path)"
+cat 01-activate-simple-open-plotting.sql
+-- Run only after upgrade.py has successfully migrated the SOS database through V8.
+-- This explicitly changes CSA's open-plotting release, not its data or credentials.
+BEGIN;
+DO $$
+DECLARE firm uuid; assignment record; target record; owner_actor uuid;
+BEGIN
+ IF current_database()<>'SOS' THEN RAISE EXCEPTION 'Run this only in the SOS database'; END IF;
+ SELECT id INTO STRICT firm FROM sos.firms WHERE upper(client_code)='CSA' FOR UPDATE;
+ SELECT a.*,r.version INTO STRICT assignment FROM sos.firm_sector_assignments a
+ JOIN sos.sectors s ON s.id=a.sector_id JOIN sos.sector_releases r ON r.id=a.release_id
+ WHERE a.firm_id=firm AND s.code='open-plotting' FOR UPDATE OF a;
+ IF NOT assignment.enabled THEN RAISE EXCEPTION 'Open plotting is disabled for CSA; enable it in the owner console before assigning the new release'; END IF;
+ SELECT r.id,r.version,r.label INTO STRICT target FROM sos.sector_releases r
+ JOIN sos.project_setup_definitions d ON d.release_id=r.id
+ WHERE r.sector_id=assignment.sector_id AND r.state='PUBLISHED'
+ AND d.definition->>'presentation'='open-plotting-simple'
+ ORDER BY r.version DESC LIMIT 1;
+ IF target.version<assignment.version THEN RAISE EXCEPTION 'Refusing to downgrade the release'; END IF;
+ IF target.id<>assignment.release_id THEN
+  SELECT m.identity_id INTO STRICT owner_actor FROM sos.owner_memberships m
+  JOIN sos.identities i ON i.id=m.identity_id WHERE i.enabled;
+  UPDATE sos.firm_sector_assignments SET release_id=target.id WHERE firm_id=firm AND sector_id=assignment.sector_id;
+  INSERT INTO sos.configuration_audit(id,actor_id,event,firm_id,release_id,event_data)
+  VALUES(gen_random_uuid(),owner_actor,'SECTOR_ASSIGNED',firm,target.id,
+   jsonb_build_object('previousReleaseId',assignment.release_id,'method','owner-approved SQL','databaseOperator',current_user));
+ END IF;
+ RAISE NOTICE 'CSA assigned release: % (version %)',target.label,target.version;
+END $$;
+GRANT USAGE ON SCHEMA sos TO sos_app;
+GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA sos TO sos_app;
+GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA sos TO sos_app;
+COMMIT;
+SELECT f.client_code,r.label,r.version,d.definition->>'presentation' AS presentation
+FROM sos.firms f JOIN sos.firm_sector_assignments a ON a.firm_id=f.id
+JOIN sos.sectors s ON s.id=a.sector_id JOIN sos.sector_releases r ON r.id=a.release_id
+JOIN sos.project_setup_definitions d ON d.release_id=r.id
+WHERE upper(f.client_code)='CSA' AND s.code='open-plotting';
+ubuntu@ip-172-31-13-52:~/sos-simple-plots-dhwjsq$
+ubuntu@ip-172-31-13-52:~/sos-simple-plots-dhwjsq$
+ubuntu@ip-172-31-13-52:~/sos-simple-plots-dhwjsq$
+ubuntu@ip-172-31-13-52:~/sos-simple-plots-dhwjsq$ (
+  set -e
+  cd "$(cat /home/ubuntu/sos-simple-open-plotting-update.path)"
+
+  sudo install -o sos-api -g sos-api -m 0644 \
+    sos-api.jar /opt/syndicateos/sos-api.jar
+
+  sudo cp -a web/. /opt/syndicateos/web/
+  sudo nginx -t
+
+  sudo systemctl reset-failed syndicateos-api
+  sudo systemctl start syndicateos-api
+  sudo systemctl reload nginx
+
+  for attempt in $(seq 1 30); do
+    if curl -fsS --max-time 2 \
+      http://127.0.0.1:8090/api/healthz >/dev/null; then
+      break
+    fi
+    sleep 2
+  done
+
+  sudo systemctl status syndicateos-api --no-pager -l
+  sudo journalctl -u syndicateos-api -n 40 --no-pager
+  curl -fsS http://127.0.0.1:8090/api/healthz
+  printf '\n'
+)
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+curl: (7) Failed to connect to 127.0.0.1 port 8090 after 0 ms: Could not connect to server
+curl: (7) Failed to connect to 127.0.0.1 port 8090 after 0 ms: Could not connect to server
+curl: (7) Failed to connect to 127.0.0.1 port 8090 after 0 ms: Could not connect to server
+curl: (7) Failed to connect to 127.0.0.1 port 8090 after 0 ms: Could not connect to server
+● syndicateos-api.service - SyndicateOS Spring Boot API
+     Loaded: loaded (/etc/systemd/system/syndicateos-api.service; enabled; preset: enabled)
+    Drop-In: /etc/systemd/system/syndicateos-api.service.d
+             └─uploads.conf
+     Active: active (running) since Fri 2026-10-09 19:39:43 UTC; 8s ago
+ Invocation: 3983a0ebb071482ebb095ec413c47d3a
+   Main PID: 11439 (java)
+      Tasks: 21 (limit: 627)
+     Memory: 143.8M (peak: 143.8M)
+        CPU: 12.815s
+     CGroup: /system.slice/syndicateos-api.service
+             └─11439 /usr/bin/java -Xms64m -Xmx256m -Xss512k -XX:MaxDirectMemorySize=64m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -jar /opt/syndicateos/sos-api.jar --server.address=127.0.0.1 --server.port=8090 --sos.database-name=SOS --sos.setup-approved=false --spring.flyway.enabled=false --server.tomcat.threads.max=32 --server.tomcat.threads.min-spare=2
+
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.004Z  INFO 11439 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.028Z  INFO 11439 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.029Z  INFO 11439 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.082Z  INFO 11439 --- [syndicateos-api] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.084Z  INFO 11439 --- [syndicateos-api] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2682 ms
+Oct 09 19:39:49 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:49.710Z  INFO 11439 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path '/'
+Oct 09 19:39:49 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:49.738Z  INFO 11439 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Started SosApplication in 5.609 seconds (process running for 6.453)
+Oct 09 19:39:51 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:51.495Z  INFO 11439 --- [syndicateos-api] [0.1-8090-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+Oct 09 19:39:51 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:51.495Z  INFO 11439 --- [syndicateos-api] [0.1-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+Oct 09 19:39:51 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:51.497Z  INFO 11439 --- [syndicateos-api] [0.1-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+Oct 09 18:03:48 ip-172-31-13-52 java[10665]:  :: Spring Boot ::               (v3.5.16)
+Oct 09 18:03:48 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:48.342Z  INFO 10665 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Starting SosApplication v0.1.0 using Java 21.0.12.1 with PID 10665 (/opt/syndicateos/sos-api.jar started by sos-api in /opt/syndicateos)
+Oct 09 18:03:48 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:48.349Z  INFO 10665 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : No active profile set, falling back to 1 default profile: "default"
+Oct 09 18:03:50 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:50.799Z  INFO 10665 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+Oct 09 18:03:50 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:50.831Z  INFO 10665 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+Oct 09 18:03:50 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:50.832Z  INFO 10665 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+Oct 09 18:03:50 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:50.885Z  INFO 10665 --- [syndicateos-api] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+Oct 09 18:03:50 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:50.887Z  INFO 10665 --- [syndicateos-api] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2445 ms
+Oct 09 18:03:52 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:52.496Z  INFO 10665 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path '/'
+Oct 09 18:03:52 ip-172-31-13-52 java[10665]: 2026-10-09T18:03:52.538Z  INFO 10665 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Started SosApplication in 5.299 seconds (process running for 6.279)
+Oct 09 18:04:14 ip-172-31-13-52 java[10665]: 2026-10-09T18:04:14.321Z  INFO 10665 --- [syndicateos-api] [0.1-8090-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+Oct 09 18:04:14 ip-172-31-13-52 java[10665]: 2026-10-09T18:04:14.321Z  INFO 10665 --- [syndicateos-api] [0.1-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+Oct 09 18:04:14 ip-172-31-13-52 java[10665]: 2026-10-09T18:04:14.324Z  INFO 10665 --- [syndicateos-api] [0.1-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+Oct 09 19:36:25 ip-172-31-13-52 systemd[1]: Stopping syndicateos-api.service - SyndicateOS Spring Boot API...
+Oct 09 19:36:25 ip-172-31-13-52 java[10665]: 2026-10-09T19:36:25.778Z  INFO 10665 --- [syndicateos-api] [ionShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+Oct 09 19:36:25 ip-172-31-13-52 java[10665]: 2026-10-09T19:36:25.780Z  INFO 10665 --- [syndicateos-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+Oct 09 19:36:25 ip-172-31-13-52 systemd[1]: syndicateos-api.service: Main process exited, code=exited, status=143/n/a
+Oct 09 19:36:25 ip-172-31-13-52 systemd[1]: syndicateos-api.service: Failed with result 'exit-code'.
+Oct 09 19:36:25 ip-172-31-13-52 systemd[1]: Stopped syndicateos-api.service - SyndicateOS Spring Boot API.
+Oct 09 19:36:25 ip-172-31-13-52 systemd[1]: syndicateos-api.service: Consumed 27.826s CPU time over 1h 32min 39.615s wall clock time, 201.1M memory peak.
+Oct 09 19:39:43 ip-172-31-13-52 systemd[1]: Started syndicateos-api.service - SyndicateOS Spring Boot API.
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]:   .   ____          _            __ _ _
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]:  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]: ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]:  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]:   '  |____| .__|_| |_|_| |_\__, | / / / /
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]:  =========|_|==============|___/=/_/_/_/
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]:  :: Spring Boot ::               (v3.5.16)
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:45.233Z  INFO 11439 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Starting SosApplication v0.1.0 using Java 21.0.12.1 with PID 11439 (/opt/syndicateos/sos-api.jar started by sos-api in /opt/syndicateos)
+Oct 09 19:39:45 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:45.240Z  INFO 11439 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : No active profile set, falling back to 1 default profile: "default"
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.004Z  INFO 11439 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.028Z  INFO 11439 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.029Z  INFO 11439 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.082Z  INFO 11439 --- [syndicateos-api] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+Oct 09 19:39:48 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:48.084Z  INFO 11439 --- [syndicateos-api] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2682 ms
+Oct 09 19:39:49 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:49.710Z  INFO 11439 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path '/'
+Oct 09 19:39:49 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:49.738Z  INFO 11439 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Started SosApplication in 5.609 seconds (process running for 6.453)
+Oct 09 19:39:51 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:51.495Z  INFO 11439 --- [syndicateos-api] [0.1-8090-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+Oct 09 19:39:51 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:51.495Z  INFO 11439 --- [syndicateos-api] [0.1-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+Oct 09 19:39:51 ip-172-31-13-52 java[11439]: 2026-10-09T19:39:51.497Z  INFO 11439 --- [syndicateos-api] [0.1-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+{"status":"ok"}
+ubuntu@ip-172-31-13-52:~/sos-simple-plots-dhwjsq$

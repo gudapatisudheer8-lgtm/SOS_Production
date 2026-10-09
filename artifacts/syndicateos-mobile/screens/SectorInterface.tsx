@@ -16,6 +16,8 @@ import '@/screens/ErpBespoke';
 import { ERP_KEYS, ErpComponent, LangToggle, registerNav, useLang } from '@/screens/ErpScreens';
 import type { TKey } from '@/lib/i18n';
 import { useRun } from '@/lib/workspace';
+import { ProjectBar, ProjectSetup, setupStateOf } from '@/screens/ProjectSetup';
+import { readSetupConfig } from '@/lib/projectSetup';
 
 type Mode = 'live' | 'readonly' | 'preview';
 type Raw = string | boolean | null;
@@ -253,6 +255,12 @@ function ProjectForm({ ctx, comp }: { ctx: Ctx; comp: ConfigComponent }) {
   if (problem) return <InvalidConfig what="project form" problem={problem} />;
   if (ctx.mode === 'readonly') return <ReadOnlyNote />;
   const preview = ctx.mode === 'preview';
+  if (!editing) {
+    const sc = readSetupConfig(ctx.item.configuration);
+    return sc.config
+      ? <Empty icon="folder-plus" title="Add a project" text="Use Add Project in the project bar above. Projects are created through the complete setup flow." />
+      : <Banner tone="error" title="Project setup is not configured" text={sc.error ?? ''} />;
+  }
   const wanted = editing ? 'project.update' : 'project.create';
   const action = comp.actions.find((a) => a.key === wanted);
   const known = comp.actions.filter((a) => a.key !== 'project.create' && a.key !== 'project.update');
@@ -387,14 +395,20 @@ function Render({ comp, ctx }: { comp: ConfigComponent; ctx: Ctx }) {
   }
 }
 
-function InterfaceView({ item, projects, role, mode }: { item: WorkspaceInterfacesItem; projects: Project[]; role: SessionAccount['role']; mode: Mode }) {
+function InterfaceView({ item, projects, role, mode, setupItems = [], allProjects, selectedId, onPick }: { item: WorkspaceInterfacesItem; projects: Project[]; role: SessionAccount['role']; mode: Mode; setupItems?: WorkspaceInterfacesItem[]; allProjects?: Project[]; selectedId?: string | null; onPick?: (id: string) => void }) {
   const c = useColors();
   const iface = item.configuration.interfaces.find((i) => i.role === role);
   const [screenKey, setScreenKey] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
   const { t } = useLang();
   const hasErp = !!iface?.screens.some((sc) => sc.components.some((x) => ERP_KEYS.includes(x.key as string)));
-  const selected = projects.find((p) => p.id === selId) ?? (hasErp && mode !== 'preview' ? projects[0] ?? null : null);
+  const [setupOpen, setSetupOpen] = useState<'new' | 'edit' | null>(null);
+  const pool = allProjects ?? projects;
+  const pick = (id: string) => (onPick ? onPick(id) : setSelId(id));
+  const selected = projects.find((p) => p.id === (selectedId ?? selId)) ?? (hasErp && mode !== 'preview' ? projects.find((p) => setupStateOf(p) !== 'DRAFT') ?? projects[0] ?? null : null);
+  const isAcct = role === 'ACCOUNTANT' && mode === 'live';
+  const setupDefinition = readSetupConfig(item.configuration);
+  const isDraft = !!selected && setupStateOf(selected) === 'DRAFT';
   const tabLabel = (key: string, fallback: string) => {
     const map: Record<string, TKey> = { dashboard: 'tabDashboard', investments: 'tabInvestments', 'expenses-approvals': 'tabExpensesApprovals', plots: 'tabPlots', statements: 'tabStatements' };
     return role === 'PARTNER' && map[key] ? t(map[key]) : fallback;
@@ -416,11 +430,14 @@ function InterfaceView({ item, projects, role, mode }: { item: WorkspaceInterfac
     <View>
       <H1 sub={`${selected ? `Selected: ${selected.name} · ` : ''}${projects.length} project${projects.length === 1 ? '' : 's'}`}>{iface.title}</H1>
       {hasErp ? (
-        <View style={{ marginBottom: 12, gap: 8 }}>
+        <View style={{ marginBottom: 4 }}>
           {role === 'PARTNER' ? <LangToggle /> : null}
-          <Chips label={role === 'PARTNER' ? t('selectProject') : 'Select Project / Venture:'} options={projects.map((p) => ({ value: p.id, label: p.name }))} value={selected?.id ?? ''} onChange={(v) => setSelId(v)} />
+          {isAcct && setupDefinition.error ? <Banner tone="warn" title="Project setup unavailable in the assigned release" text={`Assigned release: ${item.configuration.label}. ${setupDefinition.error} Review this firm's sector assignment in the owner portal, then sign out and sign in again.`} /> : null}
+          <ProjectBar label={role === 'PARTNER' ? t('selectProject') : 'Project / Venture'} projects={pool} selected={selected} onSelect={pick} canAdd={isAcct && setupItems.length > 0} onAdd={() => setSetupOpen('new')} onEdit={isAcct ? () => setSetupOpen('edit') : undefined} setupDisabled={!!setupDefinition.error} />
+          {isAcct && projects.length === 0 ? <Empty icon="folder-plus" title="No projects yet" text="Add the first project to start recording partners, accounts and inventory." /> : null}
         </View>
       ) : null}
+      {setupOpen && isAcct ? <ProjectSetup items={setupItems} initialSectorId={item.sectorId} existing={setupOpen === 'edit' ? selected : null} onClose={() => setSetupOpen(null)} onSaved={(id) => { pick(id); setSetupOpen(null); }} /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         {iface.screens.map((s) => {
           const on = s.key === screen.key;
@@ -432,8 +449,9 @@ function InterfaceView({ item, projects, role, mode }: { item: WorkspaceInterfac
           );
         })}
       </View>
+      {isDraft && hasErp ? <Banner tone="warn" title="Setup not finished" text="This project is a draft. Partners, accounts, inventory and money views appear after Create Project & Load Data. Use Resume setup above." /> : null}
       {screen.components.length === 0 ? <Empty icon="box" title="This screen has no components" /> : null}
-      {screen.components.map((comp, i) => <Render key={`${screen.key}-${i}`} comp={comp} ctx={ctx} />)}
+      {(isDraft && hasErp ? [] : screen.components).map((comp, i) => <Render key={`${screen.key}-${i}`} comp={comp} ctx={ctx} />)}
     </View>
   );
 }
@@ -445,10 +463,14 @@ export function SectorWorkspace({ ws, account }: { ws: Workspace; account: Sessi
   // Disabled assignments stay visible (read-only) while they still hold historical projects.
   const items = ws.interfaces.filter((i) => i.configuration.interfaces.some((x) => x.role === role) && (i.enabled || projectsOf(i).length > 0));
   const [sel, setSel] = useState<string | null>(null);
+  const [want, setWant] = useState<string | null>(null);
   if (items.length === 0)
     return <Empty icon="inbox" title="No interface assigned" text="Your firm has no enabled sector interface for your role yet. The owner assigns sectors to firms." />;
   const keyOf = (i: WorkspaceInterfacesItem) => `${i.firmId}:${i.sectorId}`;
-  const item = items.find((i) => keyOf(i) === sel) ?? items[0];
+  const wantProj = want ? ws.projects.find((p) => p.id === want) ?? null : null;
+  const wantItem = wantProj ? items.find((i) => i.firmId === wantProj.firmId && i.sectorId === wantProj.sectorId) : undefined;
+  const item = wantItem ?? items.find((i) => keyOf(i) === sel) ?? items[0];
+  const firmPool = ws.projects.filter((p) => p.firmId === item.firmId && items.some((i) => i.firmId === p.firmId && i.sectorId === p.sectorId));
   const firmName = (id: string) => ws.firms.find((f) => f.id === id)?.name ?? 'Firm';
   return (
     <View>
@@ -457,7 +479,7 @@ export function SectorWorkspace({ ws, account }: { ws: Workspace; account: Sessi
           {items.map((i) => {
             const on = keyOf(i) === keyOf(item);
             return (
-              <Pressable key={keyOf(i)} onPress={() => setSel(keyOf(i))} accessibilityRole="button"
+              <Pressable key={keyOf(i)} onPress={() => { setSel(keyOf(i)); setWant(null); }} accessibilityRole="button"
                 style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: on ? c.primary : c.border, backgroundColor: on ? c.primary : c.card }}>
                 <Text style={{ color: on ? c.primaryForeground : c.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>{i.sectorName}{i.enabled ? '' : ' · Disabled'}</Text>
                 <Text style={{ color: on ? c.primaryForeground : c.mutedForeground, fontSize: 11 }}>{firmName(i.firmId)} · {i.configuration.label}</Text>
@@ -468,7 +490,7 @@ export function SectorWorkspace({ ws, account }: { ws: Workspace; account: Sessi
       ) : (
         <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 8 }}>{firmName(item.firmId)} · {item.sectorName} · {item.configuration.label}{item.enabled ? '' : ' · Disabled, read-only'}</Text>
       )}
-      <InterfaceView key={keyOf(item) + item.releaseId} item={item} projects={projectsOf(item)} role={role} mode={item.enabled ? 'live' : 'readonly'} />
+      <InterfaceView key={keyOf(item) + item.releaseId} item={item} projects={projectsOf(item)} allProjects={firmPool} selectedId={want} onPick={(id) => { const pr = ws.projects.find((x) => x.id === id); if (pr) setSel(`${pr.firmId}:${pr.sectorId}`); setWant(id); }} role={role} mode={item.enabled ? 'live' : 'readonly'} setupItems={ws.interfaces.filter((i) => i.enabled && i.firmId === item.firmId && i.configuration.interfaces.some((x) => x.role === role))} />
     </View>
   );
 }

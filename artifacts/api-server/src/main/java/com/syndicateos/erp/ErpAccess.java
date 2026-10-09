@@ -14,6 +14,12 @@ public class ErpAccess {
     private final ConfigurationService config;
     public ErpAccess(JdbcTemplate jdbc,ConfigurationService config) { this.jdbc=jdbc; this.config=config; }
     public Map<String,Object> project(SessionAccount actor,UUID project,String permission,boolean write) {
+        return scope(actor,project,permission,write,false);
+    }
+    public Map<String,Object> attachmentProject(SessionAccount actor,UUID project,String permission,boolean write) {
+        return scope(actor,project,permission,write,true);
+    }
+    private Map<String,Object> scope(SessionAccount actor,UUID project,String permission,boolean write,boolean attachment) {
         actor.business();
         if (!Set.of("ACCOUNTANT","PARTNER").contains(actor.role())) throw ApiProblem.denied();
         List<Map<String,Object>> rows=jdbc.queryForList("""
@@ -33,6 +39,8 @@ public class ErpAccess {
         if (!config.permitted((UUID)row.get("release_id"),actor.role(),permission)
             || write && (!Boolean.TRUE.equals(row.get("assignment_enabled")) || !"ACTIVE".equals(row.get("status"))))
             throw ApiProblem.denied();
+        if(!"READY".equals(row.get("setup_state")) && !(attachment&&"ACCOUNTANT".equals(actor.role())))
+            throw ApiProblem.invalid("Finalize project setup before entering operational records.");
         return row;
     }
 }

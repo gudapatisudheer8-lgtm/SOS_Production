@@ -13,6 +13,7 @@ export const GetProjectErpParams = zod.object({
 })
 
 export const GetProjectErpResponse = zod.object({
+  "projectSetup": zod.record(zod.string(), zod.unknown()).optional(),
   "projectId": zod.string(),
   "records": zod.array(zod.object({
   "id": zod.string(),
@@ -28,6 +29,11 @@ export const GetProjectErpResponse = zod.object({
   "kind": zod.string(),
   "title": zod.string(),
   "fields": zod.array(zod.object({
+  "default": zod.unknown().optional(),
+  "unit": zod.string().optional(),
+  "integer": zod.boolean().optional(),
+  "maxLength": zod.number().int().optional(),
+  "visibleWhen": zod.record(zod.string(), zod.unknown()).optional(),
   "key": zod.string(),
   "label": zod.string(),
   "kind": zod.enum(['text', 'number', 'date', 'select', 'boolean', 'account', 'partner', 'inventory', 'multiline']),
@@ -197,6 +203,8 @@ export const GetWorkspaceResponse = zod.object({
   "status": zod.enum(['ACTIVE', 'COMPLETED', 'ARCHIVED']),
   "revision": zod.number().int(),
   "details": zod.record(zod.string(), zod.unknown()),
+  "setupState": zod.enum(['DRAFT', 'READY']).optional(),
+  "setupData": zod.record(zod.string(), zod.unknown()).optional(),
   "partners": zod.array(zod.object({
   "identityId": zod.string().uuid(),
   "displayName": zod.string(),
@@ -210,6 +218,7 @@ export const GetWorkspaceResponse = zod.object({
   "sectorName": zod.string(),
   "enabled": zod.boolean(),
   "configuration": zod.object({
+  "projectSetup": zod.record(zod.string(), zod.unknown()).optional(),
   "resources": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   "releaseId": zod.string().uuid(),
   "sectorId": zod.string().uuid(),
@@ -286,6 +295,7 @@ export const GetConfigurationParams = zod.object({
 })
 
 export const GetConfigurationResponse = zod.object({
+  "projectSetup": zod.record(zod.string(), zod.unknown()).optional(),
   "resources": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   "releaseId": zod.string().uuid(),
   "sectorId": zod.string().uuid(),

@@ -7,6 +7,8 @@
  */
 import type { ProjectDetails } from './projectDetails';
 import type { ProjectPartnersItem } from './projectPartnersItem';
+import type { ProjectSetupData } from './projectSetupData';
+import type { ProjectSetupState } from './projectSetupState';
 import type { ProjectStatus } from './projectStatus';
 
 export interface Project {
@@ -19,5 +21,7 @@ export interface Project {
   status: ProjectStatus;
   revision: number;
   details: ProjectDetails;
+  setupState?: ProjectSetupState;
+  setupData?: ProjectSetupData;
   partners: ProjectPartnersItem[];
 }

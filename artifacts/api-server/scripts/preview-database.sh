@@ -17,6 +17,6 @@ if ! pg_isready -h 127.0.0.1 -p 55439 >/dev/null 2>&1; then
   fi
   pg_ctl -D "$STATE" -l "$STATE/server.log" -o "-p 55439 -h 127.0.0.1 -k $STATE" -w start
 fi
-if ! psql -h 127.0.0.1 -p 55439 -U sos_test -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='sos_preview'" | grep -q 1; then
-  createdb -h 127.0.0.1 -p 55439 -U sos_test sos_preview
+if ! psql -h 127.0.0.1 -p 55439 -U sos_test -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='sos_development'" | grep -q 1; then
+  createdb -h 127.0.0.1 -p 55439 -U sos_test sos_development
 fi

@@ -5,7 +5,8 @@ import { Banner, Btn, Card, Chips, Field } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { newRequestId, planChunks, useErpCommands } from '@/lib/erp';
 import { errMessage } from '@/lib/session';
-import { AREA_UNITS, calculateLayoutMetrics, formatINR, type AreaUnit } from '@/lib/sourceCalc';
+import { formatINR } from '@/lib/sourceCalc';
+import { erpSetup } from '@/lib/erpSetup';
 import { str, type ErpCtx } from '@/screens/ErpScreens';
 
 const nv = (x: unknown) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
@@ -30,10 +31,6 @@ function ListEditor({ title, cols, rows, onChange, addLabel, editable }: { title
   );
 }
 
-const FACINGS = ['East', 'North', 'West', 'South', 'North-East Corner', 'South-East Corner'];
-const FLATS = ['2 BHK', '3 BHK', 'Duplex Penthouse'];
-const OUTLETS = ['Premium Walk-in Lounge', 'High-Footfall Transit', 'Highway Express', 'Urban Neighborhood'];
-const SECTORS = [['Sector A (East)', 'East'], ['Sector B (North)', 'North'], ['Sector C (West)', 'West'], ['South Facing', 'South'], ['Corner Plots', 'North-East Corner'], ['Commercial', '']];
 
 export function PlanBuilder({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const c = useColors();
@@ -46,7 +43,11 @@ export function PlanBuilder({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const det = (ctx.project?.details ?? {}) as Record<string, unknown>;
   const lc = (erp.settings.layoutCalculation ?? {}) as Record<string, unknown>;
 
-  const [dist, setDist] = useState<Row[]>(rowsOf('distribution', SECTORS.map(([label, facing]) => ({ label, facing, count: '', area: '' }))));
+  const fopts = (kind: string, key: string): string[] | undefined => { const o = erp.resources.find((r) => r.kind === kind)?.fields.find((f) => f.key === key)?.options; return o && o.length ? o : undefined; };
+  const FACINGS = fopts('plots', 'facing'); const FLATS = fopts('units', 'flatType'); const UFACINGS = fopts('units', 'facing');
+  const OUTLETS = fopts('settlements', 'category') ?? fopts('counters', 'category');
+  const sel = (options?: string[]) => (options ? { kind: 'select' as const, options } : {});
+  const [dist, setDist] = useState<Row[]>(rowsOf('distribution'));
   const [startNo, setStartNo] = useState(str(plan?.startNumber));
   const [floors, setFloors] = useState(str(plan?.floorsCount));
   const [flats, setFlats] = useState<Row[]>(rowsOf('flats'));
@@ -57,11 +58,13 @@ export function PlanBuilder({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
 
   const ext = nv(det.extentValue ?? lc.totalExtentValue);
-  const unit = (str(det.extentUnit ?? lc.unit) || 'Acres') as AreaUnit;
+  const unit = str(det.extentUnit ?? lc.unit);
+  const LR = erpSetup(erp).layout;
   const roadInput = det.roadWidth ?? lc.roadWidth;
   const openInput = det.openSpacePercent ?? lc.openSpacePercent;
   const metrics = ext > 0 && roadInput !== undefined && roadInput !== '' && openInput !== undefined && openInput !== ''
-    ? calculateLayoutMetrics(ext, AREA_UNITS.includes(unit) ? unit : 'Acres', nv(roadInput), nv(openInput)) : null;
+    && LR && LR.unitConversions[unit] !== undefined && LR.roadLossPercentByWidth[String(roadInput)] !== undefined
+    ? (() => { const g = ext * LR.unitConversions[unit]; return { netSellableSqYards: Math.round(Math.max(0, g - (g * LR.roadLossPercentByWidth[String(roadInput)]) / 100 - (g * nv(openInput)) / 100)) }; })() : null;
 
   const planData = (): Record<string, unknown> => mode === 'plots' ? { distribution: dist, startNumber: startNo } : mode === 'units' ? { floorsCount: floors, flats, amenities: amen } : mode === 'liquor' ? { counters, facilities: facs } : { packages: pkgs, facilities: facs };
   const save = async () => {
@@ -142,14 +145,14 @@ export function PlanBuilder({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
         <View>
           {metrics ? <Card><Text style={{ color: c.foreground }}>Net sellable area: <Text style={{ fontFamily: 'Inter_700Bold' }}>{metrics.netSellableSqYards.toLocaleString('en-IN')} Sq.Yds</Text> · planned {plotArea.toLocaleString('en-IN')} Sq.Yds in {totalPlots} plots</Text>{plotArea > metrics.netSellableSqYards ? <Text style={{ color: c.destructive, fontSize: 12 }}>Planned area exceeds net sellable area.</Text> : <Text style={{ color: c.mutedForeground, fontSize: 12 }}>Remaining {(metrics.netSellableSqYards - plotArea).toLocaleString('en-IN')} Sq.Yds</Text>}</Card> : <Banner tone="warn" title="No extent entered" text="Enter the extent in the project details or the Layout calculator to compare against sellable area." />}
           <Field label="Starting plot number" value={startNo} onChangeText={setStartNo} keyboardType="numeric" editable={editable} />
-          <ListEditor title="Plot distribution by sector" editable={editable} addLabel="Add sector" rows={dist} onChange={setDist} cols={[{ key: 'label', label: 'Sector / block name' }, { key: 'facing', label: 'Facing', kind: 'select', options: FACINGS }, { key: 'count', label: 'Plots count', kind: 'num' }, { key: 'area', label: 'Area / Plot (Sq.Yds)', kind: 'num' }]} />
+          <ListEditor title="Plot distribution by sector" editable={editable} addLabel="Add sector" rows={dist} onChange={setDist} cols={[{ key: 'label', label: 'Sector / block name' }, { key: 'facing', label: 'Facing', ...sel(FACINGS) }, { key: 'count', label: 'Plots count', kind: 'num' }, { key: 'area', label: 'Area / Plot (Sq.Yds)', kind: 'num' }]} />
         </View>
       ) : null}
 
       {mode === 'units' ? (
         <View>
           <Field label="Floors count" value={floors} onChangeText={setFloors} keyboardType="numeric" editable={editable} />
-          <ListEditor title="Flat types repeated on every floor" editable={editable} addLabel="Add flat" rows={flats} onChange={setFlats} cols={[{ key: 'flatType', label: 'Flat type', kind: 'select', options: FLATS }, { key: 'sftArea', label: 'Super built-up area (Sft)', kind: 'num' }, { key: 'facing', label: 'Facing', kind: 'select', options: ['East', 'North', 'West', 'South', 'Corner'] }]} />
+          <ListEditor title="Flat types repeated on every floor" editable={editable} addLabel="Add flat" rows={flats} onChange={setFlats} cols={[{ key: 'flatType', label: 'Flat type', ...sel(FLATS) }, { key: 'sftArea', label: 'Super built-up area (Sft)', kind: 'num' }, { key: 'facing', label: 'Facing', ...sel(UFACINGS) }]} />
           <Card><Text style={{ color: c.foreground }}>Total residential units: <Text style={{ fontFamily: 'Inter_700Bold' }}>{Math.floor(nv(floors)) * flats.length}</Text> · Grand total BUA: <Text style={{ fontFamily: 'Inter_700Bold' }}>{bua.toLocaleString('en-IN')} Sft</Text></Text></Card>
           <ListEditor title="Project amenities" editable={editable} addLabel="Add amenity" rows={amen} onChange={setAmen} cols={[{ key: 'name', label: 'Amenity' }, { key: 'description', label: 'Description' }]} />
         </View>
@@ -158,7 +161,7 @@ export function PlanBuilder({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
       {mode === 'liquor' ? (
         <View>
           <Card><Text style={{ color: c.foreground }}>Total daily sales target: <Text style={{ fontFamily: 'Inter_700Bold' }}>{formatINR(target)}</Text> across {counters.length} counters</Text></Card>
-          <ListEditor title="Licensed retail shop counters" editable={editable} addLabel="Add retail shop counter" rows={counters} onChange={setCounters} cols={[{ key: 'name', label: 'Counter name' }, { key: 'category', label: 'Outlet type', kind: 'select', options: OUTLETS }, { key: 'sqFtArea', label: 'Floor Sq.Ft', kind: 'num' }, { key: 'dailySalesTarget', label: 'Daily target (Rs)', kind: 'num' }, { key: 'staffCount', label: 'Staff count', kind: 'num' }]} />
+          <ListEditor title="Licensed retail shop counters" editable={editable} addLabel="Add retail shop counter" rows={counters} onChange={setCounters} cols={[{ key: 'name', label: 'Counter name' }, { key: 'category', label: 'Outlet type', ...sel(OUTLETS) }, { key: 'sqFtArea', label: 'Floor Sq.Ft', kind: 'num' }, { key: 'dailySalesTarget', label: 'Daily target (Rs)', kind: 'num' }, { key: 'staffCount', label: 'Staff count', kind: 'num' }]} />
           <ListEditor title="Cold storage and cash vault facilities" editable={editable} addLabel="Add facility" rows={facs} onChange={setFacs} cols={[{ key: 'name', label: 'Facility' }, { key: 'sqFtArea', label: 'Sq.Ft', kind: 'num' }, { key: 'description', label: 'Description' }]} />
         </View>
       ) : null}

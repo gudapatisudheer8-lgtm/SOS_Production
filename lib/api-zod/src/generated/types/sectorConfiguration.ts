@@ -7,10 +7,12 @@
  */
 import type { SectorConfigurationGrantsItem } from './sectorConfigurationGrantsItem';
 import type { SectorConfigurationInterfacesItem } from './sectorConfigurationInterfacesItem';
+import type { SectorConfigurationProjectSetup } from './sectorConfigurationProjectSetup';
 import type { SectorConfigurationResourcesItem } from './sectorConfigurationResourcesItem';
 import type { SectorConfigurationState } from './sectorConfigurationState';
 
 export interface SectorConfiguration {
+  projectSetup?: SectorConfigurationProjectSetup;
   resources?: SectorConfigurationResourcesItem[];
   releaseId: string;
   sectorId: string;

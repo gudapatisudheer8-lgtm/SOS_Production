@@ -98,3 +98,171 @@ mtime_ms = 1791559747494
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/b41e9227-190a-4b7b-b3ed-1606c539649a/cc703bdc-0adf-4169-bea6-02647aa470a6"
 storage_version_token = "1791559773745734"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "5DHgFUu2kJGi4XG-NxemZ"
+uri = "file://releases/sos-project-workspace.tar.gz"
+type = "unspecified"
+title = "SyndicateOS project workspace — EC2 package"
+description = "Compiled Spring Boot API, React Native web assets, additive migration V6, checksums and step-by-step EC2 instructions. Does not reset existing SOS data."
+logical_id = "aaa75a3d-e954-4903-b50f-202bc0a0a779"
+content_hash = "sha256:44f7b744a93352f7ae9ce4aba5a0c31fdb2a016039199cacd4b9341cba0ab7e5"
+size = 32763429
+mtime_ms = 1791563808888
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/aaa75a3d-e954-4903-b50f-202bc0a0a779/604b662c-3265-465a-971e-653203618690"
+storage_version_token = "1791563959718353"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "YbMc8rJ60ZNZdl8cyU-fm"
+uri = "file://releases/project-workspace-staging/DEPLOYMENT.md"
+type = "text"
+title = "EC2 instructions for the latest corrected archive"
+description = "Step-by-step backup, checksum verification, database upgrade, application installation and Project workspace release assignment."
+logical_id = "661900f3-a0b2-4074-93b3-dbacd12ea36d"
+content_hash = "sha256:fdbfba46b578564861ef6e8253b421d44733f311ccacc8bc8dd41a5718f628d1"
+size = 9089
+mtime_ms = 1791565198888
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/661900f3-a0b2-4074-93b3-dbacd12ea36d/541c4554-5ba1-4b75-a2b4-270857392bd8"
+storage_version_token = "1791565273127839"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "p5oQgo4fLBcHslY9AI9Ks"
+uri = "file://releases/sos-project-workspace.tar.gz.sha256"
+type = "unspecified"
+title = "Package SHA-256 checksum"
+description = "Compare this checksum with the downloaded archive before installation."
+logical_id = "cab5f1a6-e405-49f2-acbc-c1e977748a37"
+content_hash = "sha256:5ee53b56dc2c5f14e82dd703796d6ee8dcbac06295d5fcf7d5ded8558256c0f4"
+size = 95
+mtime_ms = 1791563808992
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/cab5f1a6-e405-49f2-acbc-c1e977748a37/16a282a7-b88c-43cc-91ed-7c8771d8b163"
+storage_version_token = "1791563962244676"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "gdQP65IQhKFVTC9dwYXgB"
+uri = "file://releases/sos-project-workspace-v7.tar.gz"
+type = "unspecified"
+title = "Corrected SyndicateOS EC2 package — use this archive"
+description = "Latest compiled API and web assets, migrations V6–V7 and deployment instructions. Includes tested booking deletion/resubmission reservation fixes. Replaces sos-project-workspace.tar.gz."
+logical_id = "e098c799-2832-4065-b2b8-4d99576210a7"
+content_hash = "sha256:f7d38b4e3485c031594c4591d3b54cdc7843ad66ef84e663341896c8e07d385c"
+size = 32759437
+mtime_ms = 1791564435456
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/e098c799-2832-4065-b2b8-4d99576210a7/977a4273-5a15-4a16-9592-9a47db05a4c9"
+storage_version_token = "1791564525825006"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "cHupKFr9pBYNr9OUvkhDl"
+uri = "file://releases/sos-project-workspace-v7.tar.gz.sha256"
+type = "unspecified"
+title = "Corrected package checksum"
+description = "SHA-256 checksum for sos-project-workspace-v7.tar.gz."
+logical_id = "e4643d15-228e-4bb3-8baa-84e6a624d245"
+content_hash = "sha256:06c85cf9ca02e120cd3a7e85698a5f740c5671462212242e82a3039ed8790e9d"
+size = 98
+mtime_ms = 1791564435556
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/e4643d15-228e-4bb3-8baa-84e6a624d245/6d5ee1fa-a80d-4713-aaba-2419feb27697"
+storage_version_token = "1791564527148611"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "kbaNGRq6TCGmCXl5kljiN"
+uri = "file://releases/sos-project-workspace-v7-documents.tar.gz"
+type = "unspecified"
+title = "Latest corrected EC2 archive — document setup fixed"
+description = "Use this package instead of sos-project-workspace-v7.tar.gz. Includes database-defined document category selection, pre-submit validation, and the verified upload-and-finalize flow. Existing migrations remain unchanged."
+logical_id = "07fed1fc-272c-4a8a-98d3-ca13b788bb45"
+content_hash = "sha256:d974bc5dbbbc8bb469a8a3a5910d119f6bb38055c0498afb8234fd14236f5fbe"
+size = 32767978
+mtime_ms = 1791565200904
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/07fed1fc-272c-4a8a-98d3-ca13b788bb45/4d4a4683-178b-4dd9-b9a6-b9f0f9d84158"
+storage_version_token = "1791565270552254"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "75aANuECJ9AZm51pkZA-z"
+uri = "file://releases/sos-project-workspace-v7-documents.tar.gz.sha256"
+type = "unspecified"
+title = "Latest archive SHA-256 checksum"
+description = "Checksum for sos-project-workspace-v7-documents.tar.gz."
+logical_id = "a86e3f40-4e3d-4ae2-bca6-70075b5a1d6c"
+content_hash = "sha256:287bd45e14a12d54786533fae77b226931be6d8d919077362ae8b74277a56c23"
+size = 108
+mtime_ms = 1791565201000
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/a86e3f40-4e3d-4ae2-bca6-70075b5a1d6c/d73f603b-7504-4902-8cc5-25c4479d39af"
+storage_version_token = "1791565271836646"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "ZKMZfD_jqKIrR5VKa4-Nt"
+uri = "file://releases/sos-project-setup-ui-fix.tar.gz"
+type = "unspecified"
+title = "SOS project setup fix — EC2 package"
+description = "6 MB web-only update with guarded activation/removal SQL. No JAR replacement or schema migration."
+logical_id = "67601674-7288-46dd-aebe-42256cb7760e"
+content_hash = "sha256:d2cfae3ab5b650d3768109812ae20716b93aa7957c827346b99028aa2c0f0594"
+size = 6210807
+mtime_ms = 1791568022168
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/67601674-7288-46dd-aebe-42256cb7760e/2142fd07-dbda-4730-9bab-918a0463bb91"
+storage_version_token = "1791568065946692"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "wMOmS5ZHUuyFWjBNTm9iU"
+uri = "file://releases/sos-project-setup-ui-fix.tar.gz.sha256"
+type = "unspecified"
+title = "Package SHA-256 checksum"
+description = "Upload alongside the archive to verify it before installation."
+logical_id = "fe4ee7e7-84e2-4510-9d52-6f07d52a6a10"
+content_hash = "sha256:24c37afa3000e0afb5ce2bae3e34b678ba9d926c1dacc05dfea0be0017ffe7ba"
+size = 98
+mtime_ms = 1791568022192
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/fe4ee7e7-84e2-4510-9d52-6f07d52a6a10/9fe85b7c-838a-42e7-b667-094fb8c8c6fd"
+storage_version_token = "1791568067180343"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "FjgGuSP-LBpfwhsuH06Kr"
+uri = "file://releases/project-workspace-ui-fix-staging/INSTALL.md"
+type = "text"
+title = "EC2 installation instructions"
+description = "Backup, targeted SQL changes, web installation and verification steps."
+logical_id = "b8827428-1d71-4e64-8f51-7dc1bfcd77e1"
+content_hash = "sha256:273a705406e80570fd87ac535e9a0ba785acb23f336c8b93c79c1b5584f0ebd0"
+size = 4328
+mtime_ms = 1791567775032
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/b8827428-1d71-4e64-8f51-7dc1bfcd77e1/129d4105-07cc-4da9-8905-5ece7875b41a"
+storage_version_token = "1791568068388954"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "GqyANUsMzxWeaIu75WxXo"
+uri = "file://releases/sos-simple-open-plotting.tar.gz"
+type = "unspecified"
+title = "Simple Open Plotting — EC2 update"
+description = "Compiled web app, API, database upgrade utility, CSA activation SQL and installation instructions."
+logical_id = "713182a5-d421-4f52-99c3-639d29a9fdbb"
+content_hash = "sha256:ee909bbb60fa69e6dc07e91eaf6c5ad7c0e53d1a81be465a0c863077c16a6ffc"
+size = 34397021
+mtime_ms = 1791573710896
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/713182a5-d421-4f52-99c3-639d29a9fdbb/b3084dce-3014-4cb8-a54d-b696f92632a2"
+storage_version_token = "1791573774176001"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "Yfw98LoKhemLKNUTtxIb5"
+uri = "file://releases/sos-simple-open-plotting.tar.gz.sha256"
+type = "unspecified"
+title = "Update checksum"
+description = "Upload this beside the archive to verify the download on EC2."
+logical_id = "424edcec-6180-464c-9a33-f29980f621c4"
+content_hash = "sha256:745115001638e4022f8ad3b78ba8db3d559875be40a8bfe412d150d71c0d8065"
+size = 98
+mtime_ms = 1791573711008
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/424edcec-6180-464c-9a33-f29980f621c4/8e2418ca-3b15-4d42-ba28-11af43b749e3"
+storage_version_token = "1791573775399372"
+content_type = "application/octet-stream"

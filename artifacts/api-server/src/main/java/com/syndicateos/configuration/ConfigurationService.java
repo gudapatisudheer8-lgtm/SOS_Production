@@ -62,11 +62,21 @@ public class ConfigurationService {
         for (Map<String,Object> grant : jdbc.queryForList("SELECT * FROM sos.permission_grants WHERE release_id=? ORDER BY role_code,permission_key",id))
             grants.addObject().put("role",(String)grant.get("role_code")).put("permission",(String)grant.get("permission_key")).put("scope",(String)grant.get("scope"));
         root.set("resources",erp.read(id));
+        var setup=jdbc.queryForList("SELECT definition FROM sos.project_setup_definitions WHERE release_id=?",id);
+        if(!setup.isEmpty()) {
+            ObjectNode definition=(ObjectNode)parse(setup.getFirst().get("definition"));
+            definition.put("versionId",id.toString());
+            root.set("projectSetup",definition);
+        }
         return root;
     }
     public List<String> validate(JsonNode root) {
         List<String> errors = new ArrayList<>();
         errors.addAll(erp.validate(root.path("resources")));
+        if(root.hasNonNull("projectSetup")) {
+            try {com.syndicateos.workspace.ProjectSetupDefinitions.validate(root.path("projectSetup"));}
+            catch(ApiProblem problem) {errors.add(problem.getMessage());}
+        }
         if (!root.path("interfaces").isArray() || root.path("interfaces").size()!=2)
             errors.add("Provide exactly one accountant interface and one partner interface.");
         if (!root.path("grants").isArray() || root.path("grants").size()>24) errors.add("Supply at most 24 explicit permission grants.");
@@ -167,6 +177,11 @@ public class ConfigurationService {
             jdbc.update("INSERT INTO sos.sector_releases(id,sector_id,version,label,created_by) VALUES (?,?,?,?,?)",release,sector,version,label,actor.identityId());
         }
         erp.save(release,input.path("resources"));
+        if(input.has("projectSetup")) {
+            com.syndicateos.workspace.ProjectSetupDefinitions.validate(input.path("projectSetup"));
+            jdbc.update("DELETE FROM sos.project_setup_definitions WHERE release_id=?",release);
+            jdbc.update("INSERT INTO sos.project_setup_definitions(release_id,definition) VALUES (?,?::jsonb)",release,input.path("projectSetup").toString());
+        }
         Map<String,UUID> fields=new HashMap<>();
         for (JsonNode ui : input.path("interfaces")) {
             UUID interfaceId=UUID.randomUUID();

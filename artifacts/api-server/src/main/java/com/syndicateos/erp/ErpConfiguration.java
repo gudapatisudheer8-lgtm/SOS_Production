@@ -10,8 +10,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class ErpConfiguration {
     public static final Set<String> KINDS=Set.of("accounts","transactions","investments","expenses","budgets",
-        "partner-profiles","drawings","bookings","documents","plots","units","settlements","stock-draws");
-    public static final Set<String> FINANCIAL=Set.of("transactions","investments","expenses","drawings","bookings","settlements","stock-draws");
+        "partner-profiles","drawings","bookings","documents","plots","units","settlements","stock-draws","reimbursements");
+    public static final Set<String> FINANCIAL=Set.of("transactions","investments","expenses","drawings","bookings","settlements","stock-draws","reimbursements");
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     public ErpConfiguration(JdbcTemplate jdbc,ObjectMapper json) { this.jdbc=jdbc; this.json=json; }
@@ -47,8 +47,8 @@ public class ErpConfiguration {
                 Set<String> found=new HashSet<>();
                 for(JsonNode role:roles) {
                     String code=role.asText();
-                    boolean partnerAllowed="submit".equals(permission)?Set.of("investments","expenses","drawings","bookings").contains(kind)
-                        :"review".equals(permission)&&Set.of("investments","expenses").contains(kind);
+                    boolean partnerAllowed="submit".equals(permission)?Set.of("investments","expenses","drawings","bookings","reimbursements").contains(kind)
+                        :"review".equals(permission)&&Set.of("investments","expenses","bookings","reimbursements").contains(kind);
                     if(!found.add(code)||!"ACCOUNTANT".equals(code)&&!("PARTNER".equals(code)&&partnerAllowed))
                         errors.add("Invalid resource role capability.");
                 }

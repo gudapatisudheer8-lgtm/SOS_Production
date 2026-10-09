@@ -1,3 +1,4 @@
+import { erpSetup } from '@/lib/erpSetup';
 import React, { useState } from 'react';
 import { Linking, Text, View } from 'react-native';
 import type { ErpRecord, ProjectErp } from '@workspace/api-client-react';
@@ -10,11 +11,8 @@ import { label, live, recLabel, str, tone, type ErpCtx } from '@/screens/ErpScre
 
 const nv = (x: unknown) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
 /** Source ConstructionModule milestone ladder (cumulative completion). Token Advance precedes construction. */
-export const MILESTONES: { name: string; call: number; done: number }[] = [
-  { name: 'Token Advance', call: 0, done: 0 }, { name: 'Plinth Level', call: 20, done: 20 }, { name: '1st Slab', call: 20, done: 40 },
-  { name: 'Brickwork', call: 15, done: 55 }, { name: 'Plastering & Electrical', call: 15, done: 70 }, { name: 'Flooring', call: 15, done: 85 }, { name: 'Handover', call: 15, done: 100 },
-];
-export const stagePct = (m: string): number | null => MILESTONES.find((x) => x.name === m)?.done ?? null;
+export const milestonesOf = (erp: ProjectErp) => erpSetup(erp).milestones;
+export const stagePct = (erp: ProjectErp, m: string): number | null => milestonesOf(erp)?.find((x) => x.name === m)?.done ?? null;
 export const RECEIPT_CATEGORY = { plots: 'plot_booking_advance', units: 'flat_booking_advance' } as const;
 
 export function waLink(text: string, phone?: string): string {
@@ -52,7 +50,7 @@ export function InventoryStage({ erp, rec, ctx }: { erp: ProjectErp; rec: ErpRec
       {!isPlot ? <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 6 }}>Milestone: {str(rec.data.currentMilestone || rec.data.milestoneStage) || 'not set'}{str(rec.data.paymentMilestone) ? ` · payment milestone ${str(rec.data.paymentMilestone)}` : ''}</Text> : null}
       {!accountant ? <Text style={{ color: c.mutedForeground, fontSize: 12 }}>Stage changes are made by the accountant. This view is read-only for partners.</Text> : (
         <View>
-          {!isPlot ? <Chips label="Construction milestone" options={MILESTONES.map((m) => ({ value: m.name, label: `${m.name}${m.call ? ` (${m.call}%)` : ''}` }))} value={ms} onChange={setMs} /> : null}
+          {!isPlot && !milestonesOf(erp) ? <Banner tone="warn" title="Milestone rules are not configured" text="This project's release defines no construction milestones, so stage updates are unavailable." /> : null}{!isPlot && milestonesOf(erp) ? <Chips label="Construction milestone" options={(milestonesOf(erp) ?? []).map((m) => ({ value: m.name, label: `${m.name}${m.call ? ` (${m.call}%)` : ''}` }))} value={ms} onChange={setMs} /> : null}
           <Field label="Official registration document value (Rs, optional)" value={doc} onChangeText={setDoc} keyboardType="numeric" />
           {!isPlot && status && status !== 'available' ? <Btn label="Update milestone" variant="ghost" loading={busy} disabled={!ms} onPress={() => void go({ status, currentMilestone: ms })} /> : null}
           <View style={{ height: 6 }} />

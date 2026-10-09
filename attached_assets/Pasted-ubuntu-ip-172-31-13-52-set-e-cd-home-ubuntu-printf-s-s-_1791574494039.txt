@@ -1,0 +1,233 @@
+ubuntu@ip-172-31-13-52:~$ (
+  set -e
+  cd /home/ubuntu
+
+  printf '%s  %s\n' \
+    'ee909bbb60fa69e6dc07e91eaf6c5ad7c0e53d1a81be465a0c863077c16a6ffc' \
+    'sos-simple-open-plotting.tar.gz' | sha256sum -c -
+
+  UPDATE_DIR="$(mktemp -d /home/ubuntu/sos-simple-plots-XXXXXX)"
+  tar -xzf sos-simple-open-plotting.tar.gz -C "$UPDATE_DIR"
+  cd "$UPDATE_DIR"
+
+  sha256sum -c FILES.sha256
+  sudo nginx -t
+
+  printf '%s\n' "$UPDATE_DIR" > /home/ubuntu/sos-simple-open-plotting-update.path
+  printf '\nVerified update folder: %s\n' "$UPDATE_DIR"
+)
+sos-simple-open-plotting.tar.gz: OK
+./01-activate-simple-open-plotting.sql: OK
+./INSTALL.md: OK
+./sos-api.jar: OK
+./upgrade.py: OK
+./web/assets/assets/brand/icon.8ce9f1b19f3d585a8eb9b54cf4fae372.png: OK
+./web/assets/assets/brand/logo-horizontal.bf44a9b128afec441f3700fe864a081f.png: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/100Thin/Inter_100Thin.ddbb1cd55ad509e82377bd10beed6506.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/100Thin_Italic/Inter_100Thin_Italic.1b97f7df9b976cfe530c18c09598e6f6.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/200ExtraLight/Inter_200ExtraLight.e1f33daee21eb5998b13d3e05264d9a3.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/200ExtraLight_Italic/Inter_200ExtraLight_Italic.3d0662838915a7a16d01c262735d3d29.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/300Light/Inter_300Light.d2994e3dea3856e1834395ad6cce32af.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/300Light_Italic/Inter_300Light_Italic.17f8f23a2852bfa14ce5bf590c2a0e2c.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.51b6ad87261f18b6433ec52871ddfabc.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular_Italic/Inter_400Regular_Italic.36cad9f97595b7759264b945d64502b4.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.137ab18bace28dd0bd83eb3b8ed2bc54.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium_Italic/Inter_500Medium_Italic.155406bfbfb023eb104728edfe62c0e9.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.a5f35888d2da465de352e0dcfaf33324.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold_Italic/Inter_600SemiBold_Italic.a349d1ac188e1a67689432f44de99849.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.6e237de4f1f413afa2fcc45c77ac343a.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold_Italic/Inter_700Bold_Italic.3398006c80026f0508aaaf4808950d56.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/800ExtraBold/Inter_800ExtraBold.6016034293c084aa0c056e83938bf1cc.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/800ExtraBold_Italic/Inter_800ExtraBold_Italic.7ca909a56537d965feef41abe58b87e0.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/900Black/Inter_900Black.bcec6eda9700a81ba92c483a2f2c02c1.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/900Black_Italic/Inter_900Black_Italic.d5f78c24de59ce5e4bad405e10e71941.ttf: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/arrow_down.017bc6ba3fc25503e5eb5e53826d48a8.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/error.d1ea1496f9057eb392d5bbf3732a61b7.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/file.19eeb73b9593a38f8e9f418337fc7d10.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/forward.d8b800c443b8972542883e0b9de2bdc6.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/pkg.ab19f4cbc543357183a20571f68380a3.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/back-icon.35ba0eaec5a4f5ed12ca16fabeae451d.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.0a328cd9c1afd0afe8e3b1ec5165b1b4.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55@2x.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55@3x.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55@4x.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/close-icon.808e1b1b9b53114ec2838071a7e6daa7@2x.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/close-icon.808e1b1b9b53114ec2838071a7e6daa7@3x.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/close-icon.808e1b1b9b53114ec2838071a7e6daa7@4x.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/close-icon.808e1b1b9b53114ec2838071a7e6daa7.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/react-navigation/elements/search-icon.286d67d3f74808a60a78d3ebf1a5fb57.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png: OK
+./web/assets/__node_modules/.pnpm/expo-router@57.0.25_70d4d298d090e6aaecf23c4929397ad7/node_modules/expo-router/assets/unmatched.20e71bdf79e3a97bf55fd9e164041578.png: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.3f78af31cca60105799838a1a7a59fbd.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Entypo.31b5ffea3daddc69dd01a1f3d6cf63c5.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/EvilIcons.140c53a7643ea949007aa9a282153849.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ca4b48e04dc1ce10bfbddb262c8b835f.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Brands.3b89dd103490708d19a95adcae52210e.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.1f77739ca9ff2188b539c36f30ffa2be.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.605ed7926cf39a2ad5ec2d1f9d391d3d.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Brands.56c8d80832e37783f12c05db7c8849e2.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Regular.370dd5af19f8364907b6e2c41f45dbbf.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Solid.adec7d6f310bc577f05e8fe06a5daccf.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.b06871f281fee6b241d60582ae9369b9.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Fontisto.b49ae8ab2dbccb02c4d11caaacf09eab.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Foundation.e20945d7c929279ef7a6f1db184a4470.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.6e435534bd35da5fef04168860a9b8fa.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.4e85bc9ebe07e0340c9c4fc2f6c38908.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Octicons.871378c6eab492a3e689a9385dc45a12.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/SimpleLineIcons.d2285965fe34b05465047401b8595dd0.ttf: OK
+./web/assets/__node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@57.0.4_react-native@0.86.3_@babel+core@7.29.7_@type_022122244800d27e1010b3508a466f23/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Zocial.1681f34aaca71b8dfb70756bca331eb2.ttf: OK
+./web/_expo/static/js/web/entry-45627ecf4b41826094d26116b1737eae.js: OK
+./web/_expo/static/js/web/entry-da345504dfc1e13219e2cd85f1bc758b.js: OK
+./web/_expo/static/js/web/entry-e5ad10d8d697c621283a77dd1d367a7e.js: OK
+./web/favicon.ico: OK
+./web/index.html: OK
+./web/metadata.json: OK
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+Verified update folder: /home/ubuntu/sos-simple-plots-dhwjsq
+ubuntu@ip-172-31-13-52:~$ cd "$(cat /home/ubuntu/sos-simple-open-plotting-update.path)"
+cat INSTALL.md
+# Simple open plotting update — EC2
+
+Contains the compiled web app, API JAR, guarded database upgrade utility and an explicit CSA release-activation SQL script. No sample projects, partners, accounts or transactions are included.
+
+## What changes
+
+- Facing cards: enter plot count and area per plot. Numbering is sequential across entered groups; optional individual details remain available.
+- Partner equity drives calculated planned capital. Combined allocations cannot exceed 100% equity or the entered project cost. Drafts may be incomplete; final creation requires full equity if partners are entered.
+- Bank entry displays only bank name, account holder name, account number, IFSC and branch. New accounts start at zero; old balances and effective dates remain unchanged.
+- Business choices, labels, presentation metadata, defaults and allocation rules are in a new immutable PostgreSQL configuration release.
+- Other sectors and older releases retain their existing forms.
+
+This changes planned capital, not money received, posted balances, or expense approvals.
+
+## 1. Upload and verify
+
+Download both the archive and its checksum file, then upload both using your existing scp command.
+
+On EC2:
+
+```bash
+set -e
+cd /home/ubuntu
+sha256sum -c sos-simple-open-plotting.tar.gz.sha256
+UPDATE_DIR="$(mktemp -d /home/ubuntu/sos-simple-plots-XXXXXX)"
+tar -xzf sos-simple-open-plotting.tar.gz -C "$UPDATE_DIR"
+cd "$UPDATE_DIR"
+sha256sum -c FILES.sha256
+sudo nginx -t
+printf 'Update folder: %s\n' "$UPDATE_DIR"
+```
+
+If the checksum file was not uploaded, upload it before continuing; do not skip verification.
+
+## 2. Back up before changing production
+
+Take a fresh SOS database backup and verify that it completed. The existing earlier backup may predate newly entered data.
+
+```bash
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+sudo cp -a /opt/syndicateos/web "/opt/syndicateos/web.before-simple-plots-$STAMP"
+sudo cp -a /opt/syndicateos/sos-api.jar "/opt/syndicateos/sos-api.jar.before-simple-plots-$STAMP"
+sudo systemctl stop syndicateos-api
+sudo ss -ltnp 'sport = :8090'
+```
+
+Port 8090 should now be empty. If a Java process is still listening, stop here and identify its owning service; do not kill an unknown process or change the port.
+
+## 3. Apply the additive database migration
+
+From the extracted update folder:
+
+```bash
+python3 upgrade.py
+```
+
+Enter the existing sos_migrator password at the hidden terminal prompt. This utility targets only the existing SOS database, applies migrations once through Flyway, and exits. It does not reset the owner or change firm assignments.
+
+**Do not run V8 manually in pgAdmin.** That would bypass Flyway's migration history.
+
+## 4. Activate the new forms explicitly
+
+Print the activation SQL:
+
+```bash
+cat 01-activate-simple-open-plotting.sql
+```
+
+Copy the complete script into pgAdmin connected to **SOS** and execute it as the existing database administrator. It changes only CSA's open-plotting assignment and grants the runtime role access to the application tables.
+
+Expected final row:
+
+- Client code: CSA
+- Release: Simple open plotting · Open plotting
+- Presentation: open-plotting-simple
+
+Do not proceed if the script fails or these values are different. Without this step, the application will keep displaying the older forms.
+
+## 5. Install the compiled files
+
+After upgrade and activation both succeed:
+
+```bash
+sudo install -o sos-api -g sos-api -m 0644 sos-api.jar /opt/syndicateos/sos-api.jar
+sudo cp -a web/. /opt/syndicateos/web/
+sudo nginx -t
+sudo systemctl reset-failed syndicateos-api
+sudo systemctl start syndicateos-api
+sudo systemctl reload nginx
+sleep 5
+sudo systemctl status syndicateos-api --no-pager -l
+sudo journalctl -u syndicateos-api -n 40 --no-pager
+```
+
+The web copy deliberately preserves old hashed assets so an already-open browser does not lose its loaded modules. The new index references the new compiled assets.
+
+Then sign out, refresh the page with Ctrl+Shift+R, and sign in again. New setup should show the compact Plot Matrix, Partners & Equity and Bank Accounts sections.
+
+Existing live project structure remains locked in setup; use its own tabs to manage partners, accounts and inventory. Existing drafts can be reviewed against the newly assigned release before saving; their existing child data is retained.
+
+## If an upgrade fails
+
+Do not restore an old database over newly created data. Keep the API stopped, retain the backup and copy the specific error output. If migration did not complete and the previous database schema is intact, restore the backed-up JAR/web pair before restarting. An already-applied additive configuration release should remain in the database; do not delete it or alter migration history.
+ubuntu@ip-172-31-13-52:~/sos-simple-plots-dhwjsq$ upgrade.py
+upgrade.py: command not found
+ubuntu@ip-172-31-13-52:~/sos-simple-plots-dhwjsq$ exit
+logout
+Connection to 3.111.185.116 closed.
+PS C:\WINDOWS\system32> ssh -i C:\Users\91986\Downloads\SOS.pem ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1006-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Oct  9 19:34:24 UTC 2026
+
+  System load:  0.0               Temperature:           -273.1 C
+  Usage of /:   54.1% of 6.61GB   Processes:             125
+  Memory usage: 48%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+ * Ubuntu Pro delivers the most comprehensive open source security and
+   compliance features.
+
+   https://ubuntu.com/aws/pro
+
+Expanded Security Maintenance for Applications is not enabled.
+
+189 updates can be applied immediately.
+148 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Fri Oct  9 19:32:14 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$ upgrade.py
+upgrade.py: command not found
+ubuntu@ip-172-31-13-52:~$

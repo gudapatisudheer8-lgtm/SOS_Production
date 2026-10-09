@@ -81,6 +81,12 @@ public class WorkspaceReader {
             item.put("id",project); item.put("firmId",firm); item.put("sectorId",sector); item.put("name",row.get("name"));
             item.put("location",row.get("location")); item.put("status",row.get("status")); item.put("revision",row.get("revision"));
             item.put("details",config.parse(row.get("details")));
+            item.put("setupState",row.get("setup_state"));
+            if("PARTNER".equals(actor.role()) && !"READY".equals(row.get("setup_state"))) continue;
+            if("ACCOUNTANT".equals(actor.role())) {
+                var setup=jdbc.queryForList("SELECT data FROM sos.project_setup_sections WHERE project_id=?",project);
+                if(!setup.isEmpty()) item.put("setupData",config.parse(setup.getFirst().get("data")));
+            }
             List<Map<String,Object>> partners=List.of();
             if ("OWNER".equals(actor.role()) || config.permitted(release,actor.role(),"partners.read")) {
                 if ("PARTNER".equals(actor.role())) partners=jdbc.queryForList(

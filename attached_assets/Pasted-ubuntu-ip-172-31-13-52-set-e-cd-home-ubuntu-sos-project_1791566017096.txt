@@ -1,0 +1,90 @@
+ubuntu@ip-172-31-13-52:~$ (
+set -e
+
+cd /home/ubuntu/sos-project-workspace-5eRQd9
+
+sudo systemctl stop syndicateos-api
+
+# Prepare the new web folder before replacing the current one.
+NEW_WEB="$(sudo mktemp -d /opt/syndicateos/web-new-XXXXXX)"
+
+sudo cp -a web/. "$NEW_WEB/"
+sudo chown -R root:root "$NEW_WEB"
+sudo find "$NEW_WEB" -type d -exec chmod 755 {} \;
+sudo find "$NEW_WEB" -type f -exec chmod 644 {} \;
+
+# Install the backend.
+sudo install -m 644 sos-api.jar /opt/syndicateos/sos-api.jar
+
+# Preserve the old frontend and activate the new one.
+OLD_WEB="/opt/syndicateos/web.before-project-workspace-$(date +%Y%m%d-%H%M%S)"
+
+sudo mv /opt/syndicateos/web "$OLD_WEB"
+sudo mv "$NEW_WEB" /opt/syndicateos/web
+
+echo "Previous web files preserved at: $OLD_WEB"
+
+# Allow the API to write private uploads when filesystem protection is enabled.
+sudo mkdir -p /etc/systemd/system/syndicateos-api.service.d
+
+printf '[Service]\nReadWritePaths=/var/lib/syndicateos/uploads\n' |
+  sudo tee /etc/systemd/system/syndicateos-api.service.d/uploads.conf >/dev/null
+
+sudo systemctl daemon-reload
+sudo nginx -t
+
+sudo systemctl reset-failed syndicateos-api
+sudo systemctl start syndicateos-api
+)
+Previous web files preserved at: /opt/syndicateos/web.before-project-workspace-20261009-171253
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+ubuntu@ip-172-31-13-52:~$ sudo systemctl status syndicateos-api --no-pager
+
+sudo ss -ltnp 'sport = :8090'
+
+sudo journalctl -u syndicateos-api --since "5 minutes ago" --no-pager
+● syndicateos-api.service - SyndicateOS Spring Boot API
+     Loaded: loaded (/etc/systemd/system/syndicateos-api.service; enabled; preset: enabled)
+    Drop-In: /etc/systemd/system/syndicateos-api.service.d
+             └─uploads.conf
+     Active: active (running) since Fri 2026-10-09 17:12:53 UTC; 22s ago
+ Invocation: 0903c78f5713479499b2426f7baf71b6
+   Main PID: 9661 (java)
+      Tasks: 21 (limit: 627)
+     Memory: 145.2M (peak: 153M)
+        CPU: 11.449s
+     CGroup: /system.slice/syndicateos-api.service
+             └─9661 /usr/bin/java -Xms64m -Xmx256m -Xss512k -XX:MaxDirectMemorySize=64m -XX:MaxMetaspaceSize=192m -XX:R…
+
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]:  :: Spring Boot ::               (v3.5.16)
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:55.912Z  INFO 9661 --- [syndicateos-api] [         …cateos)
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:55.919Z  INFO 9661 --- [syndicateos-api] [         …efault"
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.283Z  INFO 9661 --- [syndicateos-api] [         … (http)
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.305Z  INFO 9661 --- [syndicateos-api] [         …Tomcat]
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.306Z  INFO 9661 --- [syndicateos-api] [         …0.1.55]
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.354Z  INFO 9661 --- [syndicateos-api] [         …Context
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.357Z  INFO 9661 --- [syndicateos-api] [         …2314 ms
+Oct 09 17:12:59 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:59.883Z  INFO 9661 --- [syndicateos-api] [         …ath '/'
+Oct 09 17:12:59 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:59.902Z  INFO 9661 --- [syndicateos-api] [         … 6.173)
+Hint: Some lines were ellipsized, use -l to show in full.
+State     Recv-Q    Send-Q            Local Address:Port        Peer Address:Port    Process
+LISTEN    0         100          [::ffff:127.0.0.1]:8090                   *:*        users:(("java",pid=9661,fd=9))
+Oct 09 17:12:53 ip-172-31-13-52 systemd[1]: Started syndicateos-api.service - SyndicateOS Spring Boot API.
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]:   .   ____          _            __ _ _
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]:  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]: ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]:  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]:   '  |____| .__|_| |_|_| |_\__, | / / / /
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]:  =========|_|==============|___/=/_/_/_/
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]:  :: Spring Boot ::               (v3.5.16)
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:55.912Z  INFO 9661 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Starting SosApplication v0.1.0 using Java 21.0.12.1 with PID 9661 (/opt/syndicateos/sos-api.jar started by sos-api in /opt/syndicateos)
+Oct 09 17:12:55 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:55.919Z  INFO 9661 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : No active profile set, falling back to 1 default profile: "default"
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.283Z  INFO 9661 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.305Z  INFO 9661 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.306Z  INFO 9661 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.354Z  INFO 9661 --- [syndicateos-api] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+Oct 09 17:12:58 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:58.357Z  INFO 9661 --- [syndicateos-api] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2314 ms
+Oct 09 17:12:59 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:59.883Z  INFO 9661 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path '/'
+Oct 09 17:12:59 ip-172-31-13-52 java[9661]: 2026-10-09T17:12:59.902Z  INFO 9661 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Started SosApplication in 5.194 seconds (process running for 6.173)
+ubuntu@ip-172-31-13-52:~$
