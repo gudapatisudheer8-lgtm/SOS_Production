@@ -1,0 +1,413 @@
+PS C:\WINDOWS\system32>
+PS C:\WINDOWS\system32>
+PS C:\WINDOWS\system32> scp -i "C:\Users\91986\Downloads\SOS.pem" "C:\Users\91986\Downloads\sos-development.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
+sos-development.tar.gz                                                                100%   31MB   1.9MB/s   00:15
+PS C:\WINDOWS\system32> ssh -i "C:\Users\91986\Downloads\SOS.pem" ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1006-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Oct  9 06:22:38 UTC 2026
+
+  System load:  0.0               Temperature:           -273.1 C
+  Usage of /:   32.1% of 6.61GB   Processes:             124
+  Memory usage: 28%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+
+Expanded Security Maintenance for Applications is not enabled.
+
+0 updates can be applied immediately.
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+The list of available updates is more than a week old.
+To check for new updates run: sudo apt update
+
+Last login: Fri Oct  9 05:56:54 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$ cat /etc/os-release | head -5
+uname -m
+free -h
+PRETTY_NAME="Ubuntu 26.04 LTS"
+NAME="Ubuntu"
+VERSION_ID="26.04"
+VERSION="26.04 LTS (Resolute Raccoon)"
+VERSION_CODENAME=resolute
+x86_64
+               total        used        free      shared  buff/cache   available
+Mem:           908Mi       320Mi       159Mi       2.7Mi       539Mi       587Mi
+Swap:             0B          0B          0B
+ubuntu@ip-172-31-13-52:~$ sudo ss -ltnp | grep -E ':(80|443|8090)([[:space:]]|$)' || true
+ubuntu@ip-172-31-13-52:~$ sha256sum ~/sos-development.tar.gz
+40fe448bca58892128333fc1343e0009a623c8cc897289c21101b412dd03591a  /home/ubuntu/sos-development.tar.gz
+ubuntu@ip-172-31-13-52:~$ sudo apt-get update
+sudo apt-get install -y openjdk-21-jre-headless
+Hit:1 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute InRelease
+Get:2 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates InRelease [137 kB]
+Get:3 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports InRelease [137 kB]
+Get:4 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/universe amd64v3 Packages [16.3 MB]
+Get:5 http://security.ubuntu.com/ubuntu resolute-security InRelease [137 kB]
+Get:6 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/universe Translation-en [6329 kB]
+Get:7 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/universe amd64 Components [4556 kB]
+Get:8 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/universe amd64 c-n-f Metadata [313 kB]
+Get:9 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/multiverse amd64v3 Packages [291 kB]
+Get:10 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/multiverse Translation-en [127 kB]
+Get:11 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/multiverse amd64 Components [50.0 kB]
+Get:12 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/multiverse amd64 c-n-f Metadata [8276 B]
+Get:13 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 Packages [736 kB]
+Get:14 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main Translation-en [173 kB]
+Get:15 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64 Components [110 kB]
+Get:16 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64 c-n-f Metadata [5756 B]
+Get:17 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/universe amd64v3 Packages [324 kB]
+Get:18 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/universe Translation-en [106 kB]
+Get:19 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/universe amd64 Components [201 kB]
+Get:20 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/universe amd64 c-n-f Metadata [4704 B]
+Get:21 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/restricted amd64v3 Packages [508 kB]
+Get:22 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/restricted Translation-en [101 kB]
+Get:23 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/multiverse amd64v3 Packages [21.1 kB]
+Get:24 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/multiverse Translation-en [4168 B]
+Get:25 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/multiverse amd64 Components [216 B]
+Get:26 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/multiverse amd64 c-n-f Metadata [256 B]
+Get:27 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/main amd64 Components [212 B]
+Get:28 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/main amd64 c-n-f Metadata [112 B]
+Get:29 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/universe amd64v3 Packages [3144 B]
+Get:30 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/universe Translation-en [7988 B]
+Get:31 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/universe amd64 Components [1060 B]
+Get:32 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/universe amd64 c-n-f Metadata [116 B]
+Get:33 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/restricted amd64 Components [216 B]
+Get:34 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/restricted amd64 c-n-f Metadata [120 B]
+Get:35 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/multiverse amd64 Components [216 B]
+Get:36 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/multiverse amd64 c-n-f Metadata [120 B]
+Get:37 http://security.ubuntu.com/ubuntu resolute-security/main amd64v3 Packages [601 kB]
+Get:38 http://security.ubuntu.com/ubuntu resolute-security/main Translation-en [138 kB]
+Get:39 http://security.ubuntu.com/ubuntu resolute-security/main amd64 Components [46.7 kB]
+Get:40 http://security.ubuntu.com/ubuntu resolute-security/main amd64 c-n-f Metadata [4616 B]
+Get:41 http://security.ubuntu.com/ubuntu resolute-security/universe amd64v3 Packages [201 kB]
+Get:42 http://security.ubuntu.com/ubuntu resolute-security/universe Translation-en [65.4 kB]
+Get:43 http://security.ubuntu.com/ubuntu resolute-security/universe amd64 Components [55.6 kB]
+Get:44 http://security.ubuntu.com/ubuntu resolute-security/universe amd64 c-n-f Metadata [3552 B]
+Get:45 http://security.ubuntu.com/ubuntu resolute-security/restricted amd64v3 Packages [498 kB]
+Get:46 http://security.ubuntu.com/ubuntu resolute-security/restricted Translation-en [99.6 kB]
+Get:47 http://security.ubuntu.com/ubuntu resolute-security/multiverse amd64v3 Packages [20.1 kB]
+Get:48 http://security.ubuntu.com/ubuntu resolute-security/multiverse Translation-en [3728 B]
+Get:49 http://security.ubuntu.com/ubuntu resolute-security/multiverse amd64 Components [212 B]
+Get:50 http://security.ubuntu.com/ubuntu resolute-security/multiverse amd64 c-n-f Metadata [120 B]
+Fetched 32.4 MB in 4s (7807 kB/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Solving dependencies... Done
+The following additional packages will be installed:
+  alsa-topology-conf alsa-ucm-conf ca-certificates-java fontconfig-config fonts-dejavu-core fonts-dejavu-mono
+  java-common libasound2-data libasound2t64 libavahi-client3 libavahi-common-data libavahi-common3 libcups2t64
+  libfontconfig1 libgraphite2-3 libharfbuzz0b libjpeg-turbo8 libjpeg8 liblcms2-2 libpcsclite1
+Suggested packages:
+  default-jre alsa-utils libasound2-plugins cups-common liblcms2-utils pcscd libnss-mdns fonts-dejavu-extra
+  fonts-ipafont-gothic fonts-ipafont-mincho fonts-wqy-microhei | fonts-wqy-zenhei fonts-indic
+The following NEW packages will be installed:
+  alsa-topology-conf alsa-ucm-conf ca-certificates-java fontconfig-config fonts-dejavu-core fonts-dejavu-mono
+  java-common libasound2-data libasound2t64 libavahi-client3 libavahi-common-data libavahi-common3 libcups2t64
+  libfontconfig1 libgraphite2-3 libharfbuzz0b libjpeg-turbo8 libjpeg8 liblcms2-2 libpcsclite1 openjdk-21-jre-headless
+0 upgraded, 21 newly installed, 0 to remove and 189 not upgraded.
+Need to get 50.2 MB of archives.
+After this operation, 216 MB of additional disk space will be used.
+Get:1 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 alsa-topology-conf all 1.2.5.1-3build1 [15.6 kB]
+Get:2 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 libasound2-data all 1.2.15.3-1ubuntu1.1 [19.6 kB]
+Get:3 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 libasound2t64 amd64 1.2.15.3-1ubuntu1.1 [417 kB]
+Get:4 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 alsa-ucm-conf all 1.2.15.3-1ubuntu1.7 [106 kB]
+Get:5 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 ca-certificates-java all 20260311 [11.3 kB]
+Get:6 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 fonts-dejavu-mono all 2.37-8build1 [502 kB]
+Get:7 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 fonts-dejavu-core all 2.37-8build1 [834 kB]
+Get:8 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 fontconfig-config amd64 2.17.1-3ubuntu1 [38.5 kB]
+Get:9 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 java-common all 0.77 [6682 B]
+Get:10 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 libavahi-common-data amd64 0.8-18ubuntu1.1 [27.2 kB]
+Get:11 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 libavahi-common3 amd64 0.8-18ubuntu1.1 [23.7 kB]
+Get:12 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 libavahi-client3 amd64 0.8-18ubuntu1.1 [27.3 kB]
+Get:13 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 libcups2t64 amd64 2.4.16-1ubuntu1.3 [270 kB]
+Get:14 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 libfontconfig1 amd64 2.17.1-3ubuntu1 [145 kB]
+Get:15 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 libgraphite2-3 amd64 1.3.14-11ubuntu1.1 [72.5 kB]
+Get:16 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 libharfbuzz0b amd64 12.3.2-2 [525 kB]
+Get:17 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 libjpeg-turbo8 amd64 2.1.5-4ubuntu4 [162 kB]
+Get:18 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 libjpeg8 amd64 8c-2ubuntu12 [2154 B]
+Get:19 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main amd64v3 liblcms2-2 amd64 2.17-1ubuntu0.2 [172 kB]
+Get:20 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute/main amd64v3 libpcsclite1 amd64 2.4.1-1 [24.6 kB]
+Get:21 http://ap-south-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/universe amd64v3 openjdk-21-jre-headless amd64 21.0.12.1+1-1~26.04.4 [46.8 MB]
+Fetched 50.2 MB in 1s (99.6 MB/s)
+Selecting previously unselected package alsa-topology-conf.
+(Reading database ... 85303 files and directories currently installed.)
+Preparing to unpack .../00-alsa-topology-conf_1.2.5.1-3build1_all.deb ...
+Unpacking alsa-topology-conf (1.2.5.1-3build1) ...
+Selecting previously unselected package libasound2-data.
+Preparing to unpack .../01-libasound2-data_1.2.15.3-1ubuntu1.1_all.deb ...
+Unpacking libasound2-data (1.2.15.3-1ubuntu1.1) ...
+Selecting previously unselected package libasound2t64:amd64.
+Preparing to unpack .../02-libasound2t64_1.2.15.3-1ubuntu1.1_amd64v3.deb ...
+Unpacking libasound2t64:amd64 (1.2.15.3-1ubuntu1.1) ...
+Selecting previously unselected package alsa-ucm-conf.
+Preparing to unpack .../03-alsa-ucm-conf_1.2.15.3-1ubuntu1.7_all.deb ...
+Unpacking alsa-ucm-conf (1.2.15.3-1ubuntu1.7) ...
+Selecting previously unselected package ca-certificates-java.
+Preparing to unpack .../04-ca-certificates-java_20260311_all.deb ...
+Unpacking ca-certificates-java (20260311) ...
+Selecting previously unselected package fonts-dejavu-mono.
+Preparing to unpack .../05-fonts-dejavu-mono_2.37-8build1_all.deb ...
+Unpacking fonts-dejavu-mono (2.37-8build1) ...
+Selecting previously unselected package fonts-dejavu-core.
+Preparing to unpack .../06-fonts-dejavu-core_2.37-8build1_all.deb ...
+Unpacking fonts-dejavu-core (2.37-8build1) ...
+Selecting previously unselected package fontconfig-config.
+Preparing to unpack .../07-fontconfig-config_2.17.1-3ubuntu1_amd64v3.deb ...
+Unpacking fontconfig-config (2.17.1-3ubuntu1) ...
+Selecting previously unselected package java-common.
+Preparing to unpack .../08-java-common_0.77_all.deb ...
+Unpacking java-common (0.77) ...
+Selecting previously unselected package libavahi-common-data:amd64.
+Preparing to unpack .../09-libavahi-common-data_0.8-18ubuntu1.1_amd64v3.deb ...
+Unpacking libavahi-common-data:amd64 (0.8-18ubuntu1.1) ...
+Selecting previously unselected package libavahi-common3:amd64.
+Preparing to unpack .../10-libavahi-common3_0.8-18ubuntu1.1_amd64v3.deb ...
+Unpacking libavahi-common3:amd64 (0.8-18ubuntu1.1) ...
+Selecting previously unselected package libavahi-client3:amd64.
+Preparing to unpack .../11-libavahi-client3_0.8-18ubuntu1.1_amd64v3.deb ...
+Unpacking libavahi-client3:amd64 (0.8-18ubuntu1.1) ...
+Selecting previously unselected package libcups2t64:amd64.
+Preparing to unpack .../12-libcups2t64_2.4.16-1ubuntu1.3_amd64v3.deb ...
+Unpacking libcups2t64:amd64 (2.4.16-1ubuntu1.3) ...
+Selecting previously unselected package libfontconfig1:amd64.
+Preparing to unpack .../13-libfontconfig1_2.17.1-3ubuntu1_amd64v3.deb ...
+Unpacking libfontconfig1:amd64 (2.17.1-3ubuntu1) ...
+Selecting previously unselected package libgraphite2-3:amd64.
+Preparing to unpack .../14-libgraphite2-3_1.3.14-11ubuntu1.1_amd64v3.deb ...
+Unpacking libgraphite2-3:amd64 (1.3.14-11ubuntu1.1) ...
+Selecting previously unselected package libharfbuzz0b:amd64.
+Preparing to unpack .../15-libharfbuzz0b_12.3.2-2_amd64v3.deb ...
+Unpacking libharfbuzz0b:amd64 (12.3.2-2) ...
+Selecting previously unselected package libjpeg-turbo8:amd64.
+Preparing to unpack .../16-libjpeg-turbo8_2.1.5-4ubuntu4_amd64v3.deb ...
+Unpacking libjpeg-turbo8:amd64 (2.1.5-4ubuntu4) ...
+Selecting previously unselected package libjpeg8:amd64.
+Preparing to unpack .../17-libjpeg8_8c-2ubuntu12_amd64v3.deb ...
+Unpacking libjpeg8:amd64 (8c-2ubuntu12) ...
+Selecting previously unselected package liblcms2-2:amd64.
+Preparing to unpack .../18-liblcms2-2_2.17-1ubuntu0.2_amd64v3.deb ...
+Unpacking liblcms2-2:amd64 (2.17-1ubuntu0.2) ...
+Selecting previously unselected package libpcsclite1:amd64.
+Preparing to unpack .../19-libpcsclite1_2.4.1-1_amd64v3.deb ...
+Unpacking libpcsclite1:amd64 (2.4.1-1) ...
+Selecting previously unselected package openjdk-21-jre-headless:amd64.
+Preparing to unpack .../20-openjdk-21-jre-headless_21.0.12.1+1-1~26.04.4_amd64v3.deb ...
+Unpacking openjdk-21-jre-headless:amd64 (21.0.12.1+1-1~26.04.4) ...
+Setting up libgraphite2-3:amd64 (1.3.14-11ubuntu1.1) ...
+Setting up liblcms2-2:amd64 (2.17-1ubuntu0.2) ...
+Setting up java-common (0.77) ...
+Setting up libasound2-data (1.2.15.3-1ubuntu1.1) ...
+Setting up libasound2t64:amd64 (1.2.15.3-1ubuntu1.1) ...
+Setting up libavahi-common-data:amd64 (0.8-18ubuntu1.1) ...
+Setting up fonts-dejavu-mono (2.37-8build1) ...
+Setting up fonts-dejavu-core (2.37-8build1) ...
+Setting up libpcsclite1:amd64 (2.4.1-1) ...
+Setting up libjpeg-turbo8:amd64 (2.1.5-4ubuntu4) ...
+Setting up alsa-topology-conf (1.2.5.1-3build1) ...
+Setting up libharfbuzz0b:amd64 (12.3.2-2) ...
+Setting up ca-certificates-java (20260311) ...
+No JRE found. Skipping Java certificates setup.
+Setting up libjpeg8:amd64 (8c-2ubuntu12) ...
+Setting up openjdk-21-jre-headless:amd64 (21.0.12.1+1-1~26.04.4) ...
+update-alternatives: using /usr/lib/jvm/java-21-openjdk-amd64/bin/java to provide /usr/bin/java (java) in auto mode
+update-alternatives: using /usr/lib/jvm/java-21-openjdk-amd64/bin/jpackage to provide /usr/bin/jpackage (jpackage) in auto mode
+update-alternatives: using /usr/lib/jvm/java-21-openjdk-amd64/bin/keytool to provide /usr/bin/keytool (keytool) in auto mode
+update-alternatives: using /usr/lib/jvm/java-21-openjdk-amd64/bin/rmiregistry to provide /usr/bin/rmiregistry (rmiregistry) in auto mode
+update-alternatives: using /usr/lib/jvm/java-21-openjdk-amd64/lib/jexec to provide /usr/bin/jexec (jexec) in auto mode
+Setting up alsa-ucm-conf (1.2.15.3-1ubuntu1.7) ...
+Setting up fontconfig-config (2.17.1-3ubuntu1) ...
+Setting up libavahi-common3:amd64 (0.8-18ubuntu1.1) ...
+Setting up libavahi-client3:amd64 (0.8-18ubuntu1.1) ...
+Setting up libcups2t64:amd64 (2.4.16-1ubuntu1.3) ...
+Processing triggers for libc-bin (2.43-2ubuntu2) ...
+Processing triggers for man-db (2.13.1-1build1) ...
+Processing triggers for sgml-base (1.31+nmu1build1) ...
+Setting up libfontconfig1:amd64 (2.17.1-3ubuntu1) ...
+Processing triggers for ca-certificates-java (20260311) ...
+Adding debian:ACCVRAIZ1.pem
+Adding debian:AC_RAIZ_FNMT-RCM.pem
+Adding debian:AC_RAIZ_FNMT-RCM_SERVIDORES_SEGUROS.pem
+Adding debian:ANF_Secure_Server_Root_CA.pem
+Adding debian:Actalis_Authentication_Root_CA.pem
+Adding debian:AffirmTrust_Commercial.pem
+Adding debian:AffirmTrust_Networking.pem
+Adding debian:AffirmTrust_Premium.pem
+Adding debian:AffirmTrust_Premium_ECC.pem
+Adding debian:Amazon_Root_CA_1.pem
+Adding debian:Amazon_Root_CA_2.pem
+Adding debian:Amazon_Root_CA_3.pem
+Adding debian:Amazon_Root_CA_4.pem
+Adding debian:Atos_TrustedRoot_2011.pem
+Adding debian:Atos_TrustedRoot_Root_CA_ECC_TLS_2021.pem
+Adding debian:Atos_TrustedRoot_Root_CA_RSA_TLS_2021.pem
+Adding debian:Autoridad_de_Certificacion_Firmaprofesional_CIF_A62634068.pem
+Adding debian:BJCA_Global_Root_CA1.pem
+Adding debian:BJCA_Global_Root_CA2.pem
+Adding debian:Buypass_Class_2_Root_CA.pem
+Adding debian:Buypass_Class_3_Root_CA.pem
+Adding debian:CA_Disig_Root_R2.pem
+Adding debian:CFCA_EV_ROOT.pem
+Adding debian:COMODO_Certification_Authority.pem
+Adding debian:COMODO_ECC_Certification_Authority.pem
+Adding debian:COMODO_RSA_Certification_Authority.pem
+Adding debian:Certainly_Root_E1.pem
+Adding debian:Certainly_Root_R1.pem
+Adding debian:Certigna.pem
+Adding debian:Certigna_Root_CA.pem
+Adding debian:Certum_EC-384_CA.pem
+Adding debian:Certum_Trusted_Network_CA.pem
+Adding debian:Certum_Trusted_Network_CA_2.pem
+Adding debian:Certum_Trusted_Root_CA.pem
+Adding debian:D-TRUST_BR_Root_CA_1_2020.pem
+Adding debian:D-TRUST_BR_Root_CA_2_2023.pem
+Adding debian:D-TRUST_EV_Root_CA_1_2020.pem
+Adding debian:D-TRUST_EV_Root_CA_2_2023.pem
+Adding debian:D-TRUST_Root_Class_3_CA_2_2009.pem
+Adding debian:D-TRUST_Root_Class_3_CA_2_EV_2009.pem
+Adding debian:DigiCert_Assured_ID_Root_CA.pem
+Adding debian:DigiCert_Assured_ID_Root_G2.pem
+Adding debian:DigiCert_Assured_ID_Root_G3.pem
+Adding debian:DigiCert_Global_Root_CA.pem
+Adding debian:DigiCert_Global_Root_G2.pem
+Adding debian:DigiCert_Global_Root_G3.pem
+Adding debian:DigiCert_High_Assurance_EV_Root_CA.pem
+Adding debian:DigiCert_TLS_ECC_P384_Root_G5.pem
+Adding debian:DigiCert_TLS_RSA4096_Root_G5.pem
+Adding debian:DigiCert_Trusted_Root_G4.pem
+Adding debian:Entrust_Root_Certification_Authority.pem
+Adding debian:Entrust_Root_Certification_Authority_-_EC1.pem
+Adding debian:Entrust_Root_Certification_Authority_-_G2.pem
+Adding debian:FIRMAPROFESIONAL_CA_ROOT-A_WEB.pem
+Adding debian:GDCA_TrustAUTH_R5_ROOT.pem
+Adding debian:GLOBALTRUST_2020.pem
+Adding debian:GTS_Root_R1.pem
+Adding debian:GTS_Root_R2.pem
+Adding debian:GTS_Root_R3.pem
+Adding debian:GTS_Root_R4.pem
+Adding debian:GlobalSign_ECC_Root_CA_-_R4.pem
+Adding debian:GlobalSign_ECC_Root_CA_-_R5.pem
+Adding debian:GlobalSign_Root_CA_-_R3.pem
+Adding debian:GlobalSign_Root_CA_-_R6.pem
+Adding debian:GlobalSign_Root_E46.pem
+Adding debian:GlobalSign_Root_R46.pem
+Adding debian:Go_Daddy_Root_Certificate_Authority_-_G2.pem
+Adding debian:HARICA_TLS_ECC_Root_CA_2021.pem
+Adding debian:HARICA_TLS_RSA_Root_CA_2021.pem
+Adding debian:Hellenic_Academic_and_Research_Institutions_ECC_RootCA_2015.pem
+Adding debian:Hellenic_Academic_and_Research_Institutions_RootCA_2015.pem
+Adding debian:HiPKI_Root_CA_-_G1.pem
+Adding debian:Hongkong_Post_Root_CA_3.pem
+Adding debian:ISRG_Root_X1.pem
+Adding debian:ISRG_Root_X2.pem
+Adding debian:IdenTrust_Commercial_Root_CA_1.pem
+Adding debian:IdenTrust_Public_Sector_Root_CA_1.pem
+Adding debian:Izenpe.com.pem
+Adding debian:Microsec_e-Szigno_Root_CA_2009.pem
+Adding debian:Microsoft_ECC_Root_Certificate_Authority_2017.pem
+Adding debian:Microsoft_RSA_Root_Certificate_Authority_2017.pem
+Adding debian:NAVER_Global_Root_Certification_Authority.pem
+Adding debian:NetLock_Arany_=Class_Gold=_Főtanúsítvány.pem
+Adding debian:OISTE_Server_Root_ECC_G1.pem
+Adding debian:OISTE_WISeKey_Global_Root_GB_CA.pem
+Adding debian:OISTE_WISeKey_Global_Root_GC_CA.pem
+Adding debian:QuoVadis_Root_CA_1_G3.pem
+Adding debian:QuoVadis_Root_CA_2.pem
+Adding debian:QuoVadis_Root_CA_2_G3.pem
+Adding debian:QuoVadis_Root_CA_3.pem
+Adding debian:QuoVadis_Root_CA_3_G3.pem
+Adding debian:SSL.com_EV_Root_Certification_Authority_ECC.pem
+Adding debian:SSL.com_EV_Root_Certification_Authority_RSA_R2.pem
+Adding debian:SSL.com_Root_Certification_Authority_ECC.pem
+Adding debian:SSL.com_Root_Certification_Authority_RSA.pem
+Adding debian:SSL.com_TLS_ECC_Root_CA_2022.pem
+Adding debian:SSL.com_TLS_RSA_Root_CA_2022.pem
+Adding debian:SZAFIR_ROOT_CA2.pem
+Adding debian:Sectigo_Public_Server_Authentication_Root_E46.pem
+Adding debian:Sectigo_Public_Server_Authentication_Root_R46.pem
+Adding debian:SecureSign_Root_CA12.pem
+Adding debian:SecureSign_Root_CA14.pem
+Adding debian:SecureSign_Root_CA15.pem
+Adding debian:SecureTrust_CA.pem
+Adding debian:Secure_Global_CA.pem
+Adding debian:Security_Communication_ECC_RootCA1.pem
+Adding debian:Security_Communication_RootCA2.pem
+Adding debian:Starfield_Root_Certificate_Authority_-_G2.pem
+Adding debian:Starfield_Services_Root_Certificate_Authority_-_G2.pem
+Adding debian:SwissSign_Gold_CA_-_G2.pem
+Adding debian:SwissSign_RSA_TLS_Root_CA_2022_-_1.pem
+Adding debian:T-TeleSec_GlobalRoot_Class_2.pem
+Adding debian:T-TeleSec_GlobalRoot_Class_3.pem
+Adding debian:TUBITAK_Kamu_SM_SSL_Kok_Sertifikasi_-_Surum_1.pem
+Adding debian:TWCA_CYBER_Root_CA.pem
+Adding debian:TWCA_Global_Root_CA.pem
+Adding debian:TWCA_Root_Certification_Authority.pem
+Adding debian:Telekom_Security_TLS_ECC_Root_2020.pem
+Adding debian:Telekom_Security_TLS_RSA_Root_2023.pem
+Adding debian:TeliaSonera_Root_CA_v1.pem
+Adding debian:Telia_Root_CA_v2.pem
+Adding debian:TrustAsia_Global_Root_CA_G3.pem
+Adding debian:TrustAsia_Global_Root_CA_G4.pem
+Adding debian:TrustAsia_TLS_ECC_Root_CA.pem
+Adding debian:TrustAsia_TLS_RSA_Root_CA.pem
+Adding debian:Trustwave_Global_Certification_Authority.pem
+Adding debian:Trustwave_Global_ECC_P256_Certification_Authority.pem
+Adding debian:Trustwave_Global_ECC_P384_Certification_Authority.pem
+Adding debian:TunTrust_Root_CA.pem
+Adding debian:UCA_Extended_Validation_Root.pem
+Adding debian:UCA_Global_G2_Root.pem
+Adding debian:USERTrust_ECC_Certification_Authority.pem
+Adding debian:USERTrust_RSA_Certification_Authority.pem
+Adding debian:_OISTE_Server_Root_RSA_G1.pem
+Adding debian:certSIGN_ROOT_CA.pem
+Adding debian:certSIGN_Root_CA_G2.pem
+Adding debian:e-Szigno_Root_CA_2017.pem
+Adding debian:ePKI_Root_Certification_Authority.pem
+Adding debian:emSign_ECC_Root_CA_-_C3.pem
+Adding debian:emSign_ECC_Root_CA_-_G3.pem
+Adding debian:emSign_Root_CA_-_C1.pem
+Adding debian:emSign_Root_CA_-_G1.pem
+Adding debian:vTrus_ECC_Root_CA.pem
+Adding debian:vTrus_Root_CA.pem
+done.
+Processing triggers for libc-bin (2.43-2ubuntu2) ...
+Scanning processes...
+Scanning linux images...
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+ubuntu@ip-172-31-13-52:~$ java -version
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-26.04.4-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-26.04.4-Ubuntu, mixed mode, sharing)
+ubuntu@ip-172-31-13-52:~$ if sudo test -e /opt/syndicateos; then
+  echo "STOP: /opt/syndicateos already exists. Do not overwrite it."
+else
+  sudo install -d -m 0755 /opt/syndicateos &&
+  sudo tar --no-same-owner \
+    -xzf /home/ubuntu/sos-development.tar.gz \
+    -C /opt/syndicateos &&
+  sudo ls -lh \
+    /opt/syndicateos/sos-api.jar \
+    /opt/syndicateos/web/index.html \
+    /opt/syndicateos/certs/aws-rds-global-bundle.pem
+fi
+-rw-r--r-- 1 root root 166K Oct  9 06:17 /opt/syndicateos/certs/aws-rds-global-bundle.pem
+-rw-r--r-- 1 root root  29M Oct  9 06:17 /opt/syndicateos/sos-api.jar
+-rw-r--r-- 1 root root 1.2K Oct  9 06:17 /opt/syndicateos/web/index.html
+ubuntu@ip-172-31-13-52:~$
