@@ -17,7 +17,7 @@ export const loginBodyClientCodeMax = 32;
 
 
 export const LoginBody = zod.object({
-  "role": zod.enum(['OWNER', 'ACCOUNTANT', 'PARTNER']),
+  "role": zod.enum(['OWNER', 'CLIENT', 'ACCOUNTANT', 'PARTNER']).describe('CLIENT resolves accountant or partner membership within the supplied company code. OWNER is used only by the separate owner portal.'),
   "mobile": zod.string().max(loginBodyMobileMax),
   "credential": zod.string().min(1).max(loginBodyCredentialMax),
   "clientCode": zod.string().max(loginBodyClientCodeMax).optional()

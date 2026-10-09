@@ -10,16 +10,21 @@ export interface ApiError {
   message: string;
 }
 
+/**
+ * CLIENT resolves accountant or partner membership within the supplied company code. OWNER is used only by the separate owner portal.
+ */
 export type LoginInputRole = typeof LoginInputRole[keyof typeof LoginInputRole];
 
 
 export const LoginInputRole = {
   OWNER: 'OWNER',
+  CLIENT: 'CLIENT',
   ACCOUNTANT: 'ACCOUNTANT',
   PARTNER: 'PARTNER',
 } as const;
 
 export interface LoginInput {
+  /** CLIENT resolves accountant or partner membership within the supplied company code. OWNER is used only by the separate owner portal. */
   role: LoginInputRole;
   /** @maxLength 24 */
   mobile: string;

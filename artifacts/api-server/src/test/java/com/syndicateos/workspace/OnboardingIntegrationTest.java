@@ -56,8 +56,14 @@ class OnboardingIntegrationTest {
             "accountantMobile","9888880001","assignments",java.util.List.of(assignment)),owner,200);
         String firmA=created.path("entity").path("id").asText();
         String temporary=created.path("access").path("temporaryCredential").asText();
-        login("ACCOUNTANT","9888880001",temporary,"WRONG",401);
-        String accountant=login("ACCOUNTANT","9888880001",temporary,"TEST-A",200).path("token").asText();
+        login("CLIENT","9888880001",temporary,"WRONG",401);
+        login("CLIENT","9888880001",temporary,"",400);
+        login("CLIENT","9888880001","😀".repeat(36),"TEST-A",400);
+        login("CLIENT","9888880000","Owner-updated-123","TEST-A",401);
+        JsonNode accountantLogin=login("CLIENT","9888880001",temporary," test-a ",200);
+        assertEquals("ACCOUNTANT",accountantLogin.path("account").path("role").asText());
+        assertEquals(firmA,accountantLogin.path("account").path("firmId").asText());
+        String accountant=accountantLogin.path("token").asText();
         command("project.create",Map.of("sectorId",sectorId,"name","Blocked before reset"),accountant,403);
         accountant=change(accountant,temporary,"Accountant-updated-123");
         String detailKey="construction".equals(sector.path("code").asText())?"unitCount":"plotCount";
@@ -72,7 +78,11 @@ class OnboardingIntegrationTest {
         command("project.update",Map.of("projectId",projectA,"revision",1,"status","ACTIVE","name","Stale overwrite","details",details),accountant,409);
         JsonNode partnerCreated=command("partner.add",Map.of("projectId",projectA,"name","Test partner","mobile","9888880002"),accountant,200);
         String partnerPin=partnerCreated.path("access").path("temporaryCredential").asText();
-        String partner=login("PARTNER","9888880002",partnerPin,"",200).path("token").asText();
+        login("CLIENT","9888880002",partnerPin,"WRONG",401);
+        JsonNode partnerLogin=login("CLIENT","9888880002",partnerPin,"TEST-A",200);
+        assertEquals("PARTNER",partnerLogin.path("account").path("role").asText());
+        assertEquals(firmA,partnerLogin.path("account").path("firmId").asText());
+        String partner=partnerLogin.path("token").asText();
         request("GET","/workspace",null,partner,403);
         partner=change(partner,partnerPin,"Partner-updated-123");
         workspace=request("GET","/workspace",null,partner,200);
@@ -84,7 +94,7 @@ class OnboardingIntegrationTest {
             "accountantMobile","9888880001","assignments",java.util.List.of(assignment)),owner,200);
         assertTrue(firmB.path("access").path("reused").asBoolean());
         assertFalse(firmB.path("access").has("temporaryCredential"));
-        JsonNode secondLogin=login("ACCOUNTANT","9888880001","Accountant-updated-123","TEST-B",200);
+        JsonNode secondLogin=login("CLIENT","9888880001","Accountant-updated-123","TEST-B",200);
         assertFalse(secondLogin.path("account").path("mustChangeCredential").asBoolean());
         String accountantB=secondLogin.path("token").asText();
         String projectB=command("project.create",Map.of("sectorId",sectorId,"name","Firm B project","details",details),accountantB,200).path("entity").path("id").asText();
@@ -93,10 +103,19 @@ class OnboardingIntegrationTest {
         JsonNode reused=command("partner.add",Map.of("projectId",projectB,"name","Existing partner","mobile","9888880002"),accountantB,200);
         assertTrue(reused.path("access").path("reused").asBoolean());
         assertFalse(reused.path("access").has("temporaryCredential"));
-        assertEquals(2,request("GET","/workspace",null,partner,200).path("projects").size());
+        // A shared identity must not bring another company's projects into this session.
+        assertEquals(1,request("GET","/workspace",null,partner,200).path("projects").size());
+        JsonNode partnerBLogin=login("CLIENT","9888880002","Partner-updated-123","TEST-B",200);
+        String partnerB=partnerBLogin.path("token").asText();
+        assertEquals(firmB.path("entity").path("id").asText(),partnerBLogin.path("account").path("firmId").asText());
+        assertEquals(projectB,request("GET","/workspace",null,partnerB,200).path("projects").get(0).path("id").asText());
+        // Role precedence applies only to memberships actually granted by the database.
+        command("partner.add",Map.of("projectId",projectA,"name","Accountant also participating","mobile","9888880001"),accountant,200);
+        assertEquals("ACCOUNTANT",login("CLIENT","9888880001","Accountant-updated-123","TEST-A",200).path("account").path("role").asText());
         command("firm.update",Map.of("firmId",firmA,"name","Test firm A","status","SUSPENDED","revision",1),owner,200);
         request("GET","/workspace",null,accountant,401);
-        assertEquals(1,request("GET","/workspace",null,partner,200).path("projects").size());
+        request("GET","/workspace",null,partner,401);
+        assertEquals(1,request("GET","/workspace",null,partnerB,200).path("projects").size());
         assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.projects",Integer.class));
         ObjectNode published=(ObjectNode)request("GET","/configuration/"+releaseId,null,owner,200);
         command("configuration.save",published,owner,409);
@@ -110,10 +129,10 @@ class OnboardingIntegrationTest {
         command("firm.assignSector",Map.of("firmId",firmB.path("entity").path("id").asText(),"sectorId",sectorId,"releaseId",draftId,"enabled",false),owner,200);
         command("project.create",Map.of("sectorId",sectorId,"name","Disabled assignment"),accountantB,403);
         assertEquals(1,request("GET","/workspace",null,accountantB,200).path("projects").size());
-        String oldPartner=partner;
+        String oldPartner=partnerB;
         JsonNode reset=command("credentials.reset",Map.of("identityId",partnerCreated.path("entity").path("identityId").asText()),owner,200);
         request("GET","/workspace",null,oldPartner,401);
-        assertTrue(login("PARTNER","9888880002",reset.path("access").path("temporaryCredential").asText(),"",200).path("account").path("mustChangeCredential").asBoolean());
+        assertTrue(login("CLIENT","9888880002",reset.path("access").path("temporaryCredential").asText(),"TEST-B",200).path("account").path("mustChangeCredential").asBoolean());
         request("POST","/auth/logout",null,owner,200);
         request("GET","/auth/me",null,owner,401);
     }

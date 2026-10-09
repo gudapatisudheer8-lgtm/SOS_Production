@@ -1,6 +1,7 @@
 package com.syndicateos.auth;
 
 import com.syndicateos.core.*;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -25,10 +26,13 @@ public class AuthService {
     public LoginResult login(LoginInput input) {
         gate.requireReady();
         String mobile = Values.mobile(input.mobile());
-        if (!Set.of("OWNER", "ACCOUNTANT", "PARTNER").contains(Objects.toString(input.role(), "")))
-            throw ApiProblem.invalid("Choose a valid role.");
-        if (input.credential() == null || input.credential().length() > 72 || input.credential().isEmpty())
+        if (!Set.of("OWNER", "CLIENT", "ACCOUNTANT", "PARTNER").contains(Objects.toString(input.role(), "")))
+            throw ApiProblem.invalid("Use a valid sign-in portal.");
+        if (input.credential() == null || input.credential().getBytes(StandardCharsets.UTF_8).length > 72 || input.credential().isEmpty())
             throw ApiProblem.invalid("A credential is required.");
+        String clientCode = Objects.toString(input.clientCode(), "").trim().toUpperCase(Locale.ROOT);
+        if (!"OWNER".equals(input.role()) && (clientCode.isEmpty() || clientCode.length() > 32))
+            throw ApiProblem.invalid("Enter your company code.");
         String key = Values.hash("login:" + mobile);
         Object result = tx.execute(status -> {
             jdbc.update("INSERT INTO sos.signin_limits(key_hash,window_until) VALUES (?,now()+interval '15 minutes') ON CONFLICT DO NOTHING", key);
@@ -41,23 +45,42 @@ public class AuthService {
             Map<String,Object> identity = rows.isEmpty() ? null : rows.getFirst();
             boolean passwordOk = encoder.matches(input.credential(), identity == null ? dummy : (String)identity.get("credential_hash"));
             UUID firm = null;
+            String resolvedRole = input.role();
             boolean allowed = identity != null && Boolean.TRUE.equals(identity.get("enabled"))
                 && !Boolean.TRUE.equals(identity.get("temporary_expired")) && passwordOk;
             if (allowed) {
                 UUID id = (UUID)identity.get("id");
                 if ("OWNER".equals(input.role())) allowed = exists("SELECT count(*) FROM sos.owner_memberships WHERE identity_id=?", id);
-                else if ("ACCOUNTANT".equals(input.role())) {
-                    List<UUID> firms = jdbc.query("SELECT f.id FROM sos.firms f JOIN sos.firm_memberships m ON m.firm_id=f.id WHERE upper(f.client_code)=? AND f.status='ACTIVE' AND m.identity_id=? AND m.role_code='ACCOUNTANT' AND m.enabled",
-                        (rs,n) -> rs.getObject(1,UUID.class), Objects.toString(input.clientCode(),"").toUpperCase(Locale.ROOT), id);
-                    allowed = !firms.isEmpty(); if (allowed) firm = firms.getFirst();
-                } else allowed = exists("SELECT count(*) FROM sos.project_memberships p JOIN sos.firms f ON f.id=p.firm_id JOIN sos.firm_memberships m ON m.firm_id=p.firm_id AND m.identity_id=p.identity_id AND m.role_code='PARTNER' WHERE p.identity_id=? AND p.enabled AND m.enabled AND f.status='ACTIVE'", id);
+                else {
+                    // Role and tenant come only from active database memberships.
+                    // An explicitly granted accountant membership takes precedence
+                    // when one identity is also a partner in the same firm.
+                    List<Map<String,Object>> firms = jdbc.queryForList("""
+                        SELECT f.id,m.role_code FROM sos.firms f
+                        JOIN sos.firm_memberships m ON m.firm_id=f.id
+                        WHERE upper(f.client_code)=? AND f.status='ACTIVE'
+                        AND m.identity_id=? AND m.enabled
+                        AND (?='CLIENT' OR m.role_code=?)
+                        AND (m.role_code='ACCOUNTANT' OR
+                          (m.role_code='PARTNER' AND EXISTS(
+                            SELECT 1 FROM sos.project_memberships p
+                            WHERE p.firm_id=f.id AND p.identity_id=m.identity_id AND p.enabled)))
+                        ORDER BY CASE m.role_code WHEN 'ACCOUNTANT' THEN 0 ELSE 1 END
+                        LIMIT 1
+                        """, clientCode, id, input.role(), input.role());
+                    allowed = !firms.isEmpty();
+                    if (allowed) {
+                        firm = (UUID)firms.getFirst().get("id");
+                        resolvedRole = (String)firms.getFirst().get("role_code");
+                    }
+                }
             }
             if (!allowed) {
                 jdbc.update("UPDATE sos.signin_limits SET failures=failures+1,locked_until=CASE WHEN failures+1>=5 THEN now()+interval '15 minutes' ELSE NULL END WHERE key_hash=?", key);
                 return new ApiProblem(401, "INVALID_CREDENTIALS", "Check your login details or contact your administrator.");
             }
             jdbc.update("DELETE FROM sos.signin_limits WHERE key_hash=?", key);
-            return issue((UUID)identity.get("id"), input.role(), firm);
+            return issue((UUID)identity.get("id"), resolvedRole, firm);
         });
         if (result instanceof ApiProblem error) throw error; // Failure counters commit before throwing.
         return (LoginResult)result;
@@ -82,10 +105,10 @@ public class AuthService {
               (s.role_code='OWNER' AND EXISTS(SELECT 1 FROM sos.owner_memberships o WHERE o.identity_id=i.id))
               OR (s.role_code='ACCOUNTANT' AND f.status='ACTIVE' AND EXISTS(
                 SELECT 1 FROM sos.firm_memberships m WHERE m.firm_id=f.id AND m.identity_id=i.id AND m.role_code=s.role_code AND m.enabled))
-              OR (s.role_code='PARTNER' AND EXISTS(
+              OR (s.role_code='PARTNER' AND f.status='ACTIVE' AND EXISTS(
                 SELECT 1 FROM sos.project_memberships pm JOIN sos.firms pf ON pf.id=pm.firm_id
                 JOIN sos.firm_memberships fm ON fm.firm_id=pm.firm_id AND fm.identity_id=pm.identity_id AND fm.role_code='PARTNER'
-                WHERE pm.identity_id=i.id AND pm.enabled AND fm.enabled AND pf.status='ACTIVE'))
+                WHERE pm.identity_id=i.id AND pm.firm_id=f.id AND pm.enabled AND fm.enabled AND pf.status='ACTIVE'))
             )
             """, (rs,n) -> new SessionAccount(rs.getObject("id",UUID.class),rs.getString("role_code"),
                 rs.getString("display_name"),rs.getString("mobile"),rs.getBoolean("must_change_credential"),

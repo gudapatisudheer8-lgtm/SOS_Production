@@ -160,7 +160,10 @@ components:
       type: object
       required: [role, mobile, credential]
       properties:
-        role: { type: string, enum: [OWNER, ACCOUNTANT, PARTNER] }
+        role:
+          type: string
+          enum: [OWNER, CLIENT, ACCOUNTANT, PARTNER]
+          description: CLIENT resolves accountant or partner membership within the supplied company code. OWNER is used only by the separate owner portal.
         mobile: { type: string, maxLength: 24 }
         credential: { type: string, minLength: 1, maxLength: 72 }
         clientCode: { type: string, maxLength: 32 }

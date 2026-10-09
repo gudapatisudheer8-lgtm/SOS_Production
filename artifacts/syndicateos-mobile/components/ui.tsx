@@ -99,7 +99,11 @@ export function Field({
   mono,
   height,
   testID,
+  onSubmit,
+  autoFocus,
 }: {
+  onSubmit?: () => void;
+  autoFocus?: boolean;
   label: string;
   value: string;
   onChangeText: (v: string) => void;
@@ -120,6 +124,10 @@ export function Field({
       <Label>{label}</Label>
       <TextInput
         testID={testID}
+        accessibilityLabel={label}
+        autoFocus={autoFocus}
+        onSubmitEditing={onSubmit}
+        returnKeyType={onSubmit ? 'go' : undefined}
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={secure}

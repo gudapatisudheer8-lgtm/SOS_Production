@@ -22,8 +22,8 @@ public class WorkspaceReader {
         else firms=jdbc.queryForList("""
             SELECT DISTINCT f.* FROM sos.firms f JOIN sos.project_memberships pm ON pm.firm_id=f.id
             JOIN sos.firm_memberships fm ON fm.firm_id=f.id AND fm.identity_id=pm.identity_id AND fm.role_code='PARTNER'
-            WHERE pm.identity_id=? AND pm.enabled AND fm.enabled AND f.status='ACTIVE' ORDER BY f.created_at DESC
-            """,actor.identityId());
+            WHERE pm.identity_id=? AND f.id=? AND pm.enabled AND fm.enabled AND f.status='ACTIVE' ORDER BY f.created_at DESC
+            """,actor.identityId(),actor.firmId());
         List<Map<String,Object>> outputFirms=new ArrayList<>();
         List<Map<String,Object>> interfaces=new ArrayList<>();
         Set<UUID> sectorIds=new HashSet<>();
@@ -71,8 +71,8 @@ public class WorkspaceReader {
         else rows=jdbc.queryForList("""
             SELECT p.* FROM sos.projects p JOIN sos.project_memberships pm ON pm.project_id=p.id
             JOIN sos.firms f ON f.id=p.firm_id JOIN sos.firm_memberships fm ON fm.firm_id=f.id AND fm.identity_id=pm.identity_id AND fm.role_code='PARTNER'
-            WHERE pm.identity_id=? AND pm.enabled AND fm.enabled AND f.status='ACTIVE' ORDER BY p.created_at DESC
-            """,actor.identityId());
+            WHERE pm.identity_id=? AND f.id=? AND pm.enabled AND fm.enabled AND f.status='ACTIVE' ORDER BY p.created_at DESC
+            """,actor.identityId(),actor.firmId());
         for (Map<String,Object> row : rows) {
             UUID firm=(UUID)row.get("firm_id"), sector=(UUID)row.get("sector_id"), project=(UUID)row.get("id");
             UUID release=jdbc.queryForObject("SELECT release_id FROM sos.firm_sector_assignments WHERE firm_id=? AND sector_id=?",UUID.class,firm,sector);

@@ -4,7 +4,7 @@
 
 - Connection settings target the user-provided SOS database on the shared RDS instance.
 - The agent has not performed database writes, migrations, owner provisioning or changes to AWS settings.
-- The user has confirmed restored SSH access, successful EC2-to-RDS TCP connectivity, and an empty SOS database checked through pgAdmin. These confirmations do not independently verify Spring Boot SQL credentials or privileges.
+- The user confirmed restored SSH access, EC2-to-RDS connectivity, guarded SOS initialization and runtime privileges. EC2 Spring Boot and public HTTPS readiness returned 200; SOS is no longer empty.
 - The workspace TCP connection to PostgreSQL timed out before authentication. This is not evidence that the password is wrong.
 - Spring Boot starts independently of database availability. `/api/healthz` is liveness only; `/api/readyz` returns 503 while connectivity or foundation setup is pending.
 - JDBC requires TLS certificate and hostname verification using the public AWS RDS CA bundle. Do not weaken `sslmode` or use a trust-all certificate manager.
@@ -45,9 +45,9 @@ If the test fails, review the RDS-associated security group, EC2 security group,
 6. Take the appropriate backup before applying changes. Enabling schema creation in Flyway must never be mistaken for approval to create another database.
 7. Apply reviewed migrations in the SOS schema only, then verify constraints and cross-firm isolation.
 
-The migrations and initial configurations passed disposable local PostgreSQL tests. On 2026-10-09, the user ran guarded setup from EC2 against the approved AWS SOS target and verified migration history, owner provisioning, mandatory reset and the initial published releases. Runtime-role grants were also confirmed. The non-root systemd service subsequently returned HTTP 200 readiness on loopback port 8090. The workspace itself remains read-only and network-blocked; HTTPS/browser verification is still pending. This does not authorize a reset or future production migrations.
+The migrations and initial configurations passed disposable local PostgreSQL tests. On 2026-10-09, the user ran guarded setup from EC2 against the approved AWS SOS target and verified migration history, owner provisioning, mandatory reset and initial published releases. Runtime grants, public HTTPS readiness, certificate renewal and font asset delivery were confirmed. The workspace remains read-only and network-blocked. The company-code-first entry and separate owner portal require the prepared EC2 update; protected browser acceptance on AWS remains outstanding. This does not authorize a reset or future production migrations.
 
-## EC2 release checklist — deployment deferred
+## Future AWS changes and release acceptance
 
 - The intended web hostname is `sos.krishisetu9.in`; its DNS A record has been verified to resolve to the SOS EC2 address. DNS resolution alone does not verify deployment, reverse-proxy configuration or HTTPS.
 - Use Java 21; build with `pnpm --filter @workspace/api-server run build`.

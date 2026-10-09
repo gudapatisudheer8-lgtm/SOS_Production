@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { AppState, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { usePathname } from 'expo-router';
 import {
   focusManager,
   MutationCache,
@@ -25,29 +26,30 @@ import {
   type SessionAccount,
 } from '@workspace/api-client-react';
 
-const KEY = 'syndicateos.session.token';
+type Portal = 'owner' | 'client';
+const sessionKey = (portal: Portal) => `syndicateos.${portal}.session.token`;
 
 // Tokens: sessionStorage on web (survives reload only), secure storage on native.
 const store = {
-  async get(): Promise<string | null> {
+  async get(key: string): Promise<string | null> {
     if (Platform.OS === 'web') {
-      return typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(KEY);
+      return typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(key);
     }
-    return SecureStore.getItemAsync(KEY);
+    return SecureStore.getItemAsync(key);
   },
-  async set(v: string) {
+  async set(v: string, key: string) {
     if (Platform.OS === 'web') {
-      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(KEY, v);
+      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, v);
       return;
     }
-    await SecureStore.setItemAsync(KEY, v);
+    await SecureStore.setItemAsync(key, v);
   },
-  async del() {
+  async del(key: string) {
     if (Platform.OS === 'web') {
-      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(KEY);
+      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(key);
       return;
     }
-    await SecureStore.deleteItemAsync(KEY);
+    await SecureStore.deleteItemAsync(key);
   },
 };
 
@@ -107,6 +109,7 @@ export function isUnavailable(e: unknown) {
 }
 
 interface AuthValue {
+  portal: Portal;
   phase: 'booting' | 'anon' | 'authed';
   account: SessionAccount | null;
   bootError: string | null;
@@ -118,23 +121,45 @@ interface AuthValue {
 const Ctx = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const pathname = usePathname();
+  const portal: Portal = Platform.OS === 'web' && /^\/owner(?:\/|$)/.test(pathname) ? 'owner' : 'client';
+  return <PortalAuthProvider key={portal} portal={portal}>{children}</PortalAuthProvider>;
+}
+
+function belongsToPortal(account: SessionAccount, portal: Portal) {
+  return portal === 'owner'
+    ? account.role === 'OWNER'
+    : (account.role === 'ACCOUNTANT' || account.role === 'PARTNER') && !!account.firmId;
+}
+
+function PortalAuthProvider({ children, portal }: PropsWithChildren<{ portal: Portal }>) {
+  const key = sessionKey(portal);
   const [phase, setPhase] = useState<AuthValue['phase']>('booting');
   const [account, setAccount] = useState<SessionAccount | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const phaseRef = useRef(phase);
+  const mounted = useRef(true);
   phaseRef.current = phase;
 
   const clear = useCallback(async () => {
-    memToken = null;
+    if (mounted.current) memToken = null;
     let delFailed = false;
-    await store.del().catch(() => {
+    await store.del(key).catch(() => {
       delFailed = true;
     });
+    if (!mounted.current) return;
     queryClient.clear();
     if (delFailed) setBootError('Secure storage could not clear the saved session on this device.');
     setAccount(null);
     setPhase('anon');
+  }, [key]);
+
+  useEffect(() => {
+    mounted.current = true;
+    memToken = null;
+    queryClient.clear();
+    return () => { mounted.current = false; };
   }, []);
 
   useEffect(() => {
@@ -152,7 +177,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     (async () => {
       let t: string | null = null;
       try {
-        t = await store.get();
+        t = await store.get(key);
       } catch {
         if (alive) {
           setBootError('Secure storage could not be read on this device, so your saved session cannot be restored. Sign in again.');
@@ -160,6 +185,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
         return;
       }
+      if (!alive) return;
       if (!t) {
         if (alive) setPhase('anon');
         return;
@@ -168,6 +194,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       try {
         const me = await getMe();
         if (alive) {
+          if (!belongsToPortal(me, portal)) {
+            await clear();
+            return;
+          }
           setAccount(me);
           setPhase('authed');
         }
@@ -185,21 +215,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => {
       alive = false;
     };
-  }, [attempt, clear]);
+  }, [attempt, clear, key, portal]);
 
   const signIn = useCallback(async (r: LoginResult) => {
+    if (!mounted.current || !belongsToPortal(r.account, portal))
+      throw new Error('Use the correct sign-in portal for this account.');
     try {
-      await store.set(r.token);
+      await store.set(r.token, key);
     } catch {
-      memToken = null;
+      if (mounted.current) memToken = null;
       throw new Error('Secure storage is unavailable on this device, so the session was not started.');
+    }
+    if (!mounted.current) {
+      await store.del(key);
+      throw new Error('The sign-in page changed. Sign in again.');
     }
     memToken = r.token;
     setBootError(null);
     queryClient.clear();
     setAccount(r.account);
     setPhase('authed');
-  }, []);
+  }, [key, portal]);
 
   const signOut = useCallback(async () => {
     try {
@@ -213,8 +249,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const retryBoot = useCallback(() => setAttempt((n) => n + 1), []);
 
   const value = useMemo(
-    () => ({ phase, account, bootError, signIn, signOut, retryBoot }),
-    [phase, account, bootError, signIn, signOut, retryBoot],
+    () => ({ portal, phase, account, bootError, signIn, signOut, retryBoot }),
+    [portal, phase, account, bootError, signIn, signOut, retryBoot],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

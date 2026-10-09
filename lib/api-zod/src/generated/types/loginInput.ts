@@ -8,6 +8,7 @@
 import type { LoginInputRole } from './loginInputRole';
 
 export interface LoginInput {
+  /** CLIENT resolves accountant or partner membership within the supplied company code. OWNER is used only by the separate owner portal. */
   role: LoginInputRole;
   /** @maxLength 24 */
   mobile: string;
