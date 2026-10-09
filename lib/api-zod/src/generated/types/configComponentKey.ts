@@ -15,4 +15,13 @@ export const ConfigComponentKey = {
   'project-form': 'project-form',
   'partner-list': 'partner-list',
   'partner-form': 'partner-form',
+  'erp-dashboard': 'erp-dashboard',
+  'erp-resource': 'erp-resource',
+  'erp-equity': 'erp-equity',
+  'erp-layout': 'erp-layout',
+  'erp-pricing': 'erp-pricing',
+  'erp-statement': 'erp-statement',
+  'erp-audit': 'erp-audit',
+  'erp-settings': 'erp-settings',
+  'erp-plan': 'erp-plan',
 } as const;

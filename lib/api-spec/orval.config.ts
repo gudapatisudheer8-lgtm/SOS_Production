@@ -12,6 +12,15 @@ const titleTransformer: InputTransformerFn = (config) => {
 
   return config;
 };
+// Multipart is validated by Spring's bounded file adapter, not the JSON Zod package.
+// Excluding that operation avoids Node-only shared types requiring browser Blob/File globals.
+const jsonTransformer: InputTransformerFn = (config) => {
+  const result = titleTransformer(config);
+  if (result.paths) {
+    delete result.paths["/erp/{projectId}/attachments"];
+  }
+  return result;
+};
 
 export default defineConfig({
   "api-client-react": {
@@ -44,7 +53,7 @@ export default defineConfig({
     input: {
       target: "./openapi.yaml",
       override: {
-        transformer: titleTransformer,
+        transformer: jsonTransformer,
       },
     },
     output: {

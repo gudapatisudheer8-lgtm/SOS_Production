@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type {
   ConfigComponent,
@@ -11,7 +11,10 @@ import type {
 } from '@workspace/api-client-react';
 import { Badge, Btn, Banner, Card, Chips, CredentialSheet, Empty, Field, H1, Label } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
-import { errMessage } from '@/lib/session';
+import { errMessage, useAuth } from '@/lib/session';
+import '@/screens/ErpBespoke';
+import { ERP_KEYS, ErpComponent, LangToggle, registerNav, useLang } from '@/screens/ErpScreens';
+import type { TKey } from '@/lib/i18n';
 import { useRun } from '@/lib/workspace';
 
 type Mode = 'live' | 'readonly' | 'preview';
@@ -365,7 +368,15 @@ function PartnerForm({ ctx, comp }: { ctx: Ctx; comp: ConfigComponent }) {
   );
 }
 
+function ErpHost({ comp, ctx }: { comp: ConfigComponent; ctx: Ctx }) {
+  const { account } = useAuth();
+  if (!account) return null;
+  if (ctx.mode === 'preview') return <PreviewNote />;
+  return <ErpComponent compKey={comp.key as string} props={comp.props as Record<string, unknown>} ctx={{ project: ctx.selected, account }} />;
+}
+
 function Render({ comp, ctx }: { comp: ConfigComponent; ctx: Ctx }) {
+  if (ERP_KEYS.includes(comp.key as string)) return <ErpHost comp={comp} ctx={ctx} />;
   switch (comp.key) {
     case 'summary': return <Summary ctx={ctx} />;
     case 'project-list': return <ProjectList ctx={ctx} />;
@@ -381,7 +392,22 @@ function InterfaceView({ item, projects, role, mode }: { item: WorkspaceInterfac
   const iface = item.configuration.interfaces.find((i) => i.role === role);
   const [screenKey, setScreenKey] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
-  const selected = projects.find((p) => p.id === selId) ?? null;
+  const { t } = useLang();
+  const hasErp = !!iface?.screens.some((sc) => sc.components.some((x) => ERP_KEYS.includes(x.key as string)));
+  const selected = projects.find((p) => p.id === selId) ?? (hasErp && mode !== 'preview' ? projects[0] ?? null : null);
+  const tabLabel = (key: string, fallback: string) => {
+    const map: Record<string, TKey> = { dashboard: 'tabDashboard', investments: 'tabInvestments', 'expenses-approvals': 'tabExpensesApprovals', plots: 'tabPlots', statements: 'tabStatements' };
+    return role === 'PARTNER' && map[key] ? t(map[key]) : fallback;
+  };
+  useEffect(() => {
+    registerNav((i) => {
+      const hit = iface?.screens.find((sc) => sc.components.some((x) => (i.kind === 'statement' ? (x.key as string) === 'erp-statement' : (x.key as string) === 'erp-resource' && (x.props as Record<string, unknown>)?.resource === i.kind)));
+      if (!hit) return false;
+      setScreenKey(hit.key);
+      return true;
+    });
+    return () => registerNav(null);
+  }, [iface]);
   if (!iface || iface.screens.length === 0)
     return <Empty icon="layout" title="No screens configured" text={`Release "${item.configuration.label}" defines no ${role.toLowerCase()} interface.`} />;
   const screen = iface.screens.find((s) => s.key === screenKey) ?? iface.screens[0];
@@ -389,13 +415,19 @@ function InterfaceView({ item, projects, role, mode }: { item: WorkspaceInterfac
   return (
     <View>
       <H1 sub={`${selected ? `Selected: ${selected.name} · ` : ''}${projects.length} project${projects.length === 1 ? '' : 's'}`}>{iface.title}</H1>
+      {hasErp ? (
+        <View style={{ marginBottom: 12, gap: 8 }}>
+          {role === 'PARTNER' ? <LangToggle /> : null}
+          <Chips label={role === 'PARTNER' ? t('selectProject') : 'Select Project / Venture:'} options={projects.map((p) => ({ value: p.id, label: p.name }))} value={selected?.id ?? ''} onChange={(v) => setSelId(v)} />
+        </View>
+      ) : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         {iface.screens.map((s) => {
           const on = s.key === screen.key;
           return (
             <Pressable key={s.key} onPress={() => setScreenKey(s.key)} accessibilityRole="tab"
-              style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: on ? c.secondary : 'transparent' }}>
-              <Text style={{ color: on ? c.secondaryForeground : c.mutedForeground, fontFamily: 'Inter_600SemiBold' }}>{s.label}</Text>
+              style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: on ? '#FFB800' : '#e5e7eb' }}>
+              <Text style={{ color: on ? '#111827' : '#374151', fontFamily: 'Inter_700Bold' }}>{tabLabel(s.key, s.label)}</Text>
             </Pressable>
           );
         })}

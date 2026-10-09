@@ -8,6 +8,61 @@
 import * as zod from 'zod';
 
 
+export const GetProjectErpParams = zod.object({
+  "projectId": zod.coerce.string().uuid()
+})
+
+export const GetProjectErpResponse = zod.object({
+  "projectId": zod.string(),
+  "records": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.string(),
+  "createdBy": zod.string(),
+  "createdAt": zod.string(),
+  "data": zod.record(zod.string(), zod.unknown()),
+  "votes": zod.array(zod.string())
+})),
+  "resources": zod.array(zod.object({
+  "kind": zod.string(),
+  "title": zod.string(),
+  "fields": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "kind": zod.enum(['text', 'number', 'date', 'select', 'boolean', 'account', 'partner', 'inventory', 'multiline']),
+  "required": zod.boolean(),
+  "min": zod.number().optional(),
+  "max": zod.number().optional(),
+  "options": zod.array(zod.string()).optional()
+})),
+  "canCreate": zod.boolean(),
+  "canManage": zod.boolean(),
+  "canReview": zod.boolean()
+})),
+  "balances": zod.array(zod.object({
+  "accountId": zod.string(),
+  "balance": zod.string()
+})),
+  "partners": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "mobile": zod.string(),
+  "invested": zod.string(),
+  "drawings": zod.string(),
+  "expenses": zod.string(),
+  "equityPercent": zod.string()
+})),
+  "audit": zod.array(zod.object({
+  "id": zod.string(),
+  "actor": zod.string(),
+  "event": zod.string(),
+  "timestamp": zod.string()
+})),
+  "settings": zod.record(zod.string(), zod.unknown())
+})
+
+
 /**
  * Resolve an active company code to its public firm name only. No identity or membership data is returned.
  */
@@ -155,6 +210,7 @@ export const GetWorkspaceResponse = zod.object({
   "sectorName": zod.string(),
   "enabled": zod.boolean(),
   "configuration": zod.object({
+  "resources": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   "releaseId": zod.string().uuid(),
   "sectorId": zod.string().uuid(),
   "version": zod.number().int(),
@@ -168,7 +224,7 @@ export const GetWorkspaceResponse = zod.object({
   "key": zod.string(),
   "label": zod.string(),
   "components": zod.array(zod.object({
-  "key": zod.enum(['summary', 'project-list', 'project-form', 'partner-list', 'partner-form']),
+  "key": zod.enum(['summary', 'project-list', 'project-form', 'partner-list', 'partner-form', 'erp-dashboard', 'erp-resource', 'erp-equity', 'erp-layout', 'erp-pricing', 'erp-statement', 'erp-audit', 'erp-settings', 'erp-plan']),
   "props": zod.record(zod.string(), zod.unknown()),
   "fields": zod.array(zod.object({
   "key": zod.string(),
@@ -230,6 +286,7 @@ export const GetConfigurationParams = zod.object({
 })
 
 export const GetConfigurationResponse = zod.object({
+  "resources": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   "releaseId": zod.string().uuid(),
   "sectorId": zod.string().uuid(),
   "version": zod.number().int(),
@@ -243,7 +300,7 @@ export const GetConfigurationResponse = zod.object({
   "key": zod.string(),
   "label": zod.string(),
   "components": zod.array(zod.object({
-  "key": zod.enum(['summary', 'project-list', 'project-form', 'partner-list', 'partner-form']),
+  "key": zod.enum(['summary', 'project-list', 'project-form', 'partner-list', 'partner-form', 'erp-dashboard', 'erp-resource', 'erp-equity', 'erp-layout', 'erp-pricing', 'erp-statement', 'erp-audit', 'erp-settings', 'erp-plan']),
   "props": zod.record(zod.string(), zod.unknown()),
   "fields": zod.array(zod.object({
   "key": zod.string(),

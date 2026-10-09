@@ -20,12 +20,14 @@ public class CommandService {
     private final ConfigurationService config;
     private final WorkspaceReader access;
     private final PasswordEncoder encoder;
-    public CommandService(JdbcTemplate jdbc,TransactionTemplate tx,ConfigurationService config,WorkspaceReader access,PasswordEncoder encoder) {
-        this.jdbc=jdbc; this.tx=tx; this.config=config; this.access=access; this.encoder=encoder;
+    private final com.syndicateos.erp.ErpService erp;
+    public CommandService(JdbcTemplate jdbc,TransactionTemplate tx,ConfigurationService config,WorkspaceReader access,PasswordEncoder encoder,com.syndicateos.erp.ErpService erp) {
+        this.jdbc=jdbc; this.tx=tx; this.config=config; this.access=access; this.encoder=encoder; this.erp=erp;
     }
     public Map<String,Object> execute(SessionAccount actor,String action,JsonNode input) {
         actor.business();
-        if (input==null || !input.isObject() || input.toString().length()>131072) throw ApiProblem.invalid("Supply a bounded command data object.");
+        if (input==null || !input.isObject() || input.toString().length()>("erp.bulk-save".equals(action)?2_000_000:131072)) throw ApiProblem.invalid("Supply a bounded command data object.");
+        if(Set.of("erp.save","erp.bulk-save","erp.review","erp.delete","erp.settings","erp.inventory-stage").contains(action)) return erp.execute(actor,action,input);
         return tx.execute(status -> switch(action) {
             case "firm.create" -> createFirm(actor,input);
             case "firm.update" -> updateFirm(actor,input);

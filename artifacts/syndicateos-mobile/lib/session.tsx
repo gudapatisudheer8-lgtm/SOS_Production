@@ -59,6 +59,7 @@ let onUnauthorized: (() => void) | null = null;
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
 if (domain) setBaseUrl(`https://${domain}`);
 setAuthTokenGetter(() => memToken);
+export const currentToken = () => memToken;
 
 if (Platform.OS !== 'web') {
   focusManager.setEventListener((handle) => {

@@ -13,12 +13,14 @@ import org.springframework.stereotype.Service;
 public class ConfigurationService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
-    private static final Set<String> COMPONENTS = Set.of("summary","project-list","project-form","partner-list","partner-form");
+    private static final Set<String> COMPONENTS = Set.of("summary","project-list","project-form","partner-list","partner-form","erp-dashboard","erp-resource","erp-equity","erp-layout","erp-pricing","erp-statement","erp-audit","erp-settings","erp-plan");
     private static final Set<String> KINDS = Set.of("text","number","date","select","boolean");
-    private static final Set<String> PERMISSIONS = Set.of("projects.read","projects.write","partners.read","partners.write");
+    private static final Set<String> PERMISSIONS = Set.of("projects.read","projects.write","partners.read","partners.write","erp.read","erp.manage","erp.submit","erp.review");
     private static final Map<String,String> ACTION_PERMISSION = Map.of(
-        "project.create","projects.write","project.update","projects.write","partner.add","partners.write");
-    public ConfigurationService(JdbcTemplate jdbc, ObjectMapper json) { this.jdbc=jdbc; this.json=json; }
+        "project.create","projects.write","project.update","projects.write","partner.add","partners.write",
+        "erp.save","erp.submit","erp.review","erp.review","erp.delete","erp.manage","erp.settings","erp.manage","erp.bulk-save","erp.submit","erp.inventory-stage","erp.manage");
+    private final com.syndicateos.erp.ErpConfiguration erp;
+    public ConfigurationService(JdbcTemplate jdbc, ObjectMapper json,com.syndicateos.erp.ErpConfiguration erp) { this.jdbc=jdbc; this.json=json; this.erp=erp; }
     public JsonNode parse(Object value) {
         try { return json.readTree(value.toString()); }
         catch (Exception error) { throw new ApiProblem(503,"INVALID_CONFIGURATION","Stored configuration is invalid."); }
@@ -59,18 +61,20 @@ public class ConfigurationService {
         ArrayNode grants = root.putArray("grants");
         for (Map<String,Object> grant : jdbc.queryForList("SELECT * FROM sos.permission_grants WHERE release_id=? ORDER BY role_code,permission_key",id))
             grants.addObject().put("role",(String)grant.get("role_code")).put("permission",(String)grant.get("permission_key")).put("scope",(String)grant.get("scope"));
+        root.set("resources",erp.read(id));
         return root;
     }
     public List<String> validate(JsonNode root) {
         List<String> errors = new ArrayList<>();
+        errors.addAll(erp.validate(root.path("resources")));
         if (!root.path("interfaces").isArray() || root.path("interfaces").size()!=2)
             errors.add("Provide exactly one accountant interface and one partner interface.");
-        if (!root.path("grants").isArray() || root.path("grants").size()>8) errors.add("Supply at most eight explicit permission grants.");
+        if (!root.path("grants").isArray() || root.path("grants").size()>24) errors.add("Supply at most 24 explicit permission grants.");
         Set<String> grants = new HashSet<>();
         for (JsonNode grant : root.path("grants")) {
             String role=grant.path("role").asText(), permission=grant.path("permission").asText(), scope=grant.path("scope").asText();
             if (!Set.of("ACCOUNTANT","PARTNER").contains(role) || !PERMISSIONS.contains(permission)
-                || !("PARTNER".equals(role) ? "MEMBER_PROJECTS".equals(scope) && permission.endsWith(".read") : "FIRM".equals(scope)))
+                || !("PARTNER".equals(role) ? "MEMBER_PROJECTS".equals(scope) && (permission.endsWith(".read") || Set.of("erp.submit","erp.review").contains(permission)) : "FIRM".equals(scope)))
                 errors.add("Invalid role permission or scope: "+role+"/"+permission);
             if (!grants.add(role+":"+permission)) errors.add("Duplicate permission grant.");
         }
@@ -93,7 +97,7 @@ public class ConfigurationService {
                     if ("PARTNER".equals(role) && key.endsWith("-form")) errors.add("Partners cannot receive business write forms.");
                     if (!component.path("props").isObject() || component.path("props").toString().length()>4096) errors.add("Component props must be a bounded object.");
                     component.path("props").fieldNames().forEachRemaining(prop -> {
-                        if (!Set.of("title","description","emptyMessage").contains(prop)) errors.add("Unsupported component property: "+prop);
+                         if (!Set.of("title","description","emptyMessage","resource").contains(prop)) errors.add("Unsupported component property: "+prop);
                         else if (!component.path("props").path(prop).isTextual()) errors.add("Component text properties must be strings.");
                     });
                     Set<String> fieldKeys = new HashSet<>();
@@ -128,12 +132,12 @@ public class ConfigurationService {
                         String actionKey=action.path("key").asText();
                         if (!ACTION_PERMISSION.containsKey(actionKey) || !actions.add(actionKey) || !validLabel(action.path("label"),120)
                             || !grants.contains(role+":"+ACTION_PERMISSION.get(actionKey))) errors.add("Action requires a trusted handler and an explicit role permission: "+actionKey);
-                        if (!("project-form".equals(key) && actionKey.startsWith("project.") || "partner-form".equals(key) && "partner.add".equals(actionKey)))
+                        if (!("project-form".equals(key) && actionKey.startsWith("project.") || "partner-form".equals(key) && "partner.add".equals(actionKey) || key.startsWith("erp-") && actionKey.startsWith("erp.")))
                             errors.add("Action is incompatible with its form component.");
                     }
                     if (key.endsWith("-form") && (actions.isEmpty() || !fieldKeys.contains("name"))) errors.add("Forms need a name field and a supported action.");
                     if ("partner-form".equals(key) && !fieldKeys.contains("mobile")) errors.add("Partner forms need a mobile field.");
-                    String readPermission=key.startsWith("partner-") ? "partners.read" : "projects.read";
+                    String readPermission=key.startsWith("erp-") ? "erp.read" : key.startsWith("partner-") ? "partners.read" : "projects.read";
                     if (!grants.contains(role+":"+readPermission)) errors.add("Component lacks its read permission: "+key);
                 }
             }
@@ -162,6 +166,7 @@ public class ConfigurationService {
             int version=jdbc.queryForObject("SELECT coalesce(max(version),0)+1 FROM sos.sector_releases WHERE sector_id=?",Integer.class,sector);
             jdbc.update("INSERT INTO sos.sector_releases(id,sector_id,version,label,created_by) VALUES (?,?,?,?,?)",release,sector,version,label,actor.identityId());
         }
+        erp.save(release,input.path("resources"));
         Map<String,UUID> fields=new HashMap<>();
         for (JsonNode ui : input.path("interfaces")) {
             UUID interfaceId=UUID.randomUUID();

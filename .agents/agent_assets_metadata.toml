@@ -42,3 +42,45 @@ mtime_ms = 1791542899226
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/f59303c7-32f4-4742-8555-b0dc6e0fb71a/449ce7fb-6321-48a8-8e06-f3524ba83dcb"
 storage_version_token = "1791543283945881"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "pMKIQ2zBuN2-rlvtAouzd"
+uri = "file://releases/sos-original-dashboards.tar.gz"
+type = "unspecified"
+title = "SOS original dashboards — update package"
+description = "Final staging archive with Spring Boot JAR, Expo web, guarded migration script and deployment guide. Do not treat interrupted signed-in browser verification as passed."
+logical_id = "a26f6155-6e30-49f9-92ec-2d93613dd191"
+content_hash = "sha256:5bc3c67d191bdc341cd817c29b949f49df34b0799329708f70d41c4d59fa6e96"
+size = 32726191
+mtime_ms = 1791551892871
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/a26f6155-6e30-49f9-92ec-2d93613dd191/8c828008-c136-4745-878d-c5d7b8a88920"
+storage_version_token = "1791551894105220"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "I5-3T8euusZ1FZsDxd0HG"
+uri = "file://docs/sos-dashboard-ec2-update.md"
+type = "text"
+title = "EC2 update instructions"
+description = "Back up, run guarded SOS-only migration, install files and assign the restored dashboard release."
+logical_id = "2e3e33cc-6c35-4610-a3c3-4edd5f51e3bb"
+content_hash = "sha256:d53bc3c983ff0c9e426f8ea7b7836b1be63056abfb8fc1d7ae83c09e0ed8b9b4"
+size = 7685
+mtime_ms = 1791551506586
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/2e3e33cc-6c35-4610-a3c3-4edd5f51e3bb/e83e63eb-e1c4-477a-aa5d-d4a23c8c7f9d"
+storage_version_token = "1791551622965711"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "WQv0VVzv8NE9Cvpn2HNf-"
+uri = "file://releases/sos-original-dashboards.tar.gz.sha256"
+type = "unspecified"
+title = "Package SHA-256 checksum"
+description = "Compare with Get-FileHash before uploading to EC2."
+logical_id = "80a07af4-dc1a-47e2-a6d1-0613bf7b410e"
+content_hash = "sha256:5749ad627bede12d0b1c654b8b39d701b0e6e4b80c7091f34bfec6fa318b61ac"
+size = 106
+mtime_ms = 1791551893023
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/80a07af4-dc1a-47e2-a6d1-0613bf7b410e/12249550-6105-4f9e-abdd-dc5da7702eb4"
+storage_version_token = "1791551895358409"
+content_type = "application/octet-stream"

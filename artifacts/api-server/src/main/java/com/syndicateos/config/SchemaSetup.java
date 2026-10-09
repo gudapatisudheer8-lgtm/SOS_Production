@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Validates the exact target BEFORE any schema creation and never resets data.
  */
 @Component
+@org.springframework.core.annotation.Order(0)
 @ConditionalOnProperty(name="sos.setup-approved",havingValue="true")
 public class SchemaSetup implements ApplicationRunner {
     private final DataSource source;
@@ -38,6 +39,9 @@ public class SchemaSetup implements ApplicationRunner {
             throw new IllegalStateException("Explicit setup requires a writable SOS connection.");
         boolean existing=Boolean.TRUE.equals(jdbc.queryForObject(
             "SELECT to_regclass('sos.flyway_schema_history') IS NOT NULL",Boolean.class));
+        if(env.getProperty("sos.upgrade-only",Boolean.class,false) &&
+            (!existing || jdbc.queryForObject("SELECT count(*) FROM sos.owner_memberships",Integer.class)==0))
+            throw new IllegalStateException("Upgrade-only mode requires an existing SOS installation and owner. No initial setup performed.");
         if (!existing && jdbc.queryForObject("""
             SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
             WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%'
@@ -53,7 +57,8 @@ public class SchemaSetup implements ApplicationRunner {
             .cleanDisabled(true).baselineOnMigrate(false).locations("classpath:db/migration").load().migrate();
         tx.executeWithoutResult(status -> {
             for (UUID release : jdbc.query("SELECT id FROM sos.sector_releases",(rs,n)->rs.getObject(1,UUID.class))) {
-                if (!config.validate(config.read(release)).isEmpty()) throw new IllegalStateException("Seed configuration failed validation.");
+                var errors=config.validate(config.read(release));
+                if (!errors.isEmpty()) throw new IllegalStateException("Seed configuration failed validation: "+String.join("; ",errors));
             }
             if (jdbc.queryForObject("SELECT count(*) FROM sos.owner_memberships",Integer.class)==0) {
                 String bootstrapMobile=first ? mobile : Values.mobile(env.getProperty("SOS_OWNER_MOBILE"));

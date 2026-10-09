@@ -29,9 +29,12 @@ import type {
   HealthStatus,
   LoginInput,
   LoginResult,
+  ProjectErp,
   ReadinessStatus,
   SectorConfiguration,
   SessionAccount,
+  UploadProjectAttachment200,
+  UploadProjectAttachmentBody,
   Workspace
 } from './api.schemas';
 
@@ -61,6 +64,148 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getUploadProjectAttachmentUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/erp/${projectId}/attachments`
+}
+
+export const uploadProjectAttachment = async (projectId: string,
+    uploadProjectAttachmentBody: UploadProjectAttachmentBody, options?: Parameters<typeof customFetch>[1]): Promise<UploadProjectAttachment200> => {
+    const formData = new FormData();
+formData.append(`file`, uploadProjectAttachmentBody.file);
+
+  return customFetch<UploadProjectAttachment200>(getUploadProjectAttachmentUrl(projectId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+
+
+
+export const getUploadProjectAttachmentMutationKey = () => ['uploadProjectAttachment'] as const;
+
+export const getUploadProjectAttachmentMutationOptions = <TError = ErrorType<ApiFailureResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadProjectAttachment>>, TError,UploadProjectAttachmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadProjectAttachment>>, TError,UploadProjectAttachmentMutationVariables, TContext> => {
+
+const mutationKey = getUploadProjectAttachmentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadProjectAttachment>>, UploadProjectAttachmentMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  uploadProjectAttachment(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadProjectAttachmentMutationResult = NonNullable<Awaited<ReturnType<typeof uploadProjectAttachment>>>
+    export type UploadProjectAttachmentMutationBody = BodyType<UploadProjectAttachmentBody>
+    export type UploadProjectAttachmentMutationError = ErrorType<ApiFailureResponse>
+    export type UploadProjectAttachmentMutationVariables = {projectId: string;data: BodyType<UploadProjectAttachmentBody>}
+
+    export const useUploadProjectAttachment = <TError = ErrorType<ApiFailureResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadProjectAttachment>>, TError,UploadProjectAttachmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadProjectAttachment>>,
+        TError,
+        UploadProjectAttachmentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadProjectAttachmentMutationOptions(options));
+    }
+
+export const getGetProjectErpUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/erp/${projectId}`
+}
+
+export const getProjectErp = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectErp> => {
+
+  return customFetch<ProjectErp>(getGetProjectErpUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectErpQueryKey = (projectId: string,) => {
+    return [
+    `/api/erp/${projectId}`
+    ] as const;
+    }
+
+
+export const getGetProjectErpQueryOptions = <TData = Awaited<ReturnType<typeof getProjectErp>>, TError = ErrorType<ApiFailureResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectErp>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectErpQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectErp>>> = ({ signal }) => getProjectErp(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectErp>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectErpQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectErp>>>
+export type GetProjectErpQueryError = ErrorType<ApiFailureResponse>
+
+
+
+export function useGetProjectErp<TData = Awaited<ReturnType<typeof getProjectErp>>, TError = ErrorType<ApiFailureResponse>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectErp>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectErpQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getResolveCompanyUrl = () => {
 

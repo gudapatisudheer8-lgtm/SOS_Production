@@ -49,8 +49,13 @@ class OnboardingIntegrationTest {
         request("POST","/auth/company",Map.of("clientCode","MISSING"),null,404);
         request("POST","/auth/company",Map.of("clientCode",""),null,400);
         JsonNode workspace=request("GET","/workspace",null,owner,200);
-        assertEquals(2,workspace.path("sectors").size());
-        JsonNode sector=workspace.path("sectors").get(0), other=workspace.path("sectors").get(1);
+        assertEquals(4,workspace.path("sectors").size());
+        JsonNode sector=null,other=null;
+        for(JsonNode candidate:workspace.path("sectors")) {
+            if("construction".equals(candidate.path("code").asText())) sector=candidate;
+            if("open-plotting".equals(candidate.path("code").asText())) other=candidate;
+        }
+        assertNotNull(sector); assertNotNull(other);
         String sectorId=sector.path("id").asText(), releaseId=sector.path("releases").get(0).path("id").asText();
         for (JsonNode s:workspace.path("sectors"))
             assertEquals("valid",command("configuration.validate",Map.of("releaseId",s.path("releases").get(0).path("id").asText()),owner,200).path("status").asText());
@@ -130,6 +135,10 @@ class OnboardingIntegrationTest {
         // Role precedence applies only to memberships actually granted by the database.
         command("partner.add",Map.of("projectId",projectA,"name","Accountant also participating","mobile","9888880001"),accountant,200);
         assertEquals("ACCOUNTANT",login("CLIENT","9888880001","012345","TEST-A",200).path("account").path("role").asText());
+        // A reviewed upgrade changes only the release assignment, not existing projects or credentials.
+        String erpRelease=jdbc.queryForObject("SELECT id::text FROM sos.sector_releases WHERE sector_id=?::uuid AND state='PUBLISHED' ORDER BY version DESC LIMIT 1",String.class,sectorId);
+        command("firm.assignSector",Map.of("firmId",firmA,"sectorId",sectorId,"releaseId",erpRelease,"enabled",true),owner,200);
+        verifyErp(accountant,partner,partnerB,projectA,partnerCreated.path("entity").path("identityId").asText());
         command("firm.update",Map.of("firmId",firmA,"name","Test firm A","status","SUSPENDED","revision",1),owner,200);
         request("POST","/auth/company",Map.of("clientCode","TEST-A"),null,404);
         request("GET","/workspace",null,accountant,401);
@@ -154,5 +163,55 @@ class OnboardingIntegrationTest {
         assertTrue(login("CLIENT","9888880002",reset.path("access").path("temporaryCredential").asText(),"TEST-B",200).path("account").path("mustChangeCredential").asBoolean());
         request("POST","/auth/logout",null,owner,200);
         request("GET","/auth/me",null,owner,401);
+    }
+    private String saveRecord(String token,String project,String kind,Map<String,Object> data) {
+        return command("erp.save",Map.of("projectId",project,"kind",kind,"data",data,"requestId",java.util.UUID.randomUUID().toString()),token,200).path("entity").path("id").asText();
+    }
+    private void verifyErp(String accountant,String partner,String outsider,String project,String partnerId) {
+        request("GET","/erp/"+project,null,outsider,403);
+        assertTrue(request("GET","/erp/"+project,null,partner,200).path("resources").size()>0);
+        String account=saveRecord(accountant,project,"accounts",Map.of("accountName","Project Treasury","accountType","current_operational","openingBalance","0.00","status","active"));
+        String requestId=java.util.UUID.randomUUID().toString();
+        Object investment=Map.of("projectId",project,"kind","investments","requestId",requestId,
+            "data",Map.of("partnerId",partnerId,"amount","1000.10","accountId",account,"date","2026-10-09","purpose","Initial capital","paymentMode","UPI"));
+        String inv=command("erp.save",investment,partner,200).path("entity").path("id").asText();
+        assertEquals(inv,command("erp.save",investment,partner,200).path("entity").path("id").asText());
+        command("erp.review",Map.of("projectId",project,"recordId",inv,"revision",1,"decision","approved"),partner,400);
+        command("erp.review",Map.of("projectId",project,"recordId",inv,"revision",1,"decision","approved"),accountant,200);
+        command("erp.review",Map.of("projectId",project,"recordId",inv,"revision",1,"decision","approved"),accountant,409);
+        JsonNode erp=request("GET","/erp/"+project,null,accountant,200);
+        assertEquals("1000.10",erp.path("balances").get(0).path("balance").asText());
+        String expense=saveRecord(partner,project,"expenses",Map.of("partnerId",partnerId,"amount","100.01","date","2026-10-09",
+            "category","Material","note","Verified site materials","paymentSource","project_bank","accountId",account,"paymentMode","UPI"));
+        command("erp.review",Map.of("projectId",project,"recordId",expense,"revision",1,"decision","approved"),accountant,200);
+        assertEquals("900.09",request("GET","/erp/"+project,null,partner,200).path("balances").get(0).path("balance").asText());
+        command("erp.delete",Map.of("projectId",project,"recordId",expense,"revision",2),accountant,403);
+        String overdraft=saveRecord(partner,project,"drawings",Map.of("partnerId",partnerId,"amount","901.00","date","2026-10-09",
+            "accountId",account,"payoutMode","Bank Transfer","destinationAccountDetails","Personal account","purpose","Overdraft check"));
+        command("erp.review",Map.of("projectId",project,"recordId",overdraft,"revision",1,"decision","approved"),accountant,400);
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_approvals WHERE record_id=?::uuid",Integer.class,overdraft));
+        String unit=saveRecord(accountant,project,"units",Map.of("unitNumber","101","floor",1,"flatType","2 BHK","sftArea",1000,"facing","East","baseRate",5000,"status","available"));
+        String booking=saveRecord(partner,project,"bookings",Map.of("inventoryId",unit,"buyerName","Test buyer","buyerPhone","9000000099",
+            "advanceReceived","50.02","accountId",account,"paymentMode","UPI","date","2026-10-09"));
+        command("erp.review",Map.of("projectId",project,"recordId",booking,"revision",1,"decision","approved"),accountant,200);
+        assertEquals("booked",jdbc.queryForObject("SELECT data->>'status' FROM sos.erp_records WHERE id=?::uuid",String.class,unit));
+        assertEquals("950.11",request("GET","/erp/"+project,null,partner,200).path("balances").get(0).path("balance").asText());
+        command("erp.inventory-stage",Map.of("projectId",project,"recordId",unit,"revision",2,"status","registered","currentMilestone","Handover"),partner,403);
+        command("erp.inventory-stage",Map.of("projectId",project,"recordId",unit,"revision",2,"status","registered","currentMilestone","Handover"),accountant,200);
+        command("erp.settings",Map.of("projectId",project,"revision",0,"settings",Map.of("equitySplitMode","proportional",
+            "projectPlan",Map.of("units",Map.of("floorsCount","1","flats",java.util.List.of())))),accountant,200);
+        assertEquals("100.0000",request("GET","/erp/"+project,null,partner,200).path("partners").get(1).path("equityPercent").asText());
+        assertEquals(0,jdbc.queryForObject("""
+            SELECT count(*) FROM (SELECT record_id FROM sos.erp_postings GROUP BY record_id HAVING sum(debit)<>sum(credit)) x
+            """,Integer.class));
+        assertThrows(org.springframework.dao.DataAccessException.class,()->jdbc.update("UPDATE sos.erp_postings SET debit=0 WHERE record_id=?::uuid",inv));
+        command("erp.bulk-save",Map.of("projectId",project,"kind","units","requestId",java.util.UUID.randomUUID().toString(),"records",java.util.List.of(
+            Map.of("unitNumber","102","floor",1,"flatType","2 BHK","sftArea",1000,"facing","East","baseRate",5000,"status","available"),
+            Map.of("unitNumber","101","floor",1,"flatType","2 BHK","sftArea",1000,"facing","East","baseRate",5000,"status","available"))),accountant,400);
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE data->>'unitNumber'='102'",Integer.class));
+        ObjectNode config=(ObjectNode)request("GET","/configuration/"+jdbc.queryForObject(
+            "SELECT release_id::text FROM sos.firm_sector_assignments WHERE firm_id=(SELECT firm_id FROM sos.projects WHERE id=?::uuid)",String.class,project),null,
+            login("OWNER","9888880000","Owner-updated-123","",200).path("token").asText(),200);
+        assertTrue(config.path("resources").size()>0);
     }
 }

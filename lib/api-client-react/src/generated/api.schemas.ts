@@ -5,6 +5,87 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type ErpRecordData = {[key: string]: unknown};
+
+export interface ErpRecord {
+  id: string;
+  kind: string;
+  revision: number;
+  status: string;
+  createdBy: string;
+  createdAt: string;
+  data: ErpRecordData;
+  votes: string[];
+}
+
+export type ErpFieldKind = typeof ErpFieldKind[keyof typeof ErpFieldKind];
+
+
+export const ErpFieldKind = {
+  text: 'text',
+  number: 'number',
+  date: 'date',
+  select: 'select',
+  boolean: 'boolean',
+  account: 'account',
+  partner: 'partner',
+  inventory: 'inventory',
+  multiline: 'multiline',
+} as const;
+
+export interface ErpField {
+  key: string;
+  label: string;
+  kind: ErpFieldKind;
+  required: boolean;
+  min?: number;
+  max?: number;
+  options?: string[];
+}
+
+export interface ErpResource {
+  kind: string;
+  title: string;
+  fields: ErpField[];
+  canCreate: boolean;
+  canManage: boolean;
+  canReview: boolean;
+}
+
+export type ProjectErpBalancesItem = {
+  accountId: string;
+  balance: string;
+};
+
+export type ProjectErpPartnersItem = {
+  id: string;
+  name: string;
+  mobile: string;
+  invested: string;
+  drawings: string;
+  expenses: string;
+  equityPercent: string;
+};
+
+export type ProjectErpAuditItem = {
+  id: string;
+  actor: string;
+  event: string;
+  timestamp: string;
+};
+
+export type ProjectErpSettings = {[key: string]: unknown};
+
+export interface ProjectErp {
+  projectId: string;
+  records: ErpRecord[];
+  resources: ErpResource[];
+  balances: ProjectErpBalancesItem[];
+  partners: ProjectErpPartnersItem[];
+  audit: ProjectErpAuditItem[];
+  settings: ProjectErpSettings;
+}
+
 export interface ApiError {
   error: string;
   message: string;
@@ -222,6 +303,15 @@ export const ConfigComponentKey = {
   'project-form': 'project-form',
   'partner-list': 'partner-list',
   'partner-form': 'partner-form',
+  'erp-dashboard': 'erp-dashboard',
+  'erp-resource': 'erp-resource',
+  'erp-equity': 'erp-equity',
+  'erp-layout': 'erp-layout',
+  'erp-pricing': 'erp-pricing',
+  'erp-statement': 'erp-statement',
+  'erp-audit': 'erp-audit',
+  'erp-settings': 'erp-settings',
+  'erp-plan': 'erp-plan',
 } as const;
 
 export type ConfigComponentProps = { [key: string]: unknown };
@@ -237,6 +327,8 @@ export interface ConfigComponent {
   fields: ConfigField[];
   actions: ConfigComponentActionsItem[];
 }
+
+export type SectorConfigurationResourcesItem = { [key: string]: unknown };
 
 export type SectorConfigurationState = typeof SectorConfigurationState[keyof typeof SectorConfigurationState];
 
@@ -289,6 +381,7 @@ export type SectorConfigurationGrantsItem = {
 };
 
 export interface SectorConfiguration {
+  resources?: SectorConfigurationResourcesItem[];
   releaseId: string;
   sectorId: string;
   version: number;
@@ -331,4 +424,15 @@ export interface HealthStatus {
  * Explicit authentication, validation, conflict, permission or setup failure
  */
 export type ApiFailureResponse = ApiError;
+
+export type UploadProjectAttachmentBody = {
+  file: Blob | File;
+};
+
+export type UploadProjectAttachment200 = {
+  id: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+};
 

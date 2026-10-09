@@ -11,6 +11,48 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /erp/{projectId}/attachments:
+    post:
+      operationId: uploadProjectAttachment
+      tags: [workspace]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: Private project attachment metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, fileName, contentType, size]
+                properties:
+                  id: { type: string }
+                  fileName: { type: string }
+                  contentType: { type: string }
+                  size: { type: integer }
+        default: { $ref: "#/components/responses/ApiFailure" }
+  /erp/{projectId}:
+    get:
+      operationId: getProjectErp
+      tags: [workspace]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Authorized project ERP records, configured forms and calculated balances
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectErp" }
+        default: { $ref: "#/components/responses/ApiFailure" }
   /auth/company:
     post:
       operationId: resolveCompany
@@ -167,6 +209,78 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
   schemas:
+    ErpRecord:
+      type: object
+      required: [id, kind, revision, status, createdBy, createdAt, data, votes]
+      properties:
+        id: { type: string }
+        kind: { type: string }
+        revision: { type: integer }
+        status: { type: string }
+        createdBy: { type: string }
+        createdAt: { type: string }
+        data: { type: object, additionalProperties: {} }
+        votes: { type: array, items: { type: string } }
+    ErpField:
+      type: object
+      required: [key, label, kind, required]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        kind: { type: string, enum: [text, number, date, select, boolean, account, partner, inventory, multiline] }
+        required: { type: boolean }
+        min: { type: number }
+        max: { type: number }
+        options: { type: array, items: { type: string } }
+    ErpResource:
+      type: object
+      required: [kind, title, fields, canCreate, canManage, canReview]
+      properties:
+        kind: { type: string }
+        title: { type: string }
+        fields: { type: array, items: { $ref: "#/components/schemas/ErpField" } }
+        canCreate: { type: boolean }
+        canManage: { type: boolean }
+        canReview: { type: boolean }
+    ProjectErp:
+      type: object
+      required: [projectId, records, resources, balances, partners, audit, settings]
+      properties:
+        projectId: { type: string }
+        records: { type: array, items: { $ref: "#/components/schemas/ErpRecord" } }
+        resources: { type: array, items: { $ref: "#/components/schemas/ErpResource" } }
+        balances:
+          type: array
+          items:
+            type: object
+            required: [accountId, balance]
+            properties:
+              accountId: { type: string }
+              balance: { type: string }
+        partners:
+          type: array
+          items:
+            type: object
+            required: [id, name, mobile, invested, drawings, expenses, equityPercent]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              mobile: { type: string }
+              invested: { type: string }
+              drawings: { type: string }
+              expenses: { type: string }
+              equityPercent: { type: string }
+        audit:
+          type: array
+          items:
+            type: object
+            required: [id, actor, event, timestamp]
+            properties:
+              id: { type: string }
+              actor: { type: string }
+              event: { type: string }
+              timestamp: { type: string }
+        settings: { type: object, additionalProperties: {} }
     ApiError:
       type: object
       required: [error, message]
@@ -326,7 +440,7 @@ components:
       type: object
       required: [key, props, fields, actions]
       properties:
-        key: { type: string, enum: [summary, project-list, project-form, partner-list, partner-form] }
+        key: { type: string, enum: [summary, project-list, project-form, partner-list, partner-form, erp-dashboard, erp-resource, erp-equity, erp-layout, erp-pricing, erp-statement, erp-audit, erp-settings, erp-plan] }
         props: { type: object, additionalProperties: true }
         fields: { type: array, items: { $ref: "#/components/schemas/ConfigField" } }
         actions:
@@ -341,6 +455,9 @@ components:
       type: object
       required: [releaseId, sectorId, version, revision, state, label, interfaces, grants]
       properties:
+        resources:
+          type: array
+          items: { type: object, additionalProperties: true }
         releaseId: { type: string, format: uuid }
         sectorId: { type: string, format: uuid }
         version: { type: integer }

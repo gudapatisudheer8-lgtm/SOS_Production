@@ -68,6 +68,27 @@ export function WorkspaceShell({ mode }: { mode: 'owner' | 'client' }) {
     </View>
   );
 
+  if (!owner) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F4F4F6' }}>
+        <View style={{ backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingTop: Platform.OS === 'web' ? 16 : insets.top + 8, paddingHorizontal: wide ? 32 : 16, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <View style={{ flexShrink: 1, gap: 6 }}>
+            <BrandLogo width={wide ? 150 : 110} />
+            <Text numberOfLines={1} style={{ color: '#111827', fontFamily: 'Inter_700Bold', fontSize: wide ? 18 : 15 }}>{firm ? firm.name : 'Workspace'}</Text>
+            <Text numberOfLines={1} style={{ color: '#6b7280', fontSize: 12 }}>{account?.displayName} · {account?.role === 'PARTNER' ? 'Partner' : 'Accountant'}{firm ? ` · ${firm.clientCode}` : ''}</Text>
+          </View>
+          <Pressable onPress={() => void signOut()} accessibilityRole="button" accessibilityLabel="Sign out" style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, borderRadius: 12, backgroundColor: '#f3f4f6' }}>
+            <Feather name="log-out" size={16} color="#111827" />
+            {wide ? <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#111827' }}>Sign Out</Text> : null}
+          </Pressable>
+        </View>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: wide ? 28 : 12, paddingBottom: 60, maxWidth: 1240, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+          {body}
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, flexDirection: wide ? 'row' : 'column', backgroundColor: c.background }}>
       {wide ? (

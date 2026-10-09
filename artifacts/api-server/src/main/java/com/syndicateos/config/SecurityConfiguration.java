@@ -52,7 +52,7 @@ public class SecurityConfiguration {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/healthz", "/api/readyz", "/api/auth/login", "/api/auth/company").permitAll()
-                .requestMatchers("/api/auth/**", "/api/workspace", "/api/commands/**", "/api/configuration/**").authenticated()
+                .requestMatchers("/api/auth/**", "/api/workspace", "/api/commands/**", "/api/configuration/**", "/api/erp/**").authenticated()
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, exception) -> {
