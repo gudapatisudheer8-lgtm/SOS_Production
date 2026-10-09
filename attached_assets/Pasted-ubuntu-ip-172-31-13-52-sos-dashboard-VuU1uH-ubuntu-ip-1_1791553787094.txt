@@ -1,0 +1,88 @@
+ubuntu@ip-172-31-13-52:~/sos-dashboard-VuU1uH$
+ubuntu@ip-172-31-13-52:~/sos-dashboard-VuU1uH$ client_loop: send disconnect: Connection reset
+PS C:\WINDOWS\system32>
+PS C:\WINDOWS\system32>
+PS C:\WINDOWS\system32> ssh -i C:\Users\91986\Downloads\SOS.pem ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1006-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Oct  9 13:45:10 UTC 2026
+
+  System load:  0.0               Temperature:           -273.1 C
+  Usage of /:   49.3% of 6.61GB   Processes:             123
+  Memory usage: 48%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+ * Ubuntu Pro delivers the most comprehensive open source security and
+   compliance features.
+
+   https://ubuntu.com/aws/pro
+
+Expanded Security Maintenance for Applications is not enabled.
+
+189 updates can be applied immediately.
+148 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Fri Oct  9 13:37:47 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$ cd /home/ubuntu/sos-dashboard-VuU1uH
+
+sudo systemctl stop syndicateos-api
+
+sudo ss -ltnp 'sport = :8090'
+sudo ss -ltnp 'sport = :8091'
+State        Recv-Q        Send-Q               Local Address:Port               Peer Address:Port       Process
+State        Recv-Q        Send-Q               Local Address:Port               Peer Address:Port       Process
+ubuntu@ip-172-31-13-52:~/sos-dashboard-VuU1uH$ BACKUP="/opt/syndicateos/backups/dashboard-$(date +%Y%m%d-%H%M%S)"
+
+sudo mkdir -p "$BACKUP" &&
+sudo cp -a /opt/syndicateos/sos-api.jar /opt/syndicateos/web "$BACKUP/" &&
+sudo install -d -m 700 -o sos-api -g sos-api /var/lib/syndicateos/uploads &&
+sudo cp -a /var/lib/syndicateos/uploads "$BACKUP/" &&
+echo "Application backup completed: $BACKUP"
+Application backup completed: /opt/syndicateos/backups/dashboard-20261009-134541
+ubuntu@ip-172-31-13-52:~/sos-dashboard-VuU1uH$ sudo mkdir -p /etc/systemd/system/syndicateos-api.service.d
+
+printf '[Service]\nReadWritePaths=/var/lib/syndicateos/uploads\n' |
+sudo tee /etc/systemd/system/syndicateos-api.service.d/uploads.conf >/dev/null
+
+sudo systemctl daemon-reload
+ubuntu@ip-172-31-13-52:~/sos-dashboard-VuU1uH$ python3 upgrade.py
+sos_migrator password (hidden):
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.16)
+
+2026-10-09T13:46:39.240Z  INFO 8230 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Starting SosApplication v0.1.0 using Java 21.0.12.1 with PID 8230 (/home/ubuntu/sos-dashboard-VuU1uH/sos-api.jar started by ubuntu in /home/ubuntu/sos-dashboard-VuU1uH)
+2026-10-09T13:46:39.247Z  INFO 8230 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-10-09T13:46:41.611Z  INFO 8230 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8091 (http)
+2026-10-09T13:46:41.632Z  INFO 8230 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-10-09T13:46:41.633Z  INFO 8230 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-10-09T13:46:41.669Z  INFO 8230 --- [syndicateos-api] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-10-09T13:46:41.671Z  INFO 8230 --- [syndicateos-api] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2293 ms
+2026-10-09T13:46:43.211Z  INFO 8230 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8091 (http) with context path '/'
+2026-10-09T13:46:43.239Z  INFO 8230 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Started SosApplication in 5.028 seconds (process running for 5.977)
+2026-10-09T13:46:44.629Z  INFO 8230 --- [syndicateos-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://krishisetu-db.cpmomccww28x.ap-south-1.rds.amazonaws.com:5432/SOS?sslmode=verify-full&sslrootcert=/opt/syndicateos/certs/aws-rds-global-bundle.pem&connectTimeout=3&socketTimeout=5&ApplicationName=SOS (PostgreSQL 16.12)
+2026-10-09T13:46:44.721Z  INFO 8230 --- [syndicateos-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 6 migrations (execution time 00:00.058s)
+2026-10-09T13:46:44.937Z  INFO 8230 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "sos": 2
+2026-10-09T13:46:44.996Z  INFO 8230 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "sos" to version "3 - project erp core"
+2026-10-09T13:46:45.221Z  INFO 8230 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "sos" to version "4 - original dashboard configuration"
+2026-10-09T13:46:45.326Z  INFO 8230 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "sos" to version "5 - private project attachments"
+2026-10-09T13:46:45.368Z  INFO 8230 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 3 migrations to schema "sos", now at version v5 (execution time 00:00.264s)
+2026-10-09T13:46:45.834Z  INFO 8230 --- [syndicateos-api] [           main] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-09T13:46:45.838Z  INFO 8230 --- [syndicateos-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+Guarded migration finished and exited. Continue with the runtime installation in DEPLOYMENT.md.
+ubuntu@ip-172-31-13-52:~/sos-dashboard-VuU1uH$
