@@ -2,3 +2,4 @@
 - [Java toolchain](java-toolchain.md) — Maven can use an older JAVA_HOME than the Java executable on PATH; keep the compiler selection consistent.
 - [Session delivery](auth-delivery.md) — bearer sessions support cross-origin Expo previews and native clients; cookie adoption requires a deliberate CSRF review.
 - [Configuration field bindings](configuration-field-bindings.md) — the same API field key can have different meanings across project and partner forms.
+- [Expo static assets](expo-static-assets.md) — pnpm exports can contain hidden-looking paths; serve public assets explicitly without disabling other hidden-file protection.
