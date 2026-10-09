@@ -1,4 +1,4 @@
--- DRAFT FOUNDATION MIGRATION. Flyway is disabled until the isolated target is
+-- FOUNDATION MIGRATION. Automatic Flyway startup is disabled; explicit setup
 -- verified and the owner explicitly approves writes. No existing data is reset.
 -- This file contains no credentials or application users.
 
@@ -208,7 +208,6 @@ CREATE TABLE sos.field_definitions (
     required boolean NOT NULL DEFAULT false,
     option_set_id uuid,
     constraints jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(constraints) = 'object'),
-    UNIQUE (release_id, key),
     UNIQUE (id, release_id),
     FOREIGN KEY (option_set_id, release_id) REFERENCES sos.option_sets(id, release_id)
 );

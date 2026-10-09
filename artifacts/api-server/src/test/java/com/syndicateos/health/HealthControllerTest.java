@@ -19,6 +19,8 @@ class HealthControllerTest {
     private MockMvc mvc;
     @MockitoBean
     private DatabaseReadiness database;
+    @MockitoBean
+    private com.syndicateos.auth.AuthService authService;
 
     @Test
     void livenessDoesNotDependOnRdsAvailability() throws Exception {
@@ -34,6 +36,13 @@ class HealthControllerTest {
         mvc.perform(get("/api/readyz"))
             .andExpect(status().isServiceUnavailable())
             .andExpect(jsonPath("$.databaseReachable").value(false));
+    }
+
+    @Test
+    void configuredApplicationIsReportedAsReady() throws Exception {
+        when(database.inspect()).thenReturn(new DatabaseReadiness.Status("ready",true,true,"READY"));
+        mvc.perform(get("/api/readyz")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ready"));
     }
 
     @Test

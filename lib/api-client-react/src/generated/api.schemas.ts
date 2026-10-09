@@ -5,6 +5,297 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ApiError {
+  error: string;
+  message: string;
+}
+
+export type LoginInputRole = typeof LoginInputRole[keyof typeof LoginInputRole];
+
+
+export const LoginInputRole = {
+  OWNER: 'OWNER',
+  ACCOUNTANT: 'ACCOUNTANT',
+  PARTNER: 'PARTNER',
+} as const;
+
+export interface LoginInput {
+  role: LoginInputRole;
+  /** @maxLength 24 */
+  mobile: string;
+  /**
+     * @minLength 1
+     * @maxLength 72
+     */
+  credential: string;
+  /** @maxLength 32 */
+  clientCode?: string;
+}
+
+export interface CredentialInput {
+  /** @maxLength 72 */
+  currentCredential: string;
+  /**
+     * @minLength 8
+     * @maxLength 72
+     */
+  newCredential: string;
+}
+
+export type SessionAccountRole = typeof SessionAccountRole[keyof typeof SessionAccountRole];
+
+
+export const SessionAccountRole = {
+  OWNER: 'OWNER',
+  ACCOUNTANT: 'ACCOUNTANT',
+  PARTNER: 'PARTNER',
+} as const;
+
+export interface SessionAccount {
+  identityId: string;
+  role: SessionAccountRole;
+  displayName: string;
+  mobile: string;
+  mustChangeCredential: boolean;
+  firmId?: string;
+  clientCode?: string;
+}
+
+export interface LoginResult {
+  token: string;
+  expiresAt: string;
+  account: SessionAccount;
+}
+
+export type CommandInputData = { [key: string]: unknown };
+
+export interface CommandInput {
+  data: CommandInputData;
+}
+
+export type CommandResultEntity = { [key: string]: unknown };
+
+export type CommandResultAccess = {
+  mobile: string;
+  reused: boolean;
+  temporaryCredential?: string;
+  expiresAt?: string;
+};
+
+export interface CommandResult {
+  status: string;
+  entity?: CommandResultEntity;
+  access?: CommandResultAccess;
+  errors?: string[];
+}
+
+export type FirmStatus = typeof FirmStatus[keyof typeof FirmStatus];
+
+
+export const FirmStatus = {
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+} as const;
+
+export type FirmAccountantsItem = {
+  identityId: string;
+  displayName: string;
+  mobile: string;
+};
+
+export interface Firm {
+  id: string;
+  clientCode: string;
+  name: string;
+  status: FirmStatus;
+  revision: number;
+  accountants: FirmAccountantsItem[];
+}
+
+export type SectorReleasesItemState = typeof SectorReleasesItemState[keyof typeof SectorReleasesItemState];
+
+
+export const SectorReleasesItemState = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+} as const;
+
+export type SectorReleasesItem = {
+  id: string;
+  version: number;
+  revision: number;
+  state: SectorReleasesItemState;
+  label: string;
+};
+
+export interface Sector {
+  id: string;
+  code: string;
+  name: string;
+  enabled: boolean;
+  releases: SectorReleasesItem[];
+}
+
+export type ProjectStatus = typeof ProjectStatus[keyof typeof ProjectStatus];
+
+
+export const ProjectStatus = {
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export type ProjectDetails = { [key: string]: unknown };
+
+export type ProjectPartnersItem = {
+  identityId: string;
+  displayName: string;
+  mobile?: string;
+};
+
+export interface Project {
+  id: string;
+  firmId: string;
+  sectorId: string;
+  name: string;
+  /** @nullable */
+  location?: string | null;
+  status: ProjectStatus;
+  revision: number;
+  details: ProjectDetails;
+  partners: ProjectPartnersItem[];
+}
+
+export type ConfigFieldKind = typeof ConfigFieldKind[keyof typeof ConfigFieldKind];
+
+
+export const ConfigFieldKind = {
+  text: 'text',
+  number: 'number',
+  date: 'date',
+  select: 'select',
+  boolean: 'boolean',
+} as const;
+
+export type ConfigFieldConstraints = { [key: string]: unknown };
+
+export type ConfigFieldOptionsItem = {
+  value: string;
+  label: string;
+};
+
+export interface ConfigField {
+  key: string;
+  label: string;
+  kind: ConfigFieldKind;
+  required: boolean;
+  constraints: ConfigFieldConstraints;
+  options: ConfigFieldOptionsItem[];
+}
+
+export type ConfigComponentKey = typeof ConfigComponentKey[keyof typeof ConfigComponentKey];
+
+
+export const ConfigComponentKey = {
+  summary: 'summary',
+  'project-list': 'project-list',
+  'project-form': 'project-form',
+  'partner-list': 'partner-list',
+  'partner-form': 'partner-form',
+} as const;
+
+export type ConfigComponentProps = { [key: string]: unknown };
+
+export type ConfigComponentActionsItem = {
+  key: string;
+  label: string;
+};
+
+export interface ConfigComponent {
+  key: ConfigComponentKey;
+  props: ConfigComponentProps;
+  fields: ConfigField[];
+  actions: ConfigComponentActionsItem[];
+}
+
+export type SectorConfigurationState = typeof SectorConfigurationState[keyof typeof SectorConfigurationState];
+
+
+export const SectorConfigurationState = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+} as const;
+
+export type SectorConfigurationInterfacesItemRole = typeof SectorConfigurationInterfacesItemRole[keyof typeof SectorConfigurationInterfacesItemRole];
+
+
+export const SectorConfigurationInterfacesItemRole = {
+  ACCOUNTANT: 'ACCOUNTANT',
+  PARTNER: 'PARTNER',
+} as const;
+
+export type SectorConfigurationInterfacesItemScreensItem = {
+  key: string;
+  label: string;
+  components: ConfigComponent[];
+};
+
+export type SectorConfigurationInterfacesItem = {
+  role: SectorConfigurationInterfacesItemRole;
+  title: string;
+  screens: SectorConfigurationInterfacesItemScreensItem[];
+};
+
+export type SectorConfigurationGrantsItemRole = typeof SectorConfigurationGrantsItemRole[keyof typeof SectorConfigurationGrantsItemRole];
+
+
+export const SectorConfigurationGrantsItemRole = {
+  ACCOUNTANT: 'ACCOUNTANT',
+  PARTNER: 'PARTNER',
+} as const;
+
+export type SectorConfigurationGrantsItemScope = typeof SectorConfigurationGrantsItemScope[keyof typeof SectorConfigurationGrantsItemScope];
+
+
+export const SectorConfigurationGrantsItemScope = {
+  FIRM: 'FIRM',
+  MEMBER_PROJECTS: 'MEMBER_PROJECTS',
+} as const;
+
+export type SectorConfigurationGrantsItem = {
+  role: SectorConfigurationGrantsItemRole;
+  permission: string;
+  scope: SectorConfigurationGrantsItemScope;
+};
+
+export interface SectorConfiguration {
+  releaseId: string;
+  sectorId: string;
+  version: number;
+  revision: number;
+  state: SectorConfigurationState;
+  label: string;
+  interfaces: SectorConfigurationInterfacesItem[];
+  grants: SectorConfigurationGrantsItem[];
+}
+
+export type WorkspaceInterfacesItem = {
+  firmId: string;
+  sectorId: string;
+  releaseId: string;
+  sectorName: string;
+  enabled: boolean;
+  configuration: SectorConfiguration;
+};
+
+export interface Workspace {
+  account: SessionAccount;
+  firms: Firm[];
+  sectors: Sector[];
+  projects: Project[];
+  interfaces: WorkspaceInterfacesItem[];
+}
+
 export interface ReadinessStatus {
   status: string;
   databaseReachable: boolean;
@@ -15,4 +306,9 @@ export interface ReadinessStatus {
 export interface HealthStatus {
   status: string;
 }
+
+/**
+ * Explicit authentication, validation, conflict, permission or setup failure
+ */
+export type ApiFailureResponse = ApiError;
 

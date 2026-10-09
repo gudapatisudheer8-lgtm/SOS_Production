@@ -11,6 +11,107 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginInput" }
+      responses:
+        "200":
+          description: Authenticated session; a required credential change still blocks business access
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResult" }
+        default: { $ref: "#/components/responses/ApiFailure" }
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      responses:
+        "200":
+          description: Current server-validated session
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionAccount" }
+        default: { $ref: "#/components/responses/ApiFailure" }
+  /auth/credential:
+    post:
+      operationId: changeCredential
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CredentialInput" }
+      responses:
+        "200":
+          description: New session; every previous session is revoked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResult" }
+        default: { $ref: "#/components/responses/ApiFailure" }
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      responses:
+        "200":
+          description: Session revoked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+        default: { $ref: "#/components/responses/ApiFailure" }
+  /workspace:
+    get:
+      operationId: getWorkspace
+      tags: [workspace]
+      responses:
+        "200":
+          description: Authorised live workspace only; never demonstration data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workspace" }
+        default: { $ref: "#/components/responses/ApiFailure" }
+  /commands/{action}:
+    post:
+      operationId: executeCommand
+      tags: [workspace]
+      description: |
+        Trusted commands only. OWNER: firm.create, firm.update, firm.assignSector,
+        credentials.reset, sector.create, configuration.save, configuration.validate,
+        configuration.publish. ACCOUNTANT: project.create, project.update, partner.add.
+        All identities, roles, tenancy and permissions are derived on the server.
+      parameters:
+        - { name: action, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommandInput" }
+      responses:
+        "200":
+          description: Atomic command result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommandResult" }
+        default: { $ref: "#/components/responses/ApiFailure" }
+  /configuration/{releaseId}:
+    get:
+      operationId: getConfiguration
+      tags: [configuration]
+      parameters:
+        - { name: releaseId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Owner-only draft or published configuration preview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SectorConfiguration" }
+        default: { $ref: "#/components/responses/ApiFailure" }
   /healthz:
     get:
       operationId: healthCheck
@@ -30,6 +131,11 @@ paths:
       tags: [health]
       summary: Read-only SOS database readiness check
       responses:
+        "200":
+          description: Database target, schema and owner are configured and business access is enabled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadinessStatus" }
         "503":
           description: Foundation setup or database connectivity is pending
           content:
@@ -37,7 +143,217 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReadinessStatus"
 components:
+  responses:
+    ApiFailure:
+      description: Explicit authentication, validation, conflict, permission or setup failure
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
   schemas:
+    ApiError:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
+    LoginInput:
+      type: object
+      required: [role, mobile, credential]
+      properties:
+        role: { type: string, enum: [OWNER, ACCOUNTANT, PARTNER] }
+        mobile: { type: string, maxLength: 24 }
+        credential: { type: string, minLength: 1, maxLength: 72 }
+        clientCode: { type: string, maxLength: 32 }
+    CredentialInput:
+      type: object
+      required: [currentCredential, newCredential]
+      properties:
+        currentCredential: { type: string, maxLength: 72 }
+        newCredential: { type: string, minLength: 8, maxLength: 72 }
+    SessionAccount:
+      type: object
+      required: [identityId, role, displayName, mobile, mustChangeCredential]
+      properties:
+        identityId: { type: string, format: uuid }
+        role: { type: string, enum: [OWNER, ACCOUNTANT, PARTNER] }
+        displayName: { type: string }
+        mobile: { type: string }
+        mustChangeCredential: { type: boolean }
+        firmId: { type: string, format: uuid }
+        clientCode: { type: string }
+    LoginResult:
+      type: object
+      required: [token, expiresAt, account]
+      properties:
+        token: { type: string }
+        expiresAt: { type: string, format: date-time }
+        account: { $ref: "#/components/schemas/SessionAccount" }
+    CommandInput:
+      type: object
+      required: [data]
+      properties:
+        data: { type: object, additionalProperties: true }
+    CommandResult:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        entity: { type: object, additionalProperties: true }
+        access:
+          type: object
+          required: [mobile, reused]
+          properties:
+            mobile: { type: string }
+            reused: { type: boolean }
+            temporaryCredential: { type: string }
+            expiresAt: { type: string, format: date-time }
+        errors: { type: array, items: { type: string } }
+    Firm:
+      type: object
+      required: [id, clientCode, name, status, revision, accountants]
+      properties:
+        id: { type: string, format: uuid }
+        clientCode: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [ACTIVE, SUSPENDED] }
+        revision: { type: integer }
+        accountants:
+          type: array
+          items:
+            type: object
+            required: [identityId, displayName, mobile]
+            properties:
+              identityId: { type: string, format: uuid }
+              displayName: { type: string }
+              mobile: { type: string }
+    Sector:
+      type: object
+      required: [id, code, name, enabled, releases]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        enabled: { type: boolean }
+        releases:
+          type: array
+          items:
+            type: object
+            required: [id, version, revision, state, label]
+            properties:
+              id: { type: string, format: uuid }
+              version: { type: integer }
+              revision: { type: integer }
+              state: { type: string, enum: [DRAFT, PUBLISHED] }
+              label: { type: string }
+    Project:
+      type: object
+      required: [id, firmId, sectorId, name, status, revision, details, partners]
+      properties:
+        id: { type: string, format: uuid }
+        firmId: { type: string, format: uuid }
+        sectorId: { type: string, format: uuid }
+        name: { type: string }
+        location: { type: [string, "null"] }
+        status: { type: string, enum: [ACTIVE, COMPLETED, ARCHIVED] }
+        revision: { type: integer }
+        details: { type: object, additionalProperties: true }
+        partners:
+          type: array
+          items:
+            type: object
+            required: [identityId, displayName]
+            properties:
+              identityId: { type: string, format: uuid }
+              displayName: { type: string }
+              mobile: { type: string }
+    ConfigField:
+      type: object
+      required: [key, label, kind, required, constraints, options]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        kind: { type: string, enum: [text, number, date, select, boolean] }
+        required: { type: boolean }
+        constraints: { type: object, additionalProperties: true }
+        options:
+          type: array
+          items:
+            type: object
+            required: [value, label]
+            properties:
+              value: { type: string }
+              label: { type: string }
+    ConfigComponent:
+      type: object
+      required: [key, props, fields, actions]
+      properties:
+        key: { type: string, enum: [summary, project-list, project-form, partner-list, partner-form] }
+        props: { type: object, additionalProperties: true }
+        fields: { type: array, items: { $ref: "#/components/schemas/ConfigField" } }
+        actions:
+          type: array
+          items:
+            type: object
+            required: [key, label]
+            properties:
+              key: { type: string }
+              label: { type: string }
+    SectorConfiguration:
+      type: object
+      required: [releaseId, sectorId, version, revision, state, label, interfaces, grants]
+      properties:
+        releaseId: { type: string, format: uuid }
+        sectorId: { type: string, format: uuid }
+        version: { type: integer }
+        revision: { type: integer }
+        state: { type: string, enum: [DRAFT, PUBLISHED] }
+        label: { type: string }
+        interfaces:
+          type: array
+          items:
+            type: object
+            required: [role, title, screens]
+            properties:
+              role: { type: string, enum: [ACCOUNTANT, PARTNER] }
+              title: { type: string }
+              screens:
+                type: array
+                items:
+                  type: object
+                  required: [key, label, components]
+                  properties:
+                    key: { type: string }
+                    label: { type: string }
+                    components: { type: array, items: { $ref: "#/components/schemas/ConfigComponent" } }
+        grants:
+          type: array
+          items:
+            type: object
+            required: [role, permission, scope]
+            properties:
+              role: { type: string, enum: [ACCOUNTANT, PARTNER] }
+              permission: { type: string }
+              scope: { type: string, enum: [FIRM, MEMBER_PROJECTS] }
+    Workspace:
+      type: object
+      required: [account, firms, sectors, projects, interfaces]
+      properties:
+        account: { $ref: "#/components/schemas/SessionAccount" }
+        firms: { type: array, items: { $ref: "#/components/schemas/Firm" } }
+        sectors: { type: array, items: { $ref: "#/components/schemas/Sector" } }
+        projects: { type: array, items: { $ref: "#/components/schemas/Project" } }
+        interfaces:
+          type: array
+          items:
+            type: object
+            required: [firmId, sectorId, releaseId, sectorName, enabled, configuration]
+            properties:
+              firmId: { type: string, format: uuid }
+              sectorId: { type: string, format: uuid }
+              releaseId: { type: string, format: uuid }
+              sectorName: { type: string }
+              enabled: { type: boolean }
+              configuration: { $ref: "#/components/schemas/SectorConfiguration" }
     ReadinessStatus:
       type: object
       required: [status, databaseReachable, targetVerified, reason]

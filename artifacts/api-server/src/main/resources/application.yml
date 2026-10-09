@@ -17,7 +17,7 @@ spring:
       minimum-idle: 0
       initialization-fail-timeout: -1
       connection-timeout: 5000
-      read-only: true
+      read-only: ${SOS_DB_READ_ONLY:true}
   flyway:
     # Gate stays closed until the owner approves this isolated development target.
     enabled: false
@@ -37,3 +37,5 @@ logging:
     com.zaxxer.hikari: WARN
 sos:
   database-name: ${SOS_DB_NAME}
+  writes-enabled: ${SOS_ENABLE_WRITES:false}
+  allowed-origins: ${SOS_ALLOWED_ORIGINS:}

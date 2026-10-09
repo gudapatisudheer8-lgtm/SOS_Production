@@ -8,6 +8,252 @@
 import * as zod from 'zod';
 
 
+export const loginBodyMobileMax = 24;
+
+export const loginBodyCredentialMax = 72;
+
+export const loginBodyClientCodeMax = 32;
+
+
+
+export const LoginBody = zod.object({
+  "role": zod.enum(['OWNER', 'ACCOUNTANT', 'PARTNER']),
+  "mobile": zod.string().max(loginBodyMobileMax),
+  "credential": zod.string().min(1).max(loginBodyCredentialMax),
+  "clientCode": zod.string().max(loginBodyClientCodeMax).optional()
+})
+
+export const LoginResponse = zod.object({
+  "token": zod.string(),
+  "expiresAt": zod.coerce.date(),
+  "account": zod.object({
+  "identityId": zod.string().uuid(),
+  "role": zod.enum(['OWNER', 'ACCOUNTANT', 'PARTNER']),
+  "displayName": zod.string(),
+  "mobile": zod.string(),
+  "mustChangeCredential": zod.boolean(),
+  "firmId": zod.string().uuid().optional(),
+  "clientCode": zod.string().optional()
+})
+})
+
+
+export const GetMeResponse = zod.object({
+  "identityId": zod.string().uuid(),
+  "role": zod.enum(['OWNER', 'ACCOUNTANT', 'PARTNER']),
+  "displayName": zod.string(),
+  "mobile": zod.string(),
+  "mustChangeCredential": zod.boolean(),
+  "firmId": zod.string().uuid().optional(),
+  "clientCode": zod.string().optional()
+})
+
+
+export const changeCredentialBodyCurrentCredentialMax = 72;
+
+export const changeCredentialBodyNewCredentialMin = 8;
+export const changeCredentialBodyNewCredentialMax = 72;
+
+
+
+export const ChangeCredentialBody = zod.object({
+  "currentCredential": zod.string().max(changeCredentialBodyCurrentCredentialMax),
+  "newCredential": zod.string().min(changeCredentialBodyNewCredentialMin).max(changeCredentialBodyNewCredentialMax)
+})
+
+export const ChangeCredentialResponse = zod.object({
+  "token": zod.string(),
+  "expiresAt": zod.coerce.date(),
+  "account": zod.object({
+  "identityId": zod.string().uuid(),
+  "role": zod.enum(['OWNER', 'ACCOUNTANT', 'PARTNER']),
+  "displayName": zod.string(),
+  "mobile": zod.string(),
+  "mustChangeCredential": zod.boolean(),
+  "firmId": zod.string().uuid().optional(),
+  "clientCode": zod.string().optional()
+})
+})
+
+
+export const LogoutResponse = zod.object({
+  "status": zod.string()
+})
+
+
+export const GetWorkspaceResponse = zod.object({
+  "account": zod.object({
+  "identityId": zod.string().uuid(),
+  "role": zod.enum(['OWNER', 'ACCOUNTANT', 'PARTNER']),
+  "displayName": zod.string(),
+  "mobile": zod.string(),
+  "mustChangeCredential": zod.boolean(),
+  "firmId": zod.string().uuid().optional(),
+  "clientCode": zod.string().optional()
+}),
+  "firms": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "clientCode": zod.string(),
+  "name": zod.string(),
+  "status": zod.enum(['ACTIVE', 'SUSPENDED']),
+  "revision": zod.number().int(),
+  "accountants": zod.array(zod.object({
+  "identityId": zod.string().uuid(),
+  "displayName": zod.string(),
+  "mobile": zod.string()
+}))
+})),
+  "sectors": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "releases": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "version": zod.number().int(),
+  "revision": zod.number().int(),
+  "state": zod.enum(['DRAFT', 'PUBLISHED']),
+  "label": zod.string()
+}))
+})),
+  "projects": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "firmId": zod.string().uuid(),
+  "sectorId": zod.string().uuid(),
+  "name": zod.string(),
+  "location": zod.string().nullish(),
+  "status": zod.enum(['ACTIVE', 'COMPLETED', 'ARCHIVED']),
+  "revision": zod.number().int(),
+  "details": zod.record(zod.string(), zod.unknown()),
+  "partners": zod.array(zod.object({
+  "identityId": zod.string().uuid(),
+  "displayName": zod.string(),
+  "mobile": zod.string().optional()
+}))
+})),
+  "interfaces": zod.array(zod.object({
+  "firmId": zod.string().uuid(),
+  "sectorId": zod.string().uuid(),
+  "releaseId": zod.string().uuid(),
+  "sectorName": zod.string(),
+  "enabled": zod.boolean(),
+  "configuration": zod.object({
+  "releaseId": zod.string().uuid(),
+  "sectorId": zod.string().uuid(),
+  "version": zod.number().int(),
+  "revision": zod.number().int(),
+  "state": zod.enum(['DRAFT', 'PUBLISHED']),
+  "label": zod.string(),
+  "interfaces": zod.array(zod.object({
+  "role": zod.enum(['ACCOUNTANT', 'PARTNER']),
+  "title": zod.string(),
+  "screens": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "components": zod.array(zod.object({
+  "key": zod.enum(['summary', 'project-list', 'project-form', 'partner-list', 'partner-form']),
+  "props": zod.record(zod.string(), zod.unknown()),
+  "fields": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "kind": zod.enum(['text', 'number', 'date', 'select', 'boolean']),
+  "required": zod.boolean(),
+  "constraints": zod.record(zod.string(), zod.unknown()),
+  "options": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+}))
+})),
+  "actions": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+}))
+}))
+}))
+})),
+  "grants": zod.array(zod.object({
+  "role": zod.enum(['ACCOUNTANT', 'PARTNER']),
+  "permission": zod.string(),
+  "scope": zod.enum(['FIRM', 'MEMBER_PROJECTS'])
+}))
+})
+}))
+})
+
+
+/**
+ * Trusted commands only. OWNER: firm.create, firm.update, firm.assignSector,
+ * credentials.reset, sector.create, configuration.save, configuration.validate,
+ * configuration.publish. ACCOUNTANT: project.create, project.update, partner.add.
+ * All identities, roles, tenancy and permissions are derived on the server.
+ */
+export const ExecuteCommandParams = zod.object({
+  "action": zod.coerce.string()
+})
+
+export const ExecuteCommandBody = zod.object({
+  "data": zod.record(zod.string(), zod.unknown())
+})
+
+export const ExecuteCommandResponse = zod.object({
+  "status": zod.string(),
+  "entity": zod.record(zod.string(), zod.unknown()).optional(),
+  "access": zod.object({
+  "mobile": zod.string(),
+  "reused": zod.boolean(),
+  "temporaryCredential": zod.string().optional(),
+  "expiresAt": zod.coerce.date().optional()
+}).optional(),
+  "errors": zod.array(zod.string()).optional()
+})
+
+
+export const GetConfigurationParams = zod.object({
+  "releaseId": zod.coerce.string().uuid()
+})
+
+export const GetConfigurationResponse = zod.object({
+  "releaseId": zod.string().uuid(),
+  "sectorId": zod.string().uuid(),
+  "version": zod.number().int(),
+  "revision": zod.number().int(),
+  "state": zod.enum(['DRAFT', 'PUBLISHED']),
+  "label": zod.string(),
+  "interfaces": zod.array(zod.object({
+  "role": zod.enum(['ACCOUNTANT', 'PARTNER']),
+  "title": zod.string(),
+  "screens": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "components": zod.array(zod.object({
+  "key": zod.enum(['summary', 'project-list', 'project-form', 'partner-list', 'partner-form']),
+  "props": zod.record(zod.string(), zod.unknown()),
+  "fields": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "kind": zod.enum(['text', 'number', 'date', 'select', 'boolean']),
+  "required": zod.boolean(),
+  "constraints": zod.record(zod.string(), zod.unknown()),
+  "options": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+}))
+})),
+  "actions": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+}))
+}))
+}))
+})),
+  "grants": zod.array(zod.object({
+  "role": zod.enum(['ACCOUNTANT', 'PARTNER']),
+  "permission": zod.string(),
+  "scope": zod.enum(['FIRM', 'MEMBER_PROJECTS'])
+}))
+})
+
+
 /**
  * Returns server health status
  * @summary Health check
@@ -20,6 +266,11 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Read-only SOS database readiness check
  */
-export const ReadinessCheckResponse = zod.void()
+export const ReadinessCheckResponse = zod.object({
+  "status": zod.string(),
+  "databaseReachable": zod.boolean(),
+  "targetVerified": zod.boolean(),
+  "reason": zod.string()
+})
 
 

@@ -8,7 +8,7 @@
 - The workspace TCP connection to PostgreSQL timed out before authentication. This is not evidence that the password is wrong.
 - Spring Boot starts independently of database availability. `/api/healthz` is liveness only; `/api/readyz` returns 503 while connectivity or foundation setup is pending.
 - JDBC requires TLS certificate and hostname verification using the public AWS RDS CA bundle. Do not weaken `sslmode` or use a trust-all certificate manager.
-- The connection pool is read-only, Flyway is disabled, and Spring Security rejects all business routes during setup.
+- Default workspace settings keep the connection pool read-only and automatic Flyway startup disabled. Business routes require a validated session and an enabled setup gate; login returns an explicit setup error while that gate is closed.
 
 ## Preferred network arrangement
 
@@ -45,7 +45,7 @@ If the test fails, review the RDS-associated security group, EC2 security group,
 6. Take the appropriate backup before applying changes. Enabling schema creation in Flyway must never be mistaken for approval to create another database.
 7. Apply reviewed migrations in the SOS schema only, then verify constraints and cross-firm isolation.
 
-The draft migration has **not** been executed or SQL-tested. It is not a production migration approval.
+The migrations and initial configurations have been tested against a disposable local PostgreSQL instance, not RDS. They have not been applied to the approved AWS target. Local test success is not a production migration approval.
 
 ## EC2 release checklist — deployment deferred
 
@@ -58,5 +58,5 @@ The draft migration has **not** been executed or SQL-tested. It is not a product
 - Serve the API over HTTPS through an approved reverse proxy/load balancer; do not expose login credentials over HTTP.
 - Restrict the backend listening port and database ingress. Configure approved browser origins only once the frontend/HTTPS hostname is known.
 - Verify backups, migrations, rollback recovery, restart behaviour and readiness.
-- Complete onboarding/authentication/membership APIs and acceptance testing before calling this service production-ready.
+- Onboarding/authentication/membership API code is implemented and isolated PostgreSQL API tests passed. Complete AWS and browser acceptance testing before calling this service production-ready.
 - Native application release, AWS deployment and production migration remain separate approvals.

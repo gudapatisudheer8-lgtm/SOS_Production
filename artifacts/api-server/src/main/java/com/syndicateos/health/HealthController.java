@@ -22,6 +22,7 @@ public class HealthController {
 
     @GetMapping("/readyz")
     public ResponseEntity<DatabaseReadiness.Status> ready() {
-        return ResponseEntity.status(503).body(database.inspect());
+        DatabaseReadiness.Status status=database.inspect();
+        return ResponseEntity.status("ready".equals(status.status()) ? 200 : 503).body(status);
     }
 }

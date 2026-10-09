@@ -21,9 +21,10 @@ SyndicateOS is a multi-tenant business syndicate and ERP platform for multi-part
 - Java Spring Boot backend.
 - PostgreSQL database.
 - The first version built in Google AI Studio is at https://github.com/gudapatisudheer8-lgtm/SOS. Its source has been reviewed: reuse its business workflows and domain models as reference, while retaining the required React Native, Java Spring Boot, and PostgreSQL product stack.
-- The mobile build remains a clearly labelled local demo. It is not yet connected to live onboarding APIs.
-- The API scaffold has been replaced with a Java 21 / Spring Boot service providing liveness, read-only database readiness checks, and default-deny security. Login, owner bootstrap, onboarding APIs, and tenant-authorised business operations remain to be implemented.
-- The relational onboarding/configuration migration is drafted but has not been applied or tested against PostgreSQL. No SOS tables or application accounts have been created.
+- The Expo frontend now implements browser-first role login/reset, owner firm/sector onboarding, configuration editing/preview/publication, accountant projects and partner provisioning, and read-only partner interfaces. Demo persistence and financial balances have been removed. It uses generated API clients and reports unavailable setup explicitly.
+- The Java 21 / Spring Boot API implements hashed credentials, persisted opaque sessions, attempt limits, required credential changes, owner bootstrap, tenant-scoped onboarding commands and normalized configuration resolution. Default workspace settings keep database writes and automatic migrations disabled.
+- The relational migrations and the API provisioning/isolation journey have passed tests against a disposable localhost PostgreSQL instance. These tests did not touch AWS. No tables or application accounts have been created by the agent in RDS; live AWS and browser journey verification are still pending.
+- See `docs/sos-ec2-release.md` for build outputs and guarded setup/release instructions. Do not mark the onboarding foundation complete before approved AWS persistence and full browser journeys are verified.
 
 ### Initial workspace tooling
 

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 public class DatabaseReadiness {
     private final JdbcTemplate jdbc;
     private final String expectedDatabase;
+    @Value("${sos.writes-enabled:false}")
+    private boolean writesEnabled;
 
     public DatabaseReadiness(JdbcTemplate jdbc, @Value("${sos.database-name}") String expectedDatabase) {
         this.jdbc = jdbc;
@@ -29,7 +31,9 @@ public class DatabaseReadiness {
             }
             Integer tables = jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'sos'", Integer.class);
-            // Database connectivity is not application readiness. Onboarding is still being implemented.
+            if (writesEnabled && tables != null && tables > 0 && Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM sos.owner_memberships)", Boolean.class)))
+                return new Status("ready",true,true,"READY");
             return new Status("not_ready", true, true,
                 tables != null && tables > 0 ? "ONBOARDING_SETUP_PENDING" : "MIGRATIONS_PENDING");
         } catch (DataAccessException exception) {

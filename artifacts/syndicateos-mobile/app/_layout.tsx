@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,34 +13,21 @@ import {
 } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { SyndicateProvider } from '@/context/SyndicateContext';
+import { AuthProvider, queryClient } from '@/lib/session';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { useColors } from '@/hooks/useColors';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
-
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="venture/[id]"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="venture/new"
-        options={{
-          presentation: 'modal',
-          headerShown: false,
-          animation: 'slide_from_bottom',
-        }}
-      />
-    </Stack>
+    <Stack screenOptions={{ headerShown: false }} />
   );
 }
 
 export default function RootLayout() {
+  const colors = useColors();
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -54,17 +41,24 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.hero, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <ActivityIndicator color={colors.heroForeground} size="large" />
+        <Text style={{ color: colors.heroForeground, fontSize: 16 }}>Preparing SyndicateOS…</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView>
+          <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
-              <SyndicateProvider>
+              <AuthProvider>
                 <RootLayoutNav />
-              </SyndicateProvider>
+              </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
