@@ -55,7 +55,9 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - Each sector has distinct accountant and partner interfaces, selected from assigned sectors and the user's firm/project permissions.
 - Accountants add projects and partners. Adding a partner automatically provisions that partner's login.
 - Partners log in with their mobile number and a default PIN, with a mandatory PIN/password change on first login.
-- The user created AWS EC2 and a PostgreSQL database named SOS on the shared KrishiSetu RDS instance. The endpoint is configured, but the workspace TCP check times out before authentication; exact database name, emptiness, permissions and SQL connectivity remain unverified. Scope SOS setup to its own database and do not alter other applications' databases or AWS network settings without explicit approval.
+- The user created AWS EC2 and a PostgreSQL database named SOS on the shared KrishiSetu RDS instance. The user reports that SOS is empty after checking through pgAdmin, and has confirmed EC2-to-RDS TCP connectivity and restored SSH access. The workspace cannot yet reach RDS; Spring Boot SQL authentication and database privileges remain unverified. Verify the exact target before writes, scope SOS setup to its own database, and do not alter other applications' databases or AWS network settings without explicit approval.
+- PostgreSQL remains on RDS; no PostgreSQL server installation is needed on EC2. A command-line PostgreSQL client is optional because pgAdmin can run SQL checks.
+- The intended AWS web hostname is sos.krishisetu9.in. Its A record resolves to the SOS EC2 address; this does not establish that the app is deployed or HTTPS is configured.
 - Admin/accountant need desktop web and mobile. Partner starts with mobile web; native dashboards follow browser development, with real device testing before release.
 
 ## Product

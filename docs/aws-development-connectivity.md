@@ -3,7 +3,8 @@
 ## Current safeguards
 
 - Connection settings target the user-provided SOS database on the shared RDS instance.
-- No database writes, migrations, owner provisioning or changes to AWS settings have occurred.
+- The agent has not performed database writes, migrations, owner provisioning or changes to AWS settings.
+- The user has confirmed restored SSH access, successful EC2-to-RDS TCP connectivity, and an empty SOS database checked through pgAdmin. These confirmations do not independently verify Spring Boot SQL credentials or privileges.
 - The workspace TCP connection to PostgreSQL timed out before authentication. This is not evidence that the password is wrong.
 - Spring Boot starts independently of database availability. `/api/healthz` is liveness only; `/api/readyz` returns 503 while connectivity or foundation setup is pending.
 - JDBC requires TLS certificate and hostname verification using the public AWS RDS CA bundle. Do not weaken `sslmode` or use a trust-all certificate manager.
@@ -14,6 +15,12 @@
 Run the production Spring Boot API on the approved EC2 instance and allow RDS PostgreSQL ingress from that EC2 security group, not the whole internet. Ensure the instances have appropriate VPC connectivity. Network access to the shared RDS instance is not database-level isolation: the SOS login must also have appropriately restricted database/schema privileges.
 
 For workspace development, agree a secure connection arrangement or a dedicated reachable development target before changing any AWS settings. Do not assume the workspace has a permanent outbound IP for allowlisting.
+
+## Database tooling
+
+PostgreSQL is hosted on RDS, not EC2. Spring Boot connects using its JDBC driver; a PostgreSQL server installation on EC2 is unnecessary. The `postgresql-client` package is an optional diagnostic tool, not a deployment prerequisite. The user can perform SQL checks through pgAdmin instead; do not repeatedly require the same emptiness check through an EC2 command-line client.
+
+Keep application schema changes in reviewed, versioned migrations. pgAdmin can execute SQL, but applying an initial migration manually does not create Flyway's migration history. Do not subsequently run the same migration through Flyway without an explicitly reviewed migration-history strategy; do not enable automatic baselining as a workaround.
 
 ## Read-only checks on EC2
 
@@ -42,6 +49,7 @@ The draft migration has **not** been executed or SQL-tested. It is not a product
 
 ## EC2 release checklist — deployment deferred
 
+- The intended web hostname is `sos.krishisetu9.in`; its DNS A record has been verified to resolve to the SOS EC2 address. DNS resolution alone does not verify deployment, reverse-proxy configuration or HTTPS.
 - Use Java 21; build with `pnpm --filter @workspace/api-server run build`.
 - The executable JAR is `artifacts/api-server/target/sos-api.jar`.
 - Store database and owner-bootstrap credentials securely on AWS; workspace secrets do not automatically provision EC2.
