@@ -167,7 +167,8 @@ function App() {
   const projects = data?.projects ?? [];
   const currentFirm = firms.find((f) => f.id === selectedFirmId) || null;
   const erpOf = (projectId?: string) => (projectId ? data?.erpByProject[projectId] : undefined);
-  const activeProjectId = selectedProjectId || projects[0]?.id || '';
+  const activeProjectId = projects.find((p) => p.id === selectedProjectId && p.firmId === selectedFirmId)?.id
+    || projects.find((p) => p.firmId === selectedFirmId)?.id || '';
   const metaOf = (id: string) => data?.meta.get(id);
 
   const pendingExpensesCount = useMemo(() => (data?.fieldExpenses ?? []).filter((e) => e.status === 'pending').length, [data]);
@@ -555,7 +556,10 @@ function App() {
             firm={currentFirm}
             firms={firms}
             currentUser={currentUser}
-            onSelectFirm={setSelectedFirmId}
+            onSelectFirm={(firmId) => {
+              setSelectedFirmId(firmId);
+              setSelectedProjectId(projects.find((p) => p.firmId === firmId)?.id || '');
+            }}
             partners={data.partners}
             plots={data.plots}
             apartmentUnits={data.units}

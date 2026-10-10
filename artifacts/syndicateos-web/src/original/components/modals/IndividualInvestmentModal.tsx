@@ -122,23 +122,24 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
   );
   const [cashDenominations, setCashDenominations] = useState<string>('₹500 Notes Bundles');
 
-  // Approval Process & Syndicate Consensus
-  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'pending'>(
-    'pending'
-  );
-  const [approverSignatory, setApproverSignatory] = useState<string>(
-    firm.managingPartnerName ? `${firm.managingPartnerName} (Managing Partner)` : ''
-  );
-  const [coSignatory, setCoSignatory] = useState<string>(
-    partners.length > 1 ? partners[1].name : ''
-  );
-  const [authPin, setAuthPin] = useState<string>('');
 
   useEffect(() => {
     if (preSelectedPartnerId) {
       setPartnerId(preSelectedPartnerId);
     }
   }, [preSelectedPartnerId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !submitting) {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', dismiss);
+    return () => document.removeEventListener('keydown', dismiss);
+  }, [isOpen, onClose, submitting]);
 
   if (!isOpen) return null;
 
@@ -199,10 +200,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
       paymentMode,
       referenceNo: referenceNo.trim(),
       notes: notes.trim() || `Individual capital investment by ${finalPartnerName} for ${finalPurpose}${isCashAccount ? ` [Cash Handover witnessed by: ${cashWitness}]` : ''}`,
-      status: approvalStatus,
-      approvedBy: approvalStatus === 'approved' ? approverSignatory : undefined,
-      approvedAt: approvalStatus === 'approved' ? new Date().toISOString().replace('T', ' ').slice(0, 16) : undefined,
-      coSignatory: approvalStatus === 'approved' ? coSignatory : undefined,
+      status: 'pending',
       witnessName: isCashAccount ? cashWitness : undefined,
       cashVaultLocation: isCashAccount ? chosenAccountName : undefined,
     };
@@ -250,9 +248,9 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
             <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">
               <span className="font-black text-emerald-950 block text-xs">
-                Syndicate Capital Enrollment &amp; Transparent Consensus Workflow
+                Record Project Investment
               </span>
-              Recording an individual investment immediately registers the capital in the chosen <strong>Cash Treasury Vault</strong> or <strong>Bank Account</strong>. It initiates the partner approval process so that all syndicate members have 100% verified transparency on their dashboards.
+              Your investment is submitted automatically for project approval. The selected cash or bank account and partner capital ledger update only after approval.
             </div>
           </div>
 
@@ -509,108 +507,6 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
             </div>
           </div>
 
-          {/* 7. APPROVAL PROCESS & TRANSPARENCY WORKFLOW */}
-          <div className="bg-blue-50/90 border border-blue-200 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-black text-blue-950 uppercase flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-blue-700" />
-                <span>Syndicate Consensus &amp; Approval Process *</span>
-              </label>
-              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-blue-600 text-white flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                <span>Transparent to All Partners</span>
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase mb-1">
-                  Approval Workflow Mode:
-                </label>
-                <select
-                  value={approvalStatus}
-                  disabled
-                  onChange={(e) => setApprovalStatus(e.target.value as 'approved' | 'pending')}
-                  className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-bold text-gray-950 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-                >
-                  <option value="pending">
-                    ⏳ Submit for Managing Partner &amp; Consortium Signoff
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase mb-1">
-                  Primary Authorizing Signatory:
-                </label>
-                <input
-                  type="text"
-                  value={approverSignatory}
-                  onChange={(e) => setApproverSignatory(e.target.value)}
-                  placeholder="e.g. Srikanth Reddy (Managing Partner)"
-                  className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-semibold text-gray-950 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Consortium 2-Partner Consensus Field */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-blue-200/70">
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase mb-1 flex items-center gap-1">
-                  <Users className="w-3 h-3 text-blue-700" />
-                  <span>Consensus Co-Signatory Partner:</span>
-                </label>
-                <select
-                  value={coSignatory}
-                  onChange={(e) => setCoSignatory(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-bold text-gray-950 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-                >
-                  {partners
-                    .filter((p) => p.name !== approverSignatory)
-                    .map((p) => (
-                      <option key={p.id} value={`${p.name} (Consensus Partner - ${p.fixedEquityPercent}%)`}>
-                        {p.name} ({p.roleDescription || 'Partner'} - {p.fixedEquityPercent}%)
-                      </option>
-                    ))}
-                  <option value="Consortium Committee Approval">Consortium Committee General Approval</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase mb-1 flex items-center gap-1">
-                  <Key className="w-3 h-3 text-blue-700" />
-                  <span>Consensus Security PIN:</span>
-                </label>
-                <input
-                  type="password"
-                  maxLength={4}
-                  value={authPin}
-                  onChange={(e) => setAuthPin(e.target.value)}
-                  placeholder="4-digit PIN"
-                  className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-mono font-bold text-gray-950 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Real-time Status Notice */}
-            <div className="text-[10px] text-blue-950 leading-relaxed bg-white/90 p-2.5 rounded-xl border border-blue-200/80 flex items-center gap-2">
-              {approvalStatus === 'approved' ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    <strong>Status: Approved &amp; Ratified (✓)</strong>. Capital immediately credits the partner equity ledger and project passbook. All partners will see this verified entry in their records history.
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>
-                    <strong>Status: ⏳ Pending Consortium Signoff</strong>. This investment claim will display with an alert badge on all partner dashboard top bars and records history until ratified.
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
 
           {/* 8. Remarks & Notes */}
           <div>
@@ -628,11 +524,11 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
           </div>
 
           {/* Form Actions */}
-          <div className="pt-3 flex items-center justify-between border-t border-gray-100">
+          <div className="pt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-gray-100">
             <span className="text-[11px] text-gray-500 font-medium">
-              * Broadcasts instantly to Partner Dashboard Top Bar
+              Submitted automatically for project review
             </span>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
                 onClick={onClose}
@@ -646,7 +542,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
                 className="px-5 py-2.5 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95 flex items-center gap-1.5"
               >
                 <Coins className="w-4 h-4 text-gray-950" />
-                <span>+ Record Individual Investment</span>
+                <span>Submit Investment</span>
               </button>
             </div>
           </div>

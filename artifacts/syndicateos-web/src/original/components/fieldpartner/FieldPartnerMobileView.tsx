@@ -57,6 +57,7 @@ import { OpenPlottingModule } from '../accountant/OpenPlottingModule';
 import { ProjectStatementModule } from '../accountant/ProjectStatementModule';
 import { CustomerPlotBookingModal } from '../modals/CustomerPlotBookingModal';
 import { IndividualInvestmentModal, IndividualInvestmentData } from '../modals/IndividualInvestmentModal';
+import { EntryDialog } from './EntryDialog';
 
 export type Language = 'en' | 'te';
 
@@ -562,6 +563,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   const [voiceSeconds, setVoiceSeconds] = useState(0);
 
   // Expenses sub-filter
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+  const [isDrawingDialogOpen, setIsDrawingDialogOpen] = useState(false);
   const [expenseFilter, setExpenseFilter] = useState<'all' | 'pending' | 'approved'>('all');
 
   // Drawing Request State: Source Account & Destination Account
@@ -570,7 +573,6 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   const [drawPayoutMode, setDrawPayoutMode] = useState<'Bank Transfer' | 'Field Vault Cash' | 'Cheque'>('Bank Transfer');
   const [drawDestinationAccountDetails, setDrawDestinationAccountDetails] = useState<string>('');
   const [drawPurpose, setDrawPurpose] = useState<string>('');
-  const submittedDrawings = drawingRequests;
 
   // Success toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -623,22 +625,34 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   }, [projects, activeFirm.id]);
 
   const activeProject = useMemo(() => {
-    if (firmProjects.length === 0) {
-      return projects.find((p) => p.id === selectedProjectId) || projects[0];
-    }
+    // Never fall back to a project from a different firm.
+    if (firmProjects.length === 0) return undefined;
     if (selectedProjectId) {
       const match = firmProjects.find((p) => p.id === selectedProjectId);
       if (match) return match;
     }
     return firmProjects[0];
-  }, [firmProjects, selectedProjectId, projects]);
+  }, [firmProjects, selectedProjectId]);
 
   // Plots filtered by active project
   const activePlots = useMemo(() => {
-    if (!activeProject) return plots;
-    const filtered = plots.filter((p) => p.projectId === activeProject.id);
-    return filtered.length > 0 ? filtered : plots;
+    if (!activeProject) return [];
+    return plots.filter((p) => p.projectId === activeProject.id);
   }, [plots, activeProject]);
+
+  // Accounts strictly linked to the active project (no fallback to firm-wide accounts)
+  const projectAccounts = useMemo(() => {
+    if (!activeProject) return [];
+    return firmAccounts.filter((a) => a.firmId === activeFirm.id && a.linkedProjectId === activeProject.id);
+  }, [firmAccounts, activeFirm.id, activeProject]);
+
+  // Drawing requests strictly scoped to the active project
+  const submittedDrawings = useMemo(() => {
+    if (!activeProject) return [];
+    return drawingRequests.filter(
+      (d) => d.projectId === activeProject.id && (!d.firmId || d.firmId === activeFirm.id)
+    );
+  }, [drawingRequests, activeProject, activeFirm.id]);
 
   // Derived financial computations for current logged-in partner
   const {
@@ -760,15 +774,10 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
 
   // Expenses submitted by this partner or for this firm
   const partnerExpenses = useMemo(() => {
-    if (!currentPartner) return [];
-    return fieldExpenses.filter(
-      (e) =>
-        e.firmId === activeFirm.id &&
-        (e.partnerId === currentPartner.id ||
-          (e.enrolledBy && e.enrolledBy.toLowerCase().includes(currentPartner.name.toLowerCase().split(':')[0])) ||
-          (e.partnerName && e.partnerName.toLowerCase().includes(currentPartner.name.toLowerCase().split(':')[0])))
-    );
-  }, [fieldExpenses, activeFirm, currentPartner]);
+    // All expenses of the selected project; approval eligibility comes from server reviewableRecordIds.
+    if (!currentPartner || !activeProject) return [];
+    return fieldExpenses.filter((e) => e.firmId === activeFirm.id && e.projectId === activeProject.id);
+  }, [fieldExpenses, activeFirm.id, activeProject, currentPartner]);
 
   const displayedExpenses = useMemo(() => {
     if (expenseFilter === 'pending') {
@@ -785,9 +794,9 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   // Active Project Individual Investments (Cash & Bank)
   const activeProjectInvestments = useMemo(() => {
     return (individualInvestments || []).filter((inv) => {
+      if (!activeProject) return false;
       if (inv.firmId && inv.firmId !== activeFirm.id) return false;
-      if (activeProject && inv.projectId && inv.projectId !== activeProject.id) return false;
-      return true;
+      return inv.projectId === activeProject.id;
     });
   }, [individualInvestments, activeFirm.id, activeProject]);
 
@@ -850,7 +859,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
       return;
     }
 
-    const chosenBankAcc = firmAccounts.find((a) => a.id === expenseBankAccountId) || firmAccounts[0];
+    const chosenBankAcc = projectAccounts.find((a) => a.id === expenseBankAccountId) || projectAccounts[0];
     const newLog: FieldExpenseLog = {
       id: `exp-${Date.now()}`,
       firmId: activeFirm.id,
@@ -880,6 +889,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     setExpenseVendor('');
     setSimulatedReceiptImage(null);
     setHasRecordedVoice(false);
+    setIsExpenseDialogOpen(false);
     showToast(lang === 'te' ? 'ఫీల్డ్ ఖర్చు రసీదు ఆమోదం కొరకు సమర్పించబడింది!' : 'Field expense voucher submitted for approval!');
   };
 
@@ -919,6 +929,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     setDrawAmount('');
     setDrawDestinationAccountDetails('');
     setDrawPurpose('');
+    setIsDrawingDialogOpen(false);
   };
 
   const handleApproveDrawing = (drawId: string) => {
@@ -989,19 +1000,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                 <span className={`w-2.5 h-2.5 rounded-full ${currentPartner.avatarColor || 'bg-amber-500'}`} />
                 <span>{currentPartner.name}</span>
               </span>
-              <span className="text-gray-300">•</span>
-              <span>{t('pin')}: <strong className="font-mono text-gray-900">{currentPartner.pinCode || '••••'}</strong></span>
-              <span className="text-gray-300">•</span>
-              <span>{t('limit')}: <strong className="font-mono text-gray-900">₹100k/d</strong></span>
 
-              <button
-                type="button"
-                onClick={onLogout}
-                className="text-[11px] text-gray-700 hover:text-black font-bold flex items-center gap-1 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer border border-gray-200"
-              >
-                <LogOut className="w-3 h-3" />
-                <span>{t('switchFirm')}</span>
-              </button>
             </div>
           </div>
 
@@ -1584,6 +1583,15 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                   Real-time verifiable register of all partner contributions credited to Bank &amp; Cash Treasury.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsEnrollInvestmentModalOpen(true)}
+                disabled={!activeProject}
+                className="px-4 py-2 rounded-xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Coins className="w-4 h-4" />
+                <span>{lang === 'te' ? '+ పెట్టుబడి జోడించండి' : '+ Add Investment'}</span>
+              </button>
             </div>
 
             {/* Filter & Search Toolbar */}
@@ -1897,15 +1905,44 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsExpenseDialogOpen(true)}
+              disabled={!activeProject}
+              className="px-4 py-2.5 rounded-xl bg-[#111827] hover:bg-black text-[#FFB800] font-black text-xs shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Receipt className="w-4 h-4" />
+              <span>{lang === 'te' ? '+ ఖర్చు జోడించండి' : '+ Add Expense'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsDrawingDialogOpen(true)}
+              disabled={!activeProject}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <DollarSign className="w-4 h-4" />
+              <span>{lang === 'te' ? '+ డ్రాయింగ్ జోడించండి' : '+ Add Drawing'}</span>
+            </button>
+            {!activeProject && (
+              <span className="text-[11px] text-gray-500 font-medium">{t('noActiveProjects')}</span>
+            )}
+          </div>
+
+          <>
             {/* ACTION 1: ENROLL ON-SITE FIELD EXPENSE */}
-            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-gray-200 shadow-sm space-y-4">
-              <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3">
+            <EntryDialog
+              open={isExpenseDialogOpen}
+              onClose={() => setIsExpenseDialogOpen(false)}
+              titleId="fp-expense-dialog-title"
+              closeLabel={lang === 'te' ? 'మూసివేయండి' : 'Close expense dialog'}
+            >
+              <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3 pr-8">
                 <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
                   <Camera className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-black text-sm text-gray-950">{t('enrollExpenseTitle')}</h3>
+                  <h3 id="fp-expense-dialog-title" className="font-black text-sm text-gray-950">{t('enrollExpenseTitle')}</h3>
                   <p className="text-[11px] text-gray-500">{t('enrollExpenseDesc')}</p>
                 </div>
               </div>
@@ -1948,21 +1985,21 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                     <div>
                       <label className="block text-[10px] font-black text-amber-950 uppercase mb-1 flex items-center justify-between">
                         <span>{lang === 'te' ? 'డెబిట్ చేయవలసిన ప్రాజెక్ట్ బ్యాంక్' : 'Select Project Bank to Debit'} *</span>
-                        {firmAccounts.length > 0 && (
+                        {projectAccounts.length > 0 && (
                           <span className="font-mono text-[9px] text-amber-900 font-bold">
-                            {firmAccounts.find((a) => a.id === expenseBankAccountId)?.bankName || firmAccounts[0]?.bankName}: {formatINR(firmAccounts.find((a) => a.id === expenseBankAccountId)?.currentBalance || firmAccounts[0]?.currentBalance || 0)}
+                            {projectAccounts.find((a) => a.id === expenseBankAccountId)?.bankName || projectAccounts[0]?.bankName}: {formatINR(projectAccounts.find((a) => a.id === expenseBankAccountId)?.currentBalance || projectAccounts[0]?.currentBalance || 0)}
                           </span>
                         )}
                       </label>
                       <select
-                        value={expenseBankAccountId || firmAccounts[0]?.id || ''}
+                        value={expenseBankAccountId || projectAccounts[0]?.id || ''}
                         onChange={(e) => setExpenseBankAccountId(e.target.value)}
                         className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none focus:ring-2 focus:ring-amber-500"
                       >
-                        {firmAccounts.length === 0 && (
+                        {projectAccounts.length === 0 && (
                           <option value="">Cash Treasury / Site Vault</option>
                         )}
-                        {firmAccounts.map((acc) => (
+                        {projectAccounts.map((acc) => (
                           <option key={acc.id} value={acc.id}>
                             {acc.bankName} - {acc.accountName} (••••{acc.accountNumber.slice(-4)}) — Bal: {formatINR(acc.currentBalance)}
                           </option>
@@ -2104,17 +2141,29 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                   <Send className="w-4 h-4" />
                   <span>{t('submitExpenseBtn')}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsExpenseDialogOpen(false)}
+                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-xs border border-gray-200 cursor-pointer"
+                >
+                  {lang === 'te' ? 'రద్దు' : 'Cancel'}
+                </button>
               </form>
-            </div>
+            </EntryDialog>
 
             {/* ACTION 2: PLACE DRAWING / DIVIDEND REQUEST */}
-            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-gray-200 shadow-sm space-y-4">
-              <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3">
+            <EntryDialog
+              open={isDrawingDialogOpen}
+              onClose={() => setIsDrawingDialogOpen(false)}
+              titleId="fp-drawing-dialog-title"
+              closeLabel={lang === 'te' ? 'మూసివేయండి' : 'Close drawing dialog'}
+            >
+              <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3 pr-8">
                 <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-900 flex items-center justify-center font-bold">
                   <DollarSign className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-black text-sm text-gray-950">{t('placeDrawTitle')}</h3>
+                  <h3 id="fp-drawing-dialog-title" className="font-black text-sm text-gray-950">{t('placeDrawTitle')}</h3>
                   <p className="text-[11px] text-gray-500">{t('placeDrawDesc')}</p>
                 </div>
               </div>
@@ -2127,21 +2176,21 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                       <Landmark className="w-3.5 h-3.5 text-amber-600" />
                       <span>{lang === 'te' ? 'డెబిట్ చేయవలసిన ప్రాజెక్ట్ బ్యాంక్ ఖాతా' : 'Request Drawing From (Project Bank Account)'} *</span>
                     </span>
-                    {firmAccounts.length > 0 && (
+                    {projectAccounts.length > 0 && (
                       <span className="font-mono text-[9px] text-emerald-800 font-bold">
-                        Bal: {formatINR(firmAccounts.find((a) => a.id === drawSourceAccountId)?.currentBalance || firmAccounts[0]?.currentBalance || 0)}
+                        Bal: {formatINR(projectAccounts.find((a) => a.id === drawSourceAccountId)?.currentBalance || projectAccounts[0]?.currentBalance || 0)}
                       </span>
                     )}
                   </label>
                   <select
-                    value={drawSourceAccountId || firmAccounts[0]?.id || ''}
+                    value={drawSourceAccountId || projectAccounts[0]?.id || ''}
                     onChange={(e) => setDrawSourceAccountId(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none focus:bg-white focus:border-emerald-500 cursor-pointer"
                   >
-                    {firmAccounts.length === 0 && (
+                    {projectAccounts.length === 0 && (
                       <option value="">Syndicate Primary Escrow Vault</option>
                     )}
-                    {firmAccounts.map((acc) => (
+                    {projectAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
                         {acc.bankName} - {acc.accountName} (••••{acc.accountNumber.slice(-4)}) — Bal: {formatINR(acc.currentBalance)}
                       </option>
@@ -2235,9 +2284,16 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                   <DollarSign className="w-4 h-4" />
                   <span>{t('submitDrawBtn')}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDrawingDialogOpen(false)}
+                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-xs border border-gray-200 cursor-pointer"
+                >
+                  {lang === 'te' ? 'రద్దు' : 'Cancel'}
+                </button>
               </form>
-            </div>
-          </div>
+            </EntryDialog>
+          </>
 
           {/* TRACKING SECTIONS: APPROVALS QUEUE & DRAWING HISTORY */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -22,6 +22,10 @@ Check the testing runner's database target before using its database tools.
 **Why:** the runner may expose a separate built-in database rather than this application's local PostgreSQL; an isolated application database is not automatically available through that connection.
 **How to apply:** seed the disposable local database from the main workspace when necessary, check its name explicitly, and provide the tester with browser-only fixture access. Do not substitute the runner's default database.
 
+Isolated browser checks must use the same frontend styling and API-route behavior as Preview.
+**Why:** a stripped-down test frontend produced false layout failures and an incorrectly scoped test expectation interrupted validation before the actual financial forms were checked.
+**How to apply:** isolate the database/backend without changing rendering; respect firm-code session boundaries and verify actual form controls rather than treating explanatory approval text as an editable workflow.
+
 Dashboard delivery requires verifying the firm's assigned release and rendered interface, not just API health.
 **Why:** additive configuration updates deliberately preserve existing firm assignments for compatibility; a healthy deployment can still display the old dashboard. Incorrect release names in rollout instructions caused unnecessary user effort.
 **How to apply:** use actual published release labels rather than planning terminology, keep activation owner-controlled, and distinguish successful installation from verified dashboard activation.
@@ -29,3 +33,7 @@ Dashboard delivery requires verifying the firm's assigned release and rendered i
 Submitters cannot approve their own expenses, investments or drawings when their project has partners. This applies to accountants and partners, including bulk approval and payout controls.
 **Why:** the user explicitly requires independent approval, with an exception only when there are no project partners.
 **How to apply:** use server-owned creator/recipient identity and project membership, never the selected spender's display name; make UI eligibility agree with the server and store exception policy in database configuration.
+
+Investment enrollment automatically enters the project's pending approval queue; submitters do not choose signatories or enter another partner's PIN.
+**Why:** the user wants a simple enrollment form and automatic visibility to the project's reviewers rather than manual consensus inputs.
+**How to apply:** preserve pending financial entries and the existing independent-review policy; credit cleared account and capital balances only after server approval.
