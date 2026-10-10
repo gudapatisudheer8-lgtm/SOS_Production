@@ -1,0 +1,78 @@
+buntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$ (
+  set -e
+
+  SITE=/etc/nginx/sites-available/syndicateos
+  BACKUP="${SITE}.before-fresh-$(date -u +%Y%m%dT%H%M%SZ)"
+
+  test -f /etc/nginx/snippets/syndicateos-fresh.conf
+  sudo cp -a "$SITE" "$BACKUP"
+  echo "Nginx backup: $BACKUP"
+
+  sudo tee "$SITE" >/dev/null <<'NGINX'
+server {
+    server_name sos.krishisetu9.in;
+
+    server_tokens off;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Authorization $http_authorization;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+    proxy_send_timeout 30s;
+
+    location = /api/auth/login {
+        client_max_body_size 256k;
+        limit_req zone=sos_login burst=10 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:8080;
+    }
+
+    include /etc/nginx/snippets/syndicateos-fresh.conf;
+
+    listen 443 ssl; # managed by Certbot
+    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/sos.krishisetu9.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/sos.krishisetu9.in/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    if ($host = sos.krishisetu9.in) {
+        return 301 https://$host$request_uri;
+    }
+
+    listen 80;
+    listen [::]:80;
+    server_name sos.krishisetu9.in;
+    return 404;
+}
+NGINX
+
+  if sudo nginx -t; then
+    echo "Nginx configuration passed. Ready for activation."
+  else
+    sudo cp -a "$BACKUP" "$SITE"
+    echo "Syntax check failed. Previous configuration restored."
+    sudo nginx -t
+    exit 1
+  fi
+)
+Nginx backup: /etc/nginx/sites-available/syndicateos.before-fresh-20261010T171517Z
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Nginx configuration passed. Ready for activation.
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$ sudo python3 /opt/syndicateos/current/deploy.py activate
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+curl: (22) The requested URL returned error: 500
+HTTPS verification failed; SOS stopped. Inspect the SOS Nginx block.
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$
