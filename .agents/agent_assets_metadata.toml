@@ -266,3 +266,17 @@ mtime_ms = 1791573711008
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/424edcec-6180-464c-9a33-f29980f621c4/8e2418ca-3b15-4d42-ba28-11af43b749e3"
 storage_version_token = "1791573775399372"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "rexLZIlegdHRXeHZlG4yA"
+uri = "file://docs/project-land-allocation-automation-draft.md"
+type = "text"
+title = "Project Land Allocation Automation — Draft"
+description = "Deferred until after EC2 deployment: live area totals, road calculations, unallocated balance, allocation limits, and synchronized project dashboards."
+logical_id = "6000d692-8802-44c3-9875-43fe9ca9bf78"
+content_hash = "sha256:4e63256f9ddb36eaaa04b3eedae28bc2ed81ea92ccd0de2ac2525e29d2211bcf"
+size = 5332
+mtime_ms = 1791627207294
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/6000d692-8802-44c3-9875-43fe9ca9bf78/4788b692-d9dd-4fd9-94e1-3b1e04951176"
+storage_version_token = "1791627219796564"
+content_type = "text/markdown"
