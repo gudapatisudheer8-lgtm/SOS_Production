@@ -56,7 +56,9 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   let body: BodyInit | undefined;
-  if (init.body !== undefined) {
+  if (init.body instanceof FormData) {
+    body = init.body;
+  } else if (init.body !== undefined) {
     headers['Content-Type'] = 'application/json';
     body = JSON.stringify(init.body);
   }
@@ -81,6 +83,27 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
 
 export function newRequestId(): string {
   return crypto.randomUUID();
+}
+
+/** Downloads private project files with the same bearer session as API calls. */
+export async function downloadProjectAttachment(projectId: string, attachmentId: string) {
+  const token = getToken();
+  const response = await nativeFetch(`${API_ROOT}/erp/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'include',
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new ApiError(response.status, error?.error || 'DOWNLOAD_FAILED', error?.message || 'Could not download this project document.');
+  }
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const name = encodedName ? decodeURIComponent(encodedName) : disposition.match(/filename="([^"]+)"/)?.[1] || 'document';
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---- Session mapping ----

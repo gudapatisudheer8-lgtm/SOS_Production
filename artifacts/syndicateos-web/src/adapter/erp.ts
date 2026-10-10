@@ -91,9 +91,39 @@ export async function loadAll(role: string): Promise<LoadedData> {
     let erp: any;
     try { erp = await api<any>(`/erp/${p.id}`); } catch (e: any) { out.loadErrors.push(`${p.name}: ${e.message}`); continue; }
     out.erpByProject[p.id] = erp;
+    const documentRecords = (erp.records || []).filter((r: any) => r.kind === 'documents' && r.status === 'approved');
+    if (documentRecords.length) {
+      try {
+        const attachments = await api<any[]>(`/erp/${p.id}/attachments`);
+        p.planDocuments = documentRecords.map((r: any) => {
+          const file = attachments.find((a) => String(a.id) === String(r.data.attachmentId));
+          if (!file) throw new Error(`An attachment is missing for project document "${r.data.title}".`);
+          return {
+            id: String(file.id), title: r.data.title, category: r.data.category,
+            fileName: file.fileName, fileType: file.contentType, fileSize: Number(file.size),
+            uploadedAt: String(file.uploadedAt),
+          };
+        });
+      } catch (e: any) { out.loadErrors.push(`${p.name} documents: ${e.message}`); }
+    }
     const base = { firmId: p.firmId, projectId: p.id };
     const balance = new Map<string, number>((erp.balances || []).map((b: any) => [String(b.accountId), Number(b.balance)]));
     const recs: any[] = erp.records || [];
+    // Workspace membership is identity/access data, not the project's capital
+    // allocation. Read each project's approved profile instead of displaying
+    // the membership projection's initial zero commitments.
+    p.partners = (erp.partners || []).map((m: any) => {
+      const profile = recs.find((r) => r.kind === 'partner-profiles' && r.status === 'approved'
+        && String(r.data?.partnerId) === String(m.id))?.data || {};
+      return {
+        partnerId: String(m.id), name: m.name || '', phone: m.mobile || '',
+        roleInProject: profile.roleDescription || 'Partner',
+        equityPercent: num(profile.fixedEquityPercent ?? m.equityPercent),
+        initialCapital: num(profile.initialCapital), actualInvested: num(m.invested),
+        drawings: num(m.drawings), shareOfFieldExpenses: num(m.expenses),
+        avatarColor: 'bg-amber-500', enabled: m.enabled,
+      };
+    });
     for (const r of recs) out.meta.set(String(r.id), { id: String(r.id), kind: r.kind, revision: r.revision, projectId: p.id, status: r.status });
     const status = (s: string) => (s === 'approved' ? 'approved' : s === 'rejected' ? 'rejected' : 'pending');
     for (const r of recs) {
@@ -129,7 +159,7 @@ export async function loadAll(role: string): Promise<LoadedData> {
         ...profile,
         id: pid, firmId: p.firmId, name: m.name ?? '', phone: m.mobile ?? '', roleDescription: profile.roleDescription ?? 'Partner',
         avatarColor: 'bg-amber-500', initialCapital: num(profile.initialCapital), actualInvested: num(m.invested),
-        fixedEquityPercent: num(m.equityPercent), drawings: num(m.drawings), shareOfFieldExpenses: num(m.expenses),
+         fixedEquityPercent: num(profile.fixedEquityPercent ?? m.equityPercent), drawings: num(m.drawings), shareOfFieldExpenses: num(m.expenses),
         userRole: 'field_partner', userStatus: m.enabled === false ? 'inactive' : 'active',
         __projectId: p.id, __revision: m.revision, __profileRevision: recs.find((r) => r.kind === 'partner-profiles' && String(r.data?.partnerId) === pid)?.revision,
       } as any);
@@ -161,7 +191,7 @@ export function pickConfigured(fields: any[], data: Record<string, any>, label: 
   const out: Record<string, any> = {};
   const rejected: string[] = [];
   for (const [k0, v] of Object.entries(data)) {
-    const empty = v === undefined || v === null || v === '' || v === 0 || v === false || (Array.isArray(v) && !v.length);
+    const empty = v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
     if (empty) continue;
     const k = keys.has(k0) ? k0 : aliases[k0] && keys.has(aliases[k0]) ? aliases[k0] : k0;
     if (keys.has(k)) {
@@ -174,7 +204,7 @@ export function pickConfigured(fields: any[], data: Record<string, any>, label: 
           ? v.join(', ') : v;
       continue;
     }
-    if (UI_KEYS.has(k0)) continue;
+    if (UI_KEYS.has(k0) || v === 0 || v === false) continue;
     rejected.push(k0);
   }
   if (rejected.length) {

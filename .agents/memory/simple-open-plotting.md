@@ -13,6 +13,8 @@ The user wants a simple, user-friendly open-plotting application for both accoun
 
 Each project must have its own default Cash account and ledger. Bank accounts belong to the project, never a firm-wide account pool. Remove project selection and account-type selection inside Add Project's bank-account form.
 
+The user expects the automatic Cash account to be visible in Add Project's banking section, not only after the project has been created.
+
 **Why:** The user explicitly requested this so cash transactions contribute to the complete ledger of the respective project.
 
-**How to apply:** Provision cash accounts automatically without invented bank details or opening money. Route project cash receipts/payments to that project's cash account; distinguish partner-personal spending from project cash and preserve existing approvals and posting history.
+**How to apply:** Show the planned Cash account clearly as created on save, without fabricating a saved account ID. Provision it automatically without invented bank details or opening money. Route project cash receipts/payments to that project's cash account; distinguish partner-personal spending from project cash and preserve existing approvals and posting history.

@@ -15,6 +15,7 @@ import { api, getToken, clearSession, toAppUser, newRequestId, normalizeClientMo
 import { useConfig, sectorUiCode, masterNumber } from './adapter/config';
 import { MasterEditor } from './adapter/MasterEditor';
 import { loadAll, erpSave, erpReview, command, pickConfigured, describeAccess, type LoadedData } from './adapter/erp';
+import { ProjectPlanSaver } from './adapter/projectPlans';
 
 const EMPTY_LAYOUT: LayoutCalculation = { totalExtentValue: 0, unit: 'Acres', roadWidth: 30, openSpacePercent: 10, floorRatePerSqYard: 0 };
 const EMPTY_MATRIX: ApartmentPricingMatrix = { baseSqFtRate: 0, eastPremium: 0, northPremium: 0, cornerPremium: 0, floorRisePerFloor: 0, carParkingFee: 0, amenitiesFee: 0, floorRatePerSqFt: 0 };
@@ -25,7 +26,6 @@ const BLOCKED_ACTIONS = [
   'Feature flags: WhatsApp, Tally export, voice notes, audit lock, dual ledger',
   'Marketing agent plot portal',
   'Separate drawing disbursement (ledger posts on approval)',
-  'Plan document / receipt uploads',
 ];
 
 function App() {
@@ -46,6 +46,8 @@ function App() {
   const [stickyNotice, setStickyNotice] = useState<string | null>(null);
   const [showGaps, setShowGaps] = useState(false);
   const toastTimer = useRef<number | undefined>(undefined);
+  const projectPlanSaver = useRef(new ProjectPlanSaver());
+  useEffect(() => { projectPlanSaver.current.clear(); }, [currentUser]);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -220,9 +222,8 @@ function App() {
     if (!def?.sections) throw new Error('The owner has not published a project setup form for this sector.');
     const { id: _id, firmId: _f, partners, sector: _s, status: stage, code, ...rest } = p as any;
     const allFields = def.sections.flatMap((sec: any) => sec.fields || []);
-    const { floorPlans, plotDistribution, layoutAmenities, amenities, planDocuments,
+    const { floorPlans, plotDistribution, layoutAmenities, amenities, planDocuments, autoGenerateInventory,
       plotsCount: _pc, totalResidentialSft: _tr, totalAmenitiesSft: _ta, totalBuiltUpAreaSft: _tb, flatsPerFloor: _fp, ...flat } = rest;
-    if (planDocuments?.length) throw new Error('Not saved: plan document upload is not available through the API yet. Remove attached plans.');
     const hasField = (k: string) => allFields.some((f: any) => f.key === k);
     const roadDeduction = hasField('roadDeductionPercent') && flat.roadWidth ? masterNumber('road_widths', String(flat.roadWidth), 'deductionPercent') : undefined;
     const values = pickConfigured(allFields, { ...flat, roadWidth: flat.roadWidth === undefined ? undefined : String(flat.roadWidth), roadDeductionPercent: roadDeduction, projectCode: code, developmentStage: stage }, 'Project setup');
@@ -240,7 +241,7 @@ function App() {
     const planKeys = groups.length ? {} : {
       floorPlans, plotDistribution: hasDistributedPlots ? plotDistribution : undefined,
     };
-    const settings = pickConfigured(def.settingsFields || [], { layoutAmenities, amenities, ...planKeys, autoGenerateInventory: groups.length > 0 }, 'Project settings');
+    const settings = pickConfigured(def.settingsFields || [], { layoutAmenities, amenities, ...planKeys, autoGenerateInventory: autoGenerateInventory ?? groups.length > 0 }, 'Project settings');
     const accounts = (initialAccounts || []).map((a) => pickConfigured(def.accountFields || [], {
       bankName: a.bankName, accountName: a.accountName, accountNumber: a.accountNumber, ifscCode: a.ifscCode,
       branchName: a.branchName, accountType: a.accountType, openingBalance: a.openingBalance, isPrimary: a.isPrimary,
@@ -248,8 +249,9 @@ function App() {
       openingBalanceDate: a.createdDate,
     }, 'Project account'));
     const setup = { values, settings, groups, documents: [], accounts, partners: partnerRows };
-    const created: any = await command('project.setup-create', { requestId: newRequestId(), sectorId: match.sectorId, setup });
+    const created: any = await projectPlanSaver.current.create(p.id, match.sectorId, setup, planDocuments || []);
     if (!created?.entity?.id) throw new Error('The server did not confirm the finalized project.');
+    setSelectedProjectId(String(created.entity.id));
     const notice = describeAccess(created.entity.access);
     if (notice) setStickyNotice(`${p.name} partners — ${notice}`);
   });

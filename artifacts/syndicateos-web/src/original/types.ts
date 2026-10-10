@@ -127,6 +127,7 @@ export interface Project {
 
   // Plan Uploads & Blueprint Documents
   planDocuments?: PlanUploadDocument[];
+  autoGenerateInventory?: boolean;
 }
 
 export interface FlatConfigUnit {

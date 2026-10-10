@@ -54,13 +54,10 @@ export const FirmAccountsBar: React.FC<FirmAccountsBarProps> = ({
   const firmAccounts = accounts.filter((acc) => !acc.firmId || acc.firmId === firm.id);
   const activeProjectObj = projects.find((p) => p.id === activeProjectId);
 
-  // Accounts strictly for this active project:
-  // - Cash accounts (field_petty_cash) are universally accessible across all projects of the firm
-  // - Bank accounts strictly belong to this active project and do not leak
+  // Cash belongs to its project just like a bank account; never pool wallets.
   const projectAccounts = activeProjectId
     ? firmAccounts.filter(
         (acc) =>
-          acc.accountType === 'field_petty_cash' ||
           acc.linkedProjectId === activeProjectId
       )
     : firmAccounts;

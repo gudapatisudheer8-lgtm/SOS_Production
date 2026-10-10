@@ -26,6 +26,7 @@ import { LiquorVendSettlementModule } from './LiquorVendSettlementModule';
 import { ProjectStatementModule } from './ProjectStatementModule';
 import { AddProjectModal } from '../modals/AddProjectModal';
 import { FirmAccountsBar } from './FirmAccountsBar';
+import { ProjectPlans } from './ProjectPlans';
 import { AddFirmAccountModal } from '../modals/AddFirmAccountModal';
 import { FirmAccountStatementModal } from '../modals/FirmAccountStatementModal';
 import { RecordLedgerTransactionModal } from '../modals/RecordLedgerTransactionModal';
@@ -363,12 +364,12 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   const projectedRoiPercent =
     activeProjectCost > 0 ? Math.round((projectedSurplus / activeProjectCost) * 100) : 0;
 
-  // Project Accounts - strictly scoped to active project + shared cash account
+  // Bank and Cash accounts are both strictly scoped to the active project.
   const projectAccounts = activeProject
     ? firmAccounts.filter(
         (acc) =>
           acc.firmId === firm.id &&
-          (acc.linkedProjectId === activeProject.id || acc.accountType === 'field_petty_cash')
+          acc.linkedProjectId === activeProject.id
       )
     : [];
   const totalProjectLiquidity = projectAccounts.reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
@@ -636,6 +637,8 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       {/* ---------------------------------------------------- */}
       {/* TAB 1: DASHBOARD (ALL QUICK VIEWABLE DATA & KPIS)    */}
       {/* ---------------------------------------------------- */}
+      <ProjectPlans key={activeProject?.id} project={activeProject} />
+
       {activeTab === 'dashboard' && (
         !activeProject ? (
           <div className="space-y-6">

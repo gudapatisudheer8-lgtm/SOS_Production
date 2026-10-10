@@ -1,4 +1,4 @@
-import { MasterOptions, masterNumber } from '../../../adapter/config';
+import { MasterOptions, masterNumber, masterItem } from '../../../adapter/config';
 import React, { useState } from 'react';
 import {
   TenantFirm,
@@ -229,6 +229,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     const primary = availableFirmAccounts.find((a) => a.isPrimary);
     return primary ? primary.id : availableFirmAccounts[0]?.id || '';
   });
+  const cashDefaults = masterItem('project_account_defaults', 'standard')?.metadata;
   const [isAddAccountSubModalOpen, setIsAddAccountSubModalOpen] = useState(false);
   // Sector options filtered by what the firm supports
   const defaultSector: SectorType = firm.sectors.includes('real_estate_open_plotting')
@@ -639,6 +640,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
       plotDistribution: sector === 'real_estate_open_plotting' ? plotDistribution : undefined,
       layoutAmenities: sector === 'real_estate_open_plotting' ? layoutAmenities : undefined,
       planDocuments: planDocuments.length > 0 ? planDocuments : undefined,
+      autoGenerateInventory: autoGeneratePlots,
       countersCount: sector === 'liquor_vends' ? liquorCounters.length : undefined,
       dailySalesTarget: sector === 'liquor_vends' ? dailySalesTarget : undefined,
       securityDeposit: sector === 'liquor_vends' ? securityDeposit : undefined,
@@ -650,7 +652,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     let initialPlots: Plot[] | undefined;
     let initialUnits: ApartmentUnit[] | undefined;
 
-    if (autoGeneratePlots && sector === 'real_estate_open_plotting') {
+    if (sector === 'real_estate_open_plotting') {
       initialPlots = [];
       let plotIdCounter = 1;
 
@@ -911,7 +913,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
             }`}
           >
             <Landmark className="w-3.5 h-3.5" />
-            <span>Project Accounts &amp; Banking ({availableFirmAccounts.length})</span>
+            <span>Project Accounts &amp; Banking ({availableFirmAccounts.length + (cashDefaults ? 1 : 0)})</span>
           </button>
         </div>
 
@@ -1893,7 +1895,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                       <h4 className="text-xs font-black uppercase tracking-wider text-gray-950 flex items-center gap-1.5">
                         <span>Project Bank Accounts &amp; Escrow</span>
                         <span className="text-[10px] font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                          {availableFirmAccounts.length} Dedicated Accounts
+                          {availableFirmAccounts.length + (cashDefaults ? 1 : 0)} Dedicated Accounts
                         </span>
                       </h4>
                       <p className="text-[11px] text-gray-500">
@@ -1913,6 +1915,21 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                   </button>
                 </div>
 
+                {cashDefaults ? (
+                  <div className="mb-3 max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-sm font-bold text-gray-950">{String(cashDefaults.cashAccountName)}</h5>
+                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">Automatic</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">Cash vault · this project's cash ledger</p>
+                    <div className="mt-3 flex justify-between border-t border-emerald-200 pt-2 text-xs">
+                      <span>Starting balance</span><strong>{formatINR(0)}</strong>
+                    </div>
+                    <p className="mt-2 text-[11px] text-gray-600">Created automatically when you save. Approved cash receipts and payments update this ledger.</p>
+                  </div>
+                ) : (
+                  <p className="mb-3 text-sm text-red-700">The default Cash policy is unavailable. Ask the owner to check account configuration.</p>
+                )}
                 {availableFirmAccounts.length === 0 ? (
                   <div className="p-4 bg-gray-50/80 rounded-xl border border-dashed border-gray-300 text-center space-y-2">
                     <p className="text-xs font-bold text-gray-800">No bank accounts registered yet for this project</p>

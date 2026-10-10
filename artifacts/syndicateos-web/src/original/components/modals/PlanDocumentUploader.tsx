@@ -42,10 +42,10 @@ export const PlanDocumentUploader: React.FC<PlanDocumentUploaderProps> = ({
 
         if (sector === 'real_estate_open_plotting') {
           defaultCategory = 'master_layout';
-          defaultTitle = `CRDA / DTCP Approved Layout Plan - ${file.name}`;
+          defaultTitle = file.name.replace(/\.[^/.]+$/, '');
         } else if (sector === 'real_estate_construction') {
           defaultCategory = 'floor_plan';
-          defaultTitle = `Architectural Floor Plan & Elevation - ${file.name}`;
+          defaultTitle = file.name.replace(/\.[^/.]+$/, '');
         }
 
         const doc: PlanUploadDocument = {

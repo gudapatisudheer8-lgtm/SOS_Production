@@ -28,6 +28,17 @@ public class AttachmentController {
         @Value("${sos.upload-directory:/var/lib/syndicateos/uploads}") String directory) {
         this.jdbc=jdbc; this.access=access; this.tx=tx; this.directory=Path.of(directory).toAbsolutePath().normalize();
     }
+    @GetMapping
+    public List<Map<String,Object>> list(@AuthenticationPrincipal SessionAccount actor,@PathVariable UUID projectId) {
+        return tx.execute(status -> {
+            access.attachmentProject(actor,projectId,"erp.read",false);
+            return jdbc.queryForList("""
+                SELECT id,file_name AS "fileName",content_type AS "contentType",
+                    size_bytes AS size,created_at AS "uploadedAt"
+                FROM sos.erp_attachments WHERE project_id=? ORDER BY created_at,id
+                """,projectId);
+        });
+    }
     @PostMapping(consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
     public Map<String,Object> upload(@AuthenticationPrincipal SessionAccount actor,@PathVariable UUID projectId,
         @RequestParam("file") MultipartFile file) throws IOException {
