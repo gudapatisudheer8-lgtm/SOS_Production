@@ -2200,7 +2200,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] text-gray-400 block font-bold uppercase">System Auth</span>
-                  <span className="font-mono text-[10px] text-gray-500">AES-256 Ledger Cleared</span>
+                  <span className="font-mono text-[10px] text-gray-500">Ledger Cleared</span>
                 </div>
               </div>
 

@@ -37,22 +37,22 @@ export const LiquorVendSettlementModule: React.FC<LiquorVendSettlementModuleProp
 
   // New Counter Settlement Form State
   const [showAddSettlementModal, setShowAddSettlementModal] = useState(false);
-  const [counterName, setCounterName] = useState('Hanamkonda Main Chowrasta Vend #01');
-  const [openingBottles, setOpeningBottles] = useState<number>(1400);
+  const [counterName, setCounterName] = useState('');
+  const [openingBottles, setOpeningBottles] = useState<number>(0);
   const [receivedBottles, setReceivedBottles] = useState<number>(300);
-  const [closingBottles, setClosingBottles] = useState<number>(1320);
+  const [closingBottles, setClosingBottles] = useState<number>(0);
   const [avgBottlePrice, setAvgBottlePrice] = useState<number>(900);
-  const [cashCollected, setCashCollected] = useState<number>(270000);
-  const [upiCollected, setUpiCollected] = useState<number>(72000);
-  const [settledBy, setSettledBy] = useState('V. Srinivasa Chary (Accountant)');
+  const [cashCollected, setCashCollected] = useState<number>(0);
+  const [upiCollected, setUpiCollected] = useState<number>(0);
+  const [settledBy, setSettledBy] = useState('');
 
   // New Partner Stock Draw Form State
   const [showAddStockDrawModal, setShowAddStockDrawModal] = useState(false);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>(partners[0]?.id || 'partner-a');
-  const [stockDetails, setStockDetails] = useState('2 Cases (24 Bottles) 100 Pipers Blended Scotch');
+  const [stockDetails, setStockDetails] = useState('');
   const [bottlesCount, setBottlesCount] = useState<number>(24);
-  const [retailValuation, setRetailValuation] = useState<number>(43200);
-  const [purpose, setPurpose] = useState('Syndicate institutional partner hospitality event');
+  const [retailValuation, setRetailValuation] = useState<number>(0);
+  const [purpose, setPurpose] = useState('');
 
   // Computed values for new settlement
   const computedBottlesSold = Math.max(0, openingBottles + receivedBottles - closingBottles);
@@ -118,7 +118,7 @@ export const LiquorVendSettlementModule: React.FC<LiquorVendSettlementModuleProp
             <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
               Retail & Liquor Vends Syndicate Engine
             </span>
-            <span className="text-xs text-gray-500 font-mono">Excise Depot: Warangal / Hanamkonda</span>
+            <span className="text-xs text-gray-500 font-mono">Excise Depot: —</span>
           </div>
           <h2 className="text-xl font-black text-gray-950 mt-1 flex items-center gap-2">
             <Wine className="w-6 h-6 text-[#FFB800]" />
@@ -379,9 +379,8 @@ export const LiquorVendSettlementModule: React.FC<LiquorVendSettlementModuleProp
                   onChange={(e) => setCounterName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 font-medium text-gray-900 text-xs focus:ring-2 focus:ring-amber-500"
                 >
-                  <option value="Hanamkonda Main Chowrasta Vend #01">Hanamkonda Main Chowrasta Vend #01</option>
-                  <option value="Warangal Station Road Outlet #02">Warangal Station Road Outlet #02</option>
-                  <option value="Kazipet Highway Bypass Vend #03">Kazipet Highway Bypass Vend #03</option>
+                  <option value="">Select counter</option>
+                  {counterName && <option value={counterName}>{counterName}</option>}
                 </select>
               </div>
 

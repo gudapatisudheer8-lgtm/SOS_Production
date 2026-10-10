@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   ShieldCheck,
   Building2,
-  Lock,
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
@@ -54,6 +53,10 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
   const [pinChangeLoading, setPinChangeLoading] = useState(false);
   const [pinChangeError, setPinChangeError] = useState('');
 
+  const isOwnerChange = pendingUser?.role === 'super_admin';
+  const minCredential = isOwnerChange ? 8 : 6;
+  const cleanCredential = (v: string) => (isOwnerChange ? v.slice(0, 72) : v.replace(/\D/g, '').slice(0, 6));
+
   // Validate Firm Code
   const handleVerifyFirmCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -93,8 +96,8 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
       return;
     }
 
-    if (!memberPin || memberPin.length !== 4) {
-      setMemberError('Please enter your 4-digit security PIN.');
+    if (!memberPin || !/^\d{6}$/.test(memberPin)) {
+      setMemberError('Please enter your 6-digit security PIN.');
       return;
     }
 
@@ -156,8 +159,8 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
       return;
     }
 
-    if (!adminPin || adminPin.length !== 4) {
-      setAdminError('Please enter your 4-digit security PIN.');
+    if (!adminPin || adminPin.length < 8) {
+      setAdminError('Please enter your owner password (at least 8 characters).');
       return;
     }
 
@@ -214,13 +217,14 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
     if (!pendingUser) return;
 
-    if (!newPin || newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
-      setPinChangeError('New PIN must be exactly 4 numeric digits.');
-      return;
-    }
-
-    if (newPin === '9999') {
-      setPinChangeError('Please choose a personal PIN different from default 9999.');
+    const bytes = new TextEncoder().encode(newPin).length;
+    if (isOwnerChange) {
+      if (newPin.length < 8 || bytes > 72) {
+        setPinChangeError('New password must be at least 8 characters and at most 72 bytes.');
+        return;
+      }
+    } else if (!/^\d{6}$/.test(newPin)) {
+      setPinChangeError('New PIN must be exactly 6 numeric digits.');
       return;
     }
 
@@ -465,7 +469,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">Member Sign-In</h2>
               <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-                Enter your registered 10-digit mobile number and 4-digit security PIN.
+                Enter your registered 10-digit mobile number and 6-digit security PIN.
               </p>
             </div>
 
@@ -495,17 +499,17 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">
-                  4-Digit Security PIN
+                  6-Digit Security PIN
                 </label>
                 <input
                   type="password"
                   value={memberPin}
                   onChange={(e) => {
-                    setMemberPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    setMemberPin(e.target.value.replace(/\D/g, '').slice(0, 6));
                     setMemberError('');
                   }}
                   placeholder="••••"
-                  maxLength={4}
+                  maxLength={isOwnerChange ? 72 : 6}
                   className="w-full bg-[#FAF9F5] border border-stone-300 focus:bg-white focus:border-amber-600 rounded-2xl px-4 py-3 text-xl font-mono text-center tracking-widest text-slate-900 placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 shadow-inner"
                 />
               </div>
@@ -519,7 +523,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
               <button
                 type="submit"
-                disabled={memberLoading || memberPhone.length < 10 || memberPin.length < 4}
+                disabled={memberLoading || memberPhone.length < 10 || memberPin.length < 6}
                 className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black rounded-2xl py-3.5 text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 {memberLoading ? (
@@ -588,17 +592,17 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">
-                  4-Digit Security PIN
+                  Owner Password
                 </label>
                 <input
                   type="password"
                   value={adminPin}
                   onChange={(e) => {
-                    setAdminPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    setAdminPin(e.target.value.slice(0, 128));
                     setAdminError('');
                   }}
                   placeholder="••••"
-                  maxLength={4}
+                  maxLength={128}
                   className="w-full bg-[#FAF9F5] border border-stone-300 focus:bg-white focus:border-slate-800 rounded-2xl px-4 py-3 text-xl font-mono text-center tracking-widest text-slate-900 placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-slate-500/10 shadow-inner"
                 />
               </div>
@@ -612,7 +616,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
               <button
                 type="submit"
-                disabled={adminLoading || adminPhone.length < 10 || adminPin.length < 4}
+                disabled={adminLoading || adminPhone.length < 10 || adminPin.length < 8}
                 className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black rounded-2xl py-3.5 text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 {adminLoading ? (
@@ -639,27 +643,27 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
                 <KeyRound className="w-6 h-6" />
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                Set Your Personal 4-Digit PIN
+                {isOwnerChange ? 'Set Your New Owner Password' : 'Set Your Personal 6-Digit PIN'}
               </h2>
               <p className="text-xs text-stone-600 max-w-sm mx-auto leading-relaxed">
-                Welcome, <strong className="text-amber-800">{pendingUser.name}</strong>! Please choose your confidential 4-digit security PIN for future logins.
+                Welcome, <strong className="text-amber-800">{pendingUser.name}</strong>! {isOwnerChange ? 'Please choose a new password (8+ characters) for future logins.' : 'Please choose your confidential 6-digit security PIN for future logins.'}
               </p>
             </div>
 
             <form onSubmit={handleSavePin} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">
-                  New 4-Digit Security PIN
+                  {isOwnerChange ? 'New Password' : 'New 6-Digit Security PIN'}
                 </label>
                 <input
                   type="password"
                   value={newPin}
                   onChange={(e) => {
-                    setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    setNewPin(cleanCredential(e.target.value));
                     setPinChangeError('');
                   }}
                   placeholder="••••"
-                  maxLength={4}
+                  maxLength={isOwnerChange ? 72 : 6}
                   className="w-full bg-[#FAF9F5] border border-stone-300 focus:bg-white focus:border-amber-600 rounded-2xl px-4 py-3 text-xl font-mono text-center tracking-widest text-slate-900 placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 shadow-inner"
                   autoFocus
                 />
@@ -667,17 +671,17 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">
-                  Confirm 4-Digit PIN
+                  {isOwnerChange ? 'Confirm Password' : 'Confirm 6-Digit PIN'}
                 </label>
                 <input
                   type="password"
                   value={confirmPin}
                   onChange={(e) => {
-                    setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    setConfirmPin(cleanCredential(e.target.value));
                     setPinChangeError('');
                   }}
                   placeholder="••••"
-                  maxLength={4}
+                  maxLength={isOwnerChange ? 72 : 6}
                   className="w-full bg-[#FAF9F5] border border-stone-300 focus:bg-white focus:border-amber-600 rounded-2xl px-4 py-3 text-xl font-mono text-center tracking-widest text-slate-900 placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 shadow-inner"
                 />
               </div>
@@ -691,7 +695,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
               <button
                 type="submit"
-                disabled={pinChangeLoading || newPin.length < 4 || confirmPin.length < 4}
+                disabled={pinChangeLoading || newPin.length < minCredential || confirmPin.length < minCredential}
                 className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black rounded-2xl py-3.5 text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 {pinChangeLoading ? (
@@ -716,8 +720,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
         <span>© 2026 SyndicateOS. All rights reserved.</span>
         <span className="hidden sm:inline">•</span>
         <span className="flex items-center gap-1 text-stone-600">
-          <Lock className="w-3 h-3 text-stone-400" />
-          <span>Multi-Tenant Enterprise Portal • 256-Bit SSL Encrypted</span>
+          <span>Multi-Tenant Enterprise Portal</span>
         </span>
       </footer>
     </div>

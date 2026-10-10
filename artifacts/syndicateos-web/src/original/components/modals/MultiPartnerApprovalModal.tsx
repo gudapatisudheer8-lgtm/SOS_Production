@@ -28,10 +28,10 @@ export const MultiPartnerApprovalModal: React.FC<MultiPartnerApprovalModalProps>
   partners,
   onConfirmApproval,
 }) => {
-  const [partner1, setPartner1] = useState('Partner A: Srikanth Reddy (Managing Partner)');
-  const [partner2, setPartner2] = useState('Partner B: K. Venkat Rao');
+  const [partner1, setPartner1] = useState('');
+  const [partner2, setPartner2] = useState('');
   const [otpPin, setOtpPin] = useState('7890');
-  const [auditNotes, setAuditNotes] = useState('Spot cash field outlay verified against physical work done.');
+  const [auditNotes, setAuditNotes] = useState('');
   const [error, setError] = useState('');
 
   if (!isOpen || !expense) return null;
@@ -138,9 +138,7 @@ export const MultiPartnerApprovalModal: React.FC<MultiPartnerApprovalModalProps>
                   onChange={(e) => setPartner1(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 font-medium text-gray-900 text-xs focus:ring-2 focus:ring-amber-500"
                 >
-                  <option value="Partner A: Srikanth Reddy (Managing Partner)">Partner A: Srikanth Reddy (MP)</option>
-                  <option value="Partner B: K. Venkat Rao">Partner B: K. Venkat Rao</option>
-                  <option value="Partner C: Rajesh Varma">Partner C: Rajesh Varma</option>
+                  <option value="">Select authorizing partner</option>
                 </select>
               </div>
 
@@ -151,9 +149,7 @@ export const MultiPartnerApprovalModal: React.FC<MultiPartnerApprovalModalProps>
                   onChange={(e) => setPartner2(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 font-medium text-gray-900 text-xs focus:ring-2 focus:ring-amber-500"
                 >
-                  <option value="Partner B: K. Venkat Rao">Partner B: K. Venkat Rao</option>
-                  <option value="Partner C: Rajesh Varma">Partner C: Rajesh Varma</option>
-                  <option value="Partner D: Murali Krishna">Partner D: Murali Krishna</option>
+                  <option value="">Select co-signing partner</option>
                 </select>
               </div>
             </div>

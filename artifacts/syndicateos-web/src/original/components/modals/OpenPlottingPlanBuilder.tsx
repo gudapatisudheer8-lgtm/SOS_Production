@@ -40,7 +40,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
   openSpacePercent,
 }) => {
   const [newAmenityName, setNewAmenityName] = useState('');
-  const [newAmenityArea, setNewAmenityArea] = useState<number>(500);
+  const [newAmenityArea, setNewAmenityArea] = useState<number>(0);
   const [showAddAmenity, setShowAddAmenity] = useState(false);
   const [showLiveGridPreview, setShowLiveGridPreview] = useState(false);
 

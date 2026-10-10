@@ -23,10 +23,10 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
   unitExtent,
   extentUnit,
 }) => {
-  const [authPartner1, setAuthPartner1] = useState('Partner A: Srikanth Reddy (Managing Partner)');
-  const [authPartner2, setAuthPartner2] = useState('Partner B: K. Venkat Rao');
+  const [authPartner1, setAuthPartner1] = useState('');
+  const [authPartner2, setAuthPartner2] = useState('');
   const [signPin, setSignPin] = useState('');
-  const [signNotes, setSignNotes] = useState('Special concession approved during Sunday Mega Site Visit by joint partner quorum.');
+  const [signNotes, setSignNotes] = useState('');
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -117,9 +117,7 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
                   onChange={(e) => setAuthPartner1(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs"
                 >
-                  <option value="Partner A: Srikanth Reddy (Managing Partner)">Partner A: Srikanth Reddy (MP)</option>
-                  <option value="Partner B: K. Venkat Rao">Partner B: K. Venkat Rao</option>
-                  <option value="Partner C: Rajesh Varma">Partner C: Rajesh Varma</option>
+                  <option value="">Select authorizing partner</option>
                 </select>
               </div>
 
@@ -130,9 +128,7 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
                   onChange={(e) => setAuthPartner2(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs"
                 >
-                  <option value="Partner B: K. Venkat Rao">Partner B: K. Venkat Rao</option>
-                  <option value="Partner C: Rajesh Varma">Partner C: Rajesh Varma</option>
-                  <option value="Partner D: Murali Krishna">Partner D: Murali Krishna</option>
+                  <option value="">Select co-signing partner</option>
                 </select>
               </div>
             </div>

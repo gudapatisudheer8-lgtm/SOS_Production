@@ -265,7 +265,7 @@ const syncPartnersCapitalWithTotalOutlay = (
   });
 };
 
-const DEFAULT_INITIAL_OUTLAY = 48000000;
+const DEFAULT_INITIAL_OUTLAY = 0;
 
 export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   isOpen,
@@ -335,11 +335,11 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   const [autoGeneratePlots, setAutoGeneratePlots] = useState(false);
 
   // Sector-specific properties
-  const [floorsCount, setFloorsCount] = useState<number>(5);
-  const [facingPremium, setFacingPremium] = useState<number>(150);
-  const [countersCount, setCountersCount] = useState<number>(4);
-  const [dailySalesTarget, setDailySalesTarget] = useState<number>(350000);
-  const [securityDeposit, setSecurityDeposit] = useState<number>(5000000);
+  const [floorsCount, setFloorsCount] = useState<number>(0);
+  const [facingPremium, setFacingPremium] = useState<number>(0);
+  const [countersCount, setCountersCount] = useState<number>(0);
+  const [dailySalesTarget, setDailySalesTarget] = useState<number>(0);
+  const [securityDeposit, setSecurityDeposit] = useState<number>(0);
   const [contractType, setContractType] = useState<string>('Item-Rate Schedule (BoQ)');
   const [retentionPercent, setRetentionPercent] = useState<number>(5.0);
 

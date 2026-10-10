@@ -88,7 +88,11 @@ export interface FieldPartnerMobileViewProps {
   plots: Plot[];
   apartmentUnits: ApartmentUnit[];
   fieldExpenses: FieldExpenseLog[];
-  onSubmitExpense: (expense: FieldExpenseLog) => void;
+  onSubmitExpense: (expense: FieldExpenseLog) => void | Promise<boolean>;
+  drawingRequests?: DrawingRequest[];
+  onSubmitDrawing?: (draw: DrawingRequest) => void | Promise<boolean>;
+  onReviewDrawing?: (drawId: string, decision: 'approved' | 'rejected') => void;
+  onBlockedAction?: (what: string) => void;
   session: { firmId: string; partnerId: string } | null;
   onLogin: (firmId: string, partnerId: string) => void;
   onLogout: () => void;
@@ -415,6 +419,10 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   onRecordIndividualInvestment,
   onApproveIndividualInvestment,
   onRejectIndividualInvestment,
+  drawingRequests = [],
+  onSubmitDrawing,
+  onReviewDrawing,
+  onBlockedAction,
 }) => {
   // Language Switcher State (stored in localStorage)
   const [lang, setLang] = useState<Language>(() => {
@@ -621,31 +629,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   const [drawPayoutMode, setDrawPayoutMode] = useState<'Bank Transfer' | 'Field Vault Cash' | 'Cheque'>('Bank Transfer');
   const [drawDestinationAccountDetails, setDrawDestinationAccountDetails] = useState<string>('');
   const [drawPurpose, setDrawPurpose] = useState<string>('');
-  const [submittedDrawings, setSubmittedDrawings] = useState<DrawingRequest[]>(() => {
-    const saved = localStorage.getItem(`syndicate_draw_requests_${firm.id || 'all'}`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [
-      {
-        id: 'draw-initial-1',
-        firmId: firm.id,
-        partnerId: session?.partnerId || 'partner-1',
-        partnerName: 'Partner A: Srikanth Reddy',
-        amount: 500000,
-        payoutMode: 'Bank Transfer',
-        destinationAccountDetails: 'HDFC A/C: •••• 9842 (IFSC: HDFC0001024)',
-        purpose: 'Advance capital draw against Q3 accrued profits',
-        requestedAt: '2026-09-24 14:30',
-        status: 'approved',
-        reviewedBy: 'Managing Partner (Srikanth Reddy)',
-      }
-    ];
-  });
+  const submittedDrawings = drawingRequests;
 
   // Success toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -916,7 +900,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     });
   }, [activeProjectInvestments, investmentFilter, investmentSearch, currentPartner]);
 
-  const handleExpenseSubmit = (e: React.FormEvent) => {
+  const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPartner) return;
     const numAmt = Number(expenseAmount);
@@ -947,7 +931,9 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
       bankAccountName: expensePaymentSource === 'project_bank' ? (chosenBankAcc ? `${chosenBankAcc.bankName} (${chosenBankAcc.accountNumber.slice(-4)})` : 'Project Bank Account') : 'Partner Individual Funds',
     };
 
-    onSubmitExpense(newLog);
+    // Keep the form intact unless the backend accepted the voucher.
+    const accepted = await onSubmitExpense(newLog);
+    if (accepted === false) return;
     setExpenseAmount('');
     setExpenseNote('');
     setExpenseVendor('');
@@ -956,7 +942,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     showToast(lang === 'te' ? 'ఫీల్డ్ ఖర్చు రసీదు ఆమోదం కొరకు సమర్పించబడింది!' : 'Field expense voucher submitted for approval!');
   };
 
-  const handleDrawingSubmit = (e: React.FormEvent) => {
+  const handleDrawingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPartner) return;
     const numAmt = Number(drawAmount);
@@ -982,82 +968,23 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
       status: 'pending_approval',
     };
 
-    const updated = [newRequest, ...submittedDrawings];
-    setSubmittedDrawings(updated);
-    localStorage.setItem(`syndicate_draw_requests_${activeFirm.id}`, JSON.stringify(updated));
+    if (!onSubmitDrawing) return;
+    const accepted = await onSubmitDrawing(newRequest);
+    if (accepted === false) return;
 
     setDrawAmount('');
     setDrawDestinationAccountDetails('');
     setDrawPurpose('');
-    showToast(lang === 'te' ? 'డ్రాయింగ్ అభ్యర్థన విజయవంతంగా పంపబడింది!' : 'Drawing request submitted to Syndicate Management!');
   };
 
   const handleApproveDrawing = (drawId: string) => {
-    if (!currentPartner) return;
-    const updated = submittedDrawings.map((d) =>
-      d.id === drawId
-        ? {
-            ...d,
-            status: 'approved' as const,
-            reviewedBy: `${currentPartner.name} (Partner Consensus)`,
-          }
-        : d
-    );
-    setSubmittedDrawings(updated);
-    localStorage.setItem(`syndicate_draw_requests_${activeFirm.id}`, JSON.stringify(updated));
-    showToast('✓ Drawing request approved! Ready for payout disbursement.');
+    if (!currentPartner || !onReviewDrawing) return;
+    onReviewDrawing(drawId, 'approved');
   };
 
-  const handleDisburseDrawing = (drawId: string) => {
-    if (!currentPartner) return;
-    const draw = submittedDrawings.find((d) => d.id === drawId);
-    if (!draw || draw.status === 'cleared') return;
-
-    const sourceAcc = firmAccounts.find((a) => a.id === draw.sourceAccountId) || firmAccounts[0];
-    if (sourceAcc && onAddAccountTransaction) {
-      const debitTx: FirmAccountTransaction = {
-        id: `tx-draw-disburse-${Date.now()}`,
-        accountId: sourceAcc.id,
-        date: new Date().toISOString().split('T')[0],
-        type: 'debit',
-        amount: draw.amount,
-        description: `Partner Draw Disbursed: ${draw.partnerName} - ${draw.purpose}`,
-        category: 'partner_draw',
-        partnerName: draw.partnerName,
-        projectName: activeProject?.name || 'Project Venture',
-        balanceAfter: sourceAcc.currentBalance - draw.amount,
-        status: 'approved',
-        paymentMode: draw.payoutMode || 'Bank Transfer',
-        notes: `Paid out to: ${draw.destinationAccountDetails}. Authorized by ${currentPartner.name}.`,
-      };
-      onAddAccountTransaction(sourceAcc.id, debitTx);
-    }
-
-    if (onUpdatePartner) {
-      const targetPartner = partners.find(
-        (p) => String(p.id) === String(draw.partnerId) || p.name.trim().toLowerCase() === draw.partnerName.trim().toLowerCase()
-      );
-      if (targetPartner) {
-        onUpdatePartner({
-          ...targetPartner,
-          drawings: (targetPartner.drawings || 0) + draw.amount,
-        });
-      }
-    }
-
-    const updated = submittedDrawings.map((d) =>
-      d.id === drawId
-        ? {
-            ...d,
-            status: 'cleared' as const,
-            disbursedBy: `${currentPartner.name} (Authorized Disburser)`,
-            disbursedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-          }
-        : d
-    );
-    setSubmittedDrawings(updated);
-    localStorage.setItem(`syndicate_draw_requests_${activeFirm.id}`, JSON.stringify(updated));
-    showToast(`✓ Draw of ₹${draw.amount.toLocaleString('en-IN')} disbursed from ${sourceAcc?.bankName || 'Project Account'} to ${draw.partnerName}!`);
+  const handleDisburseDrawing = (_drawId: string) => {
+    // Disbursement is posted by the backend when a drawing is approved; there is no separate payout command.
+    onBlockedAction?.('separate drawing disbursement (the ledger posts on approval).');
   };
 
   // If user is NOT logged in, show Login Gate with language switcher

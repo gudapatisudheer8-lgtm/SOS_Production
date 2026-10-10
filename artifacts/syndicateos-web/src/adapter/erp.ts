@@ -1,0 +1,200 @@
+// Maps Spring API workspace/ERP payloads into the original UI types, and wraps mutations.
+import { api, newRequestId } from './api';
+import type {
+  TenantFirm, Project, Plot, ApartmentUnit, SyndicatePartner, FieldExpenseLog, AuditLogEntry,
+  FirmAccount, FirmAccountTransaction, IndividualInvestmentRecord, LiquorDailySettlement,
+  PartnerStockDraw, ProjectExpense, DrawingRequest, SectorType, LayoutCalculation, ApartmentPricingMatrix, EquitySplitMode,
+} from '../original/types';
+
+export function sectorTypeFromCode(code: string = ''): SectorType {
+  const c = code.toLowerCase();
+  if (c.includes('plot')) return 'real_estate_open_plotting';
+  if (c.includes('constr')) return 'real_estate_construction';
+  if (c.includes('liquor')) return 'liquor_vends';
+  return 'custom_infra';
+}
+
+export interface RecordMeta { id: string; kind: string; revision: number; projectId: string; status: string }
+
+export interface LoadedData {
+  workspace: any;
+  firms: TenantFirm[];
+  projects: Project[];
+  plots: Plot[];
+  units: ApartmentUnit[];
+  partners: SyndicatePartner[];
+  fieldExpenses: FieldExpenseLog[];
+  audit: AuditLogEntry[];
+  accounts: FirmAccount[];
+  investments: IndividualInvestmentRecord[];
+  settlements: LiquorDailySettlement[];
+  stockDraws: PartnerStockDraw[];
+  projectExpenses: ProjectExpense[];
+  drawings: DrawingRequest[];
+  erpByProject: Record<string, any>;
+  meta: Map<string, RecordMeta>;
+  plotIds: Map<number, string>; // original Plot.id is numeric
+  settings: { layoutCalc?: LayoutCalculation; pricingMatrix?: ApartmentPricingMatrix; splitMode?: EquitySplitMode };
+  loadErrors: string[];
+}
+
+const num = (v: any) => (v === null || v === undefined || v === '' ? 0 : Number(v));
+
+export async function loadAll(role: string): Promise<LoadedData> {
+  const ws = await api<any>('/workspace');
+  const sectorById = new Map<string, any>((ws.sectors || []).map((s: any) => [String(s.id), s]));
+  const sectorTypeOf = (sectorId: string, name?: string) => sectorTypeFromCode(sectorById.get(String(sectorId))?.code || name || '');
+
+  const firms: TenantFirm[] = (ws.firms || []).map((f: any) => {
+    const ifaces = (ws.interfaces || []).filter((i: any) => String(i.firmId) === String(f.id) && i.enabled);
+    const sectors = Array.from(new Set(ifaces.map((i: any) => sectorTypeOf(i.sectorId, i.sectorName)))) as SectorType[];
+    const acc = (f.accountants || [])[0];
+    return {
+      id: String(f.id), name: f.name, code: f.clientCode, location: '', state: '' as any, sectors,
+      subscriptionPlan: '' as any, mrrAmount: 0,
+      status: f.status === 'ACTIVE' ? 'active' : f.status === 'SUSPENDED' ? 'suspended' : 'inactive',
+      createdDate: '', managingPartnerName: '', managingPartnerPhone: '',
+      accountantName: acc?.displayName || '', accountantPhone: acc?.mobile || '',
+      featureFlags: {
+        enablePlotGrid: sectors.includes('real_estate_open_plotting'),
+        enableApartmentMatrix: sectors.includes('real_estate_construction'),
+        enableWhatsAppAlerts: false, enableTallyExport: false, enableVoiceNotes: false, enableAuditLock: false,
+      },
+      __revision: f.revision,
+    } as TenantFirm;
+  });
+
+  const projects: Project[] = (ws.projects || []).map((p: any) => ({
+    ...(p.details || {}),
+    id: String(p.id), firmId: String(p.firmId), name: p.name, location: p.location || '',
+    code: p.details?.projectCode || p.details?.code || '',
+    sector: sectorTypeOf(p.sectorId),
+    status: p.details?.status || (p.status === 'COMPLETED' ? 'completed' : 'active_sales'),
+    startDate: p.details?.startDate || '', extentValue: num(p.details?.extentValue), extentUnit: p.details?.extentUnit || '',
+    partners: (p.partners || []).map((m: any) => ({
+      partnerId: String(m.identityId), name: m.displayName, phone: m.mobile || '', roleInProject: 'Partner',
+      equityPercent: 0, initialCapital: 0, drawings: 0, shareOfFieldExpenses: 0, avatarColor: 'bg-amber-500',
+    })),
+    __sectorId: String(p.sectorId), __revision: p.revision, __setupState: p.setupState,
+  } as Project));
+
+  const out: LoadedData = {
+    workspace: ws, firms, projects, plots: [], units: [], partners: [], fieldExpenses: [], audit: [], accounts: [],
+    investments: [], settlements: [], stockDraws: [], projectExpenses: [], drawings: [], erpByProject: {}, meta: new Map(),
+    plotIds: new Map(), settings: {}, loadErrors: [],
+  };
+  if (role === 'super_admin') return out;
+
+  let plotSeq = 1;
+  for (const p of projects) {
+    let erp: any;
+    try { erp = await api<any>(`/erp/${p.id}`); } catch (e: any) { out.loadErrors.push(`${p.name}: ${e.message}`); continue; }
+    out.erpByProject[p.id] = erp;
+    const base = { firmId: p.firmId, projectId: p.id };
+    const balance = new Map<string, number>((erp.balances || []).map((b: any) => [String(b.accountId), Number(b.balance)]));
+    const recs: any[] = erp.records || [];
+    for (const r of recs) out.meta.set(String(r.id), { id: String(r.id), kind: r.kind, revision: r.revision, projectId: p.id, status: r.status });
+    const status = (s: string) => (s === 'approved' ? 'approved' : s === 'rejected' ? 'rejected' : 'pending');
+    for (const r of recs) {
+      const d = r.data || {}; const id = String(r.id);
+      switch (r.kind) {
+        case 'plots': { const n = plotSeq++; out.plotIds.set(n, id); out.plots.push({ ...d, ...base, id: n, status: d.status || 'available' }); break; }
+        case 'units': out.units.push({ ...d, ...base, id, status: d.status || 'available' }); break;
+        case 'accounts': {
+          const txs: FirmAccountTransaction[] = recs.filter((t) => t.kind === 'transactions' && String(t.data?.accountId) === id)
+            .map((t) => ({ ...t.data, id: String(t.id), accountId: id, amount: num(t.data?.amount), balanceAfter: 0, status: t.status === 'approved' ? 'approved' : 'pending' }));
+          out.accounts.push({ ...d, firmId: p.firmId, id, linkedProjectId: p.id, openingBalance: num(d.openingBalance),
+            currentBalance: balance.has(id) ? (balance.get(id) as number) : num(d.openingBalance), isPrimary: !!d.isPrimary,
+            status: r.status === 'approved' ? 'active' : 'frozen', authorizedSignatories: d.authorizedSignatories || [],
+            createdDate: r.createdAt, recentTransactions: txs } as FirmAccount);
+          break;
+        }
+        case 'expenses': out.fieldExpenses.push({ ...d, ...base, id, amount: num(d.amount), status: status(r.status), approvedByPartners: r.votes || [] } as FieldExpenseLog); break;
+        case 'investments': out.investments.push({ ...d, ...base, id, amount: num(d.amount), status: status(r.status) } as IndividualInvestmentRecord); break;
+        case 'settlements': out.settlements.push({ ...d, firmId: p.firmId, id } as LiquorDailySettlement); break;
+        case 'stock-draws': out.stockDraws.push({ ...d, firmId: p.firmId, id } as PartnerStockDraw); break;
+        case 'budgets': out.projectExpenses.push({ ...d, ...base, id, estimatedBudget: num(d.estimatedBudget), actualSpent: num(d.actualSpent) } as ProjectExpense); break;
+      }
+    }
+    for (const m of erp.partners || []) {
+      const pid = String(m.id);
+      if (out.partners.some((x) => x.id === pid)) continue;
+      const profile = recs.find((r) => r.kind === 'partner-profiles' && String(r.data?.partnerId) === pid)?.data || {};
+      out.partners.push({
+        ...profile,
+        id: pid, firmId: p.firmId, name: m.name ?? '', phone: m.mobile ?? '', roleDescription: profile.roleDescription ?? 'Partner',
+        avatarColor: 'bg-amber-500', initialCapital: num(profile.initialCapital), actualInvested: num(m.invested),
+        fixedEquityPercent: num(m.equityPercent), drawings: num(m.drawings), shareOfFieldExpenses: num(m.expenses),
+        userRole: 'field_partner', userStatus: 'active',
+      });
+    }
+    for (const r of recs.filter((x) => x.kind === 'drawings')) {
+      const d = r.data || {};
+      out.drawings.push({ ...d, id: String(r.id), firmId: p.firmId, projectId: p.id, amount: num(d.amount),
+        sourceAccountId: d.accountId, requestedAt: r.createdAt,
+        status: r.status === 'approved' ? 'cleared' : r.status === 'rejected' ? ('rejected' as any) : 'pending_approval' } as DrawingRequest);
+    }
+    for (const a of erp.audit || []) out.audit.push({ id: String(a.id), timestamp: a.timestamp, actorName: a.actor, action: a.event, deviceId: '', notes: `${p.name}`, ledgerType: 'System Governance', verified: true });
+    const s = erp.settings || {};
+    if (s.layoutCalculation) out.settings.layoutCalc = s.layoutCalculation;
+    if (s.pricingMatrix) out.settings.pricingMatrix = s.pricingMatrix;
+    if (s.equitySplitMode) out.settings.splitMode = s.equitySplitMode;
+  }
+  return out;
+}
+
+// UI-computed or identity keys the original components attach; never business input.
+const UI_KEYS = new Set(['id', 'firmId', 'projectId', 'status', 'recentTransactions', 'currentBalance', 'balanceAfter',
+  'createdDate', 'requestedAt', 'submittedAt', 'avatarColor', 'enrolledBy', 'approvedBy', 'approvedAt', 'partnerName',
+  'accountName', 'sourceAccountName', 'bankAccountName', 'projectName', 'deviceId', 'addedDate', 'addedBy']);
+const FINANCIAL = /amount|capital|rate|price|balance|value|fee|budget|spent|advance|percent|invested|outlay|premium|deposit|target|valuation|collected|shortage|sales|cost|equity|limit|rise/i;
+
+// Keep only configured fields. Financially significant non-empty values with no configured
+// field are rejected (never silently dropped).
+export function pickConfigured(fields: any[], data: Record<string, any>, label: string) {
+  const keys = new Set<string>((fields || []).map((f: any) => f.key));
+  const out: Record<string, any> = {};
+  const rejected: string[] = [];
+  for (const [k, v] of Object.entries(data)) {
+    if (v === undefined || v === null || v === '') continue;
+    if (keys.has(k)) { out[k] = v; continue; }
+    if (UI_KEYS.has(k)) continue;
+    const significant = typeof v === 'number' ? v !== 0 : FINANCIAL.test(k) && (typeof v === 'string' || typeof v === 'boolean' ? Boolean(v) : true);
+    if (significant) rejected.push(k);
+  }
+  if (rejected.length) {
+    throw new Error(`Not saved: the backend's configured "${label}" form has no field for ${rejected.join(', ')}. Clear these values or have the owner add them to the sector release.`);
+  }
+  return out;
+}
+
+export function filterFields(erp: any, kind: string, data: Record<string, any>) {
+  const res = (erp?.resources || []).find((r: any) => r.kind === kind);
+  if (!res) throw new Error(`Not supported by backend: no "${kind}" resource is configured for this project's sector release.`);
+  return pickConfigured(res.fields, data, res.title || kind);
+}
+
+// Temporary credentials come back as `access` (object, or array for project setup).
+export function describeAccess(access: any): string | null {
+  const list = Array.isArray(access) ? access : access ? [access] : [];
+  const issued = list.filter((a: any) => a?.temporaryCredential);
+  const reused = list.filter((a: any) => a?.reused);
+  const parts = issued.map((a: any) => `${a.mobile}: ${a.temporaryCredential} (expires ${String(a.expiresAt).slice(0, 10)})`);
+  if (reused.length) parts.push(`${reused.map((a: any) => a.mobile).join(', ')} already registered — existing PIN unchanged`);
+  return parts.length ? `Temporary PINs (shown once): ${parts.join(' · ')}` : null;
+}
+
+export async function command<T = any>(action: string, body: Record<string, any>): Promise<T> {
+  return api<T>(`/commands/${action}`, { body });
+}
+
+export async function erpSave(erp: any, projectId: string, kind: string, data: Record<string, any>, existing?: RecordMeta) {
+  return command('erp.save', {
+    projectId, kind, requestId: newRequestId(), data: filterFields(erp, kind, data),
+    ...(existing ? { recordId: existing.id, revision: existing.revision } : {}),
+  });
+}
+
+export async function erpReview(meta: RecordMeta, decision: 'approved' | 'rejected', reason?: string) {
+  return command('erp.review', { projectId: meta.projectId, recordId: meta.id, revision: meta.revision, decision, ...(reason ? { reason } : {}) });
+}

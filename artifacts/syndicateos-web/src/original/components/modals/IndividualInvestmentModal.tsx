@@ -148,10 +148,10 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
     initiatorRole === 'field_partner' ? 'pending' : 'approved'
   );
   const [approverSignatory, setApproverSignatory] = useState<string>(
-    firm.managingPartnerName ? `${firm.managingPartnerName} (Managing Partner)` : 'Srikanth Reddy (Managing Partner)'
+    firm.managingPartnerName ? `${firm.managingPartnerName} (Managing Partner)` : ''
   );
   const [coSignatory, setCoSignatory] = useState<string>(
-    partners.length > 1 ? partners[1].name : 'K. Venkat Rao (Consensus Partner)'
+    partners.length > 1 ? partners[1].name : ''
   );
   const [authPin, setAuthPin] = useState<string>('7890');
 

@@ -57,7 +57,7 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
   const currentProject = projects.find((p) => p.id === (targetProjectId || activeProjectId));
 
   const [accountName, setAccountName] = useState('');
-  const [bankName, setBankName] = useState('State Bank of India');
+  const [bankName, setBankName] = useState('');
   const [accountType, setAccountType] = useState<FirmAccountType>('rera_escrow');
   const [accountNumber, setAccountNumber] = useState('');
   const [confirmAccountNumber, setConfirmAccountNumber] = useState('');

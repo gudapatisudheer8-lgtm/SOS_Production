@@ -56,7 +56,7 @@ export const ConstructionPlanBuilder: React.FC<ConstructionPlanBuilderProps> = (
 }) => {
   const [activeFloorIndex, setActiveFloorIndex] = useState<number>(0);
   const [newAmenityName, setNewAmenityName] = useState('');
-  const [newAmenitySqFt, setNewAmenitySqFt] = useState<number>(1500);
+  const [newAmenitySqFt, setNewAmenitySqFt] = useState<number>(0);
   const [showAddAmenityForm, setShowAddAmenityForm] = useState(false);
 
   // Sync floor count with floorPlans array

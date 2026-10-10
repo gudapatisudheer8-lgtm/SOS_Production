@@ -71,7 +71,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   const [newGstin, setNewGstin] = useState('');
   const [newPanNumber, setNewPanNumber] = useState('');
   const [newReraNumber, setNewReraNumber] = useState('');
-  const [newFirmLocation, setNewFirmLocation] = useState('Vijayawada / CRDA');
+  const [newFirmLocation, setNewFirmLocation] = useState('');
   const [newState, setNewState] = useState<'Andhra Pradesh' | 'Telangana'>('Andhra Pradesh');
   const [newContactEmail, setNewContactEmail] = useState('');
   const [newOfficeAddress, setNewOfficeAddress] = useState('');
@@ -166,9 +166,9 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
     const mrr = newPlan === 'monthly' ? 2999 : newPlan === 'annual' ? 9999 : 24999;
     const finalProprietor = newProprietorName.trim() || managingPartnerName.trim() || 'Proprietor';
-    const finalProprietorPhone = newProprietorPhone.trim() || managingPartnerPhone.trim() || '+91 98480 00000';
-    const finalAccountantName = accountantName.trim() || 'Primary Accountant';
-    const finalAccountantPhone = accountantPhone.trim() || '+91 94401 56789';
+    const finalProprietorPhone = newProprietorPhone.trim() || managingPartnerPhone.trim() || '';
+    const finalAccountantName = accountantName.trim();;
+    const finalAccountantPhone = accountantPhone.trim();
 
     const newFirm: TenantFirm = {
       id: `firm-${Date.now()}`,
@@ -363,7 +363,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
               <ShieldAlert className="w-3.5 h-3.5" />
               Platform Owner Console
             </span>
-            <span className="text-xs text-gray-500 font-mono">Tenant Isolation: Active (AES-256 GCM)</span>
+            <span className="text-xs text-gray-500 font-mono">Tenant scoping enforced by API roles</span>
           </div>
           <h2 className="text-2xl font-black text-gray-950">
             Multi-Tenant Business Syndicate Orchestrator
@@ -445,7 +445,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
           </div>
           <div className="mt-2 flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
             <Server className="w-3 h-3 text-emerald-600" />
-            <span>Cloud Run Regional Cluster (Asia-East1)</span>
+            <span>Hosting region not reported by the API</span>
           </div>
         </div>
 
@@ -457,11 +457,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-xl font-black text-indigo-700">AES-256 GCM</span>
+            <span className="text-xl font-black text-indigo-700">Not reported</span>
           </div>
           <div className="mt-2 flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
             <ShieldCheck className="w-3 h-3 text-emerald-600" />
-            <span>Zero raw cash logs visible to host admin</span>
+            <span>Encryption status is not reported by the API</span>
           </div>
         </div>
 
