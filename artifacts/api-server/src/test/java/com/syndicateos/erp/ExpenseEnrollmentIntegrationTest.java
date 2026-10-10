@@ -224,6 +224,25 @@ class ExpenseEnrollmentIntegrationTest {
         clear(actors.get(1),actors.get(2),project,receipt);
         assertMoney("70001.19",bank);
         assertMoney("3700.15",cashAccount);
+        UUID cashPlot=UUID.randomUUID();
+        jdbc.update("INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,status,created_by,request_id) VALUES(?,?,?,'plots','{\"plotNumber\":\"2\",\"status\":\"available\",\"areaSqYards\":150,\"ratePerSqYard\":10000}'::jsonb,'{}','approved',?,?)",
+            cashPlot,project,firm,recorder.identityId(),UUID.randomUUID());
+        booking.put("inventoryId",cashPlot.toString());
+        booking.put("accountId",cashAccount.toString());
+        booking.put("paymentMode","Cash");
+        booking.put("advanceReceived","100000");
+        booking.put("ratePerSqYard",10000);
+        UUID cashReceipt=saveKind(recorder,project,"bookings",booking);
+        assertMoney("3700.15",cashAccount); // Pending receipts never inflate cleared cash.
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,cashReceipt));
+        assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(cashReceipt.toString()));
+        assertFalse(((List<?>)service.read(recorder,project).get("reviewableRecordIds")).contains(cashReceipt.toString()));
+        assertThrows(ApiProblem.class,()->review(recorder,project,cashReceipt,1));
+        clear(partner,actors.get(1),project,cashReceipt);
+        assertMoney("103700.15",cashAccount);
+        assertMoney("70001.19",bank);
+        assertEquals("Cash",jdbc.queryForObject("SELECT data->>'paymentMode' FROM sos.erp_records WHERE id=?",String.class,cashPlot));
+        assertEquals(0,new BigDecimal("100000").compareTo(new BigDecimal(jdbc.queryForObject("SELECT data->>'advanceReceived' FROM sos.erp_records WHERE id=?",String.class,cashPlot))));
         assertEquals(0,jdbc.queryForObject("SELECT coalesce(sum(debit-credit),0) FROM sos.erp_postings WHERE project_id=?",BigDecimal.class,project).signum());
         var accountantView=service.read(recorder,project);
         var partnerView=service.read(partner,project);

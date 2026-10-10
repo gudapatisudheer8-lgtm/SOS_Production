@@ -133,7 +133,24 @@ export async function loadAll(role: string): Promise<LoadedData> {
     for (const r of recs) {
       const d = r.data || {}; const id = String(r.id);
       switch (r.kind) {
-        case 'plots': { const n = plotSeq++; out.plotIds.set(n, id); out.plots.push({ ...d, ...base, id: n, status: d.status || 'available' }); break; }
+        case 'plots': {
+          const n = plotSeq++; out.plotIds.set(n, id);
+          const pending = recs.find((receipt) => receipt.kind === 'bookings' && receipt.status === 'pending'
+            && String(receipt.data?.inventoryId) === id);
+          const receipt = pending?.data || {};
+          out.plots.push({
+            ...d, ...base, id: n, status: d.status || 'available',
+            ...(pending ? {
+              pendingBookingId: String(pending.id),
+              buyerName: receipt.buyerName, buyerPhone: receipt.buyerPhone,
+              ratePerSqYard: num(receipt.ratePerSqYard), advanceReceived: num(receipt.advanceReceived),
+              paymentMode: receipt.paymentMode, paymentRefNumber: receipt.paymentRefNumber,
+              paymentMilestone: receipt.paymentMilestone, bookingAccountId: receipt.accountId,
+              bookedAt: receipt.date, notes: receipt.notes,
+            } : {}),
+          });
+          break;
+        }
         case 'units': out.units.push({ ...d, ...base, id, status: d.status || 'available' }); break;
         case 'accounts': {
           let running = 0;

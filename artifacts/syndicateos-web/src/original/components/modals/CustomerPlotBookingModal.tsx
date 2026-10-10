@@ -64,6 +64,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
   const [paymentRefNumber, setPaymentRefNumber] = useState(plot.paymentRefNumber || '');
   const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
     if (availableAccounts.length === 0) return '';
+    if (availableAccounts.some((a) => a.id === plot.bookingAccountId)) return plot.bookingAccountId!;
     if (plot.paymentMode === 'Cash') {
       const cash = availableAccounts.find((a) => a.accountType === 'field_petty_cash');
       if (cash) return cash.id;
@@ -172,6 +173,11 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (plot.pendingBookingId) return;
+    if (!paymentMode || !selectedAccountId) {
+      alert('Select the payment mode and the project account before submitting this receipt.');
+      return;
+    }
     if (!buyerName.trim()) {
       alert('Please enter Customer / Buyer Name for the booking receipt.');
       return;
@@ -574,6 +580,12 @@ Thank you for booking with ${firm.name}.
           ) : (
             /* FAST BOOKING FORM */
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            {plot.pendingBookingId && (
+              <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <strong>Receipt saved — awaiting approval.</strong> The {formatINR(advanceReceived)} receipt will credit the selected project account after approval. Review it in the booking receipts panel.
+              </div>
+            )}
+              <fieldset disabled={!!plot.pendingBookingId} className="space-y-4">
               {/* CUSTOMER IDENTITY */}
               <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
@@ -720,6 +732,7 @@ Thank you for booking with ${firm.name}.
                       Payment Mode
                     </label>
                     <select
+                      required
                     value={paymentMode || ''}
                       onChange={(e) => handlePaymentModeChange(e.target.value as any)}
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none"
@@ -755,6 +768,7 @@ Thank you for booking with ${firm.name}.
                       </span>
                     </label>
                     <select
+                      required
                       id="plot-booking-bank-account-select"
                       value={selectedAccountId}
                       onChange={(e) => setSelectedAccountId(e.target.value)}
@@ -870,6 +884,7 @@ Thank you for booking with ${firm.name}.
                   </button>
                 </div>
               </div>
+              </fieldset>
             </form>
           )}
         </div>

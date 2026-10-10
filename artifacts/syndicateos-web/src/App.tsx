@@ -16,6 +16,7 @@ import { useConfig, sectorUiCode, masterNumber } from './adapter/config';
 import { MasterEditor } from './adapter/MasterEditor';
 import { loadAll, erpSave, erpReview, command, pickConfigured, describeAccess, type LoadedData } from './adapter/erp';
 import { investmentInput, drawingInput, bookingInput } from './adapter/financialInput';
+import { BookingReceiptApprovals } from './components/BookingReceiptApprovals';
 import { ProjectPlanSaver } from './adapter/projectPlans';
 import { MarketingAccessPage } from './marketing/MarketingAccessPage';
 import { expenseInput } from './adapter/expenseInput';
@@ -326,6 +327,7 @@ function App() {
     const id = data?.plotIds.get(plot.id); const meta = id ? metaOf(id) : undefined;
     if (!meta) return unsupported('plot is not a saved backend record.');
     const prev = data?.plots.find((x) => x.id === plot.id);
+    if (prev?.pendingBookingId) return unsupported('this plot has a receipt awaiting approval. Review the existing receipt before changing its booking.');
     const proposal = plot.marketingRequest;
     if (prev?.marketingRequest?.status === 'pending' && proposal?.id === prev.marketingRequest.id
       && (proposal.status === 'accepted_blocked' || proposal.status === 'rejected')) {
@@ -472,6 +474,12 @@ function App() {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+        {data && currentRole !== 'super_admin' && (
+          <BookingReceiptApprovals
+            snapshot={data.erpByProject[activeProjectId]}
+            onReview={async (id, decision) => review(id, decision, 'Booking receipt review recorded')}
+          />
+        )}
         {!data && !loadError ? (
           <div className="bg-white rounded-3xl p-10 border border-amber-300 text-center max-w-lg mx-auto my-12 shadow-xl space-y-4 animate-pulse">
             <div className="w-12 h-12 rounded-2xl bg-[#FFB800] text-gray-950 flex items-center justify-center mx-auto shadow-md">

@@ -216,6 +216,7 @@ export interface MarketingBookingRequest {
 }
 
 export interface Plot {
+  pendingBookingId?: string;
   bookingAccountId?: string;
   id: number;
   firmId?: string;
