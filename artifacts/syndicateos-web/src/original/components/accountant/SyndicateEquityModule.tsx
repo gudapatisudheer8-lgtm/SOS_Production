@@ -293,17 +293,17 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. DYNAMIC SPLIT TABLE & CONTROLS */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-5">
+      <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-sm space-y-6 min-w-0">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-gray-200 gap-4">
           <div>
             <div className="flex items-center gap-2">
               <PieChart className="w-5 h-5 text-[#FFB800]" />
               <h3 className="text-lg font-black text-gray-950">
-                Partner Capital &amp; Dynamic Equity Engine
+                Partner Capital &amp; Equity
               </h3>
             </div>
-            <p className="text-xs text-gray-600 mt-0.5">
-              Live partner ledger tracking capital commitments, equity share, allotted sellable area, expected project profit, and drawings.
+            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed max-w-xl">
+              Review each partner’s capital commitment, investment, equity, land allocation, expected profit and drawings.
             </p>
           </div>
 
@@ -330,7 +330,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
 
             {/* Split Mode Toggle Button */}
             <div className="flex items-center bg-[#F4F4F6] p-1 rounded-full border border-gray-200 text-xs font-bold">
-              <span className="text-gray-500 px-3">Formula:</span>
+              <span className="text-gray-500 px-3">Equity basis:</span>
               <button
                 id="btn-split-fixed"
                 type="button"
@@ -362,10 +362,10 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
         {/* Aggregate Syndicate Capital Cards - Rephrased with Realizable Values, Total Sellable Yards & Expected Profit */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Total Project Estimated Value */}
-          <div className="bg-[#F4F4F6] p-4 rounded-2xl border border-gray-200 flex flex-col justify-between">
+          <div className="bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col justify-between gap-2 min-w-0">
             <span className="text-gray-500 text-[11px] font-bold uppercase block flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
-              <span>Total Project Estimated Value</span>
+              <span>Estimated Sales Value</span>
             </span>
             <div className="my-1.5">
               <strong className="text-gray-950 text-xl sm:text-2xl font-black font-mono block">
@@ -381,10 +381,10 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
           </div>
 
           {/* Card 2: Actual Total Project Invested Value Till This Day */}
-          <div className="bg-[#F4F4F6] p-4 rounded-2xl border border-gray-200 flex flex-col justify-between">
+          <div className="bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col justify-between gap-2 min-w-0">
             <span className="text-gray-500 text-[11px] font-bold uppercase block flex items-center gap-1.5">
               <Coins className="w-3.5 h-3.5 text-blue-600" />
-              <span>Actual Total Project Invested Value Till This Day</span>
+              <span>Actual Investment</span>
             </span>
             <div className="my-1.5">
               <strong className="text-gray-950 text-xl sm:text-2xl font-black font-mono block">
@@ -394,23 +394,23 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                 {formatINR(actualTotalProjectInvested)}
               </span>
             </div>
-            <div className="flex items-center justify-between text-[10px]">
+            <div className="flex flex-col gap-1 text-[10px]">
               <span className="text-gray-500">
-                {firmPartners.length} partners capital invested
+                Capital invested to date · {firmPartners.length} partners
               </span>
               {totalVariance !== 0 && (
                 <span className={`font-mono font-bold ${totalVariance > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {totalVariance > 0 ? `+${formatIndianCompact(totalVariance)}` : formatIndianCompact(totalVariance)} diff
+                  {totalVariance > 0 ? `+${formatIndianCompact(totalVariance)}` : formatIndianCompact(totalVariance)} variance
                 </span>
               )}
             </div>
           </div>
 
           {/* Card 3: Based on Entries Total Sellable Area in Yards */}
-          <div className="bg-[#F4F4F6] p-4 rounded-2xl border border-gray-200 flex flex-col justify-between">
+          <div className="bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col justify-between gap-2 min-w-0">
             <span className="text-gray-500 text-[11px] font-bold uppercase block flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Total Sellable Area in Yards</span>
+              <span>Net Sellable Area</span>
             </span>
             <div className="my-1.5">
               <strong className="text-gray-950 text-xl sm:text-2xl font-black font-mono block">
@@ -426,10 +426,10 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
           </div>
 
           {/* Card 4: Expected Profit as Rate Placed Per Square Yard */}
-          <div className="bg-[#FFFDF0] p-4 rounded-2xl border border-amber-300 flex flex-col justify-between">
+          <div className="bg-amber-50/60 p-4 sm:p-5 rounded-2xl border border-amber-200 flex flex-col justify-between gap-2 min-w-0">
             <span className="text-amber-800 text-[11px] font-bold uppercase block flex items-center gap-1.5">
               <PieChart className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Expected Profit (As Rate Placed Per Sq.Yd)</span>
+              <span>Expected Project Profit</span>
             </span>
             <div className="my-1.5">
               <strong className="text-emerald-700 text-xl sm:text-2xl font-black font-mono block">
@@ -446,20 +446,45 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
         </div>
 
         {/* Partners Table with Allotted Sellable Area, Actual Invested, Difference, and Expected Profit Columns */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="space-y-2 min-w-0">
+        <p className="text-xs text-gray-500">Partner breakdown · Scroll horizontally to view all details.</p>
+        <div role="region" aria-label="Partner capital and equity details" tabIndex={0} className="overflow-x-auto rounded-2xl border border-gray-200 focus-visible:outline-2 focus-visible:outline-amber-500">
+          <table className="w-full min-w-[1280px] text-left border-collapse text-xs">
+            <caption className="sr-only">Partner capital, equity and land allocation, expected returns, drawings, balance and account actions.</caption>
             <thead>
-              <tr className="border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider text-[11px]">
-                <th className="pb-3 px-3">Partner Name &amp; Role</th>
-                <th className="pb-3 px-3">Actual Estimated Value per Partner (₹)</th>
-                <th className="pb-3 px-3 bg-amber-50/80 text-amber-950 border-l border-amber-200">Actual Invested (₹)</th>
-                <th className="pb-3 px-3 bg-amber-50/80 text-amber-950 border-r border-amber-200">Difference (+ / -)</th>
-                <th className="pb-3 px-3">Percentage Share (%)</th>
-                <th className="pb-3 px-3">Expected Allotted Sellable Area as per Share</th>
-                <th className="pb-3 px-3">Expected Profit as per Share for this Project</th>
-                <th className="pb-3 px-3">Drawings (₹)</th>
-                <th className="pb-3 px-3">Net Balance (₹)</th>
-                <th className="pb-3 px-3 text-right min-w-[270px]">Actions (Status & PIN)</th>
+              <tr className="text-[11px] uppercase tracking-wider font-black text-gray-700 bg-gray-50 border-b border-gray-200">
+                <th scope="colgroup" className="py-3 px-3 normal-case">
+                  <span className="block uppercase">Partner</span>
+                  <span className="block normal-case font-medium tracking-normal text-gray-500">Identity and login access</span>
+                </th>
+                <th scope="colgroup" colSpan={3} className="py-3 px-3 bg-amber-50/80 border-x border-amber-200 normal-case">
+                  <span className="block uppercase">Capital</span>
+                  <span className="block normal-case font-medium tracking-normal text-gray-600">Committed, invested and the gap between them</span>
+                </th>
+                <th scope="colgroup" colSpan={2} className="py-3 px-3 normal-case">
+                  <span className="block uppercase">Equity and Allocation</span>
+                  <span className="block normal-case font-medium tracking-normal text-gray-500">Equity share and sellable land</span>
+                </th>
+                <th scope="colgroup" colSpan={3} className="py-3 px-3 border-l border-gray-200 normal-case">
+                  <span className="block uppercase">Profit and Balance</span>
+                  <span className="block normal-case font-medium tracking-normal text-gray-500">Expected profit, drawings and net position</span>
+                </th>
+                <th scope="colgroup" className="py-3 px-3 text-right normal-case border-l border-gray-200 bg-gray-50 lg:sticky lg:right-0 lg:z-10">
+                  <span className="block uppercase">Actions</span>
+                  <span className="block normal-case font-medium tracking-normal text-gray-500">Status, PIN and adjust</span>
+                </th>
+              </tr>
+              <tr className="border-b border-gray-200 text-gray-600 font-semibold text-xs bg-white">
+                <th scope="col" className="py-3 px-3">Name &amp; Role</th>
+                <th scope="col" className="py-3 px-3">Capital Commitment (₹)</th>
+                <th scope="col" className="py-3 px-3 bg-amber-50/60 text-amber-950 border-l border-amber-200">Actual Investment (₹)</th>
+                <th scope="col" className="py-3 px-3 bg-amber-50/60 text-amber-950 border-r border-amber-200">Variance (+ / −)</th>
+                <th scope="col" className="py-3 px-3">Equity Share (%)</th>
+                <th scope="col" className="py-3 px-3">Expected Land Allocation</th>
+                <th scope="col" className="py-3 px-3">Expected Profit Share (₹)</th>
+                <th scope="col" className="py-3 px-3">Drawings (₹)</th>
+                <th scope="col" className="py-3 px-3">Net Balance (₹)</th>
+                <th scope="col" className="py-3 px-3 text-right min-w-[270px] bg-white lg:sticky lg:right-0 lg:z-10 lg:border-l lg:border-gray-200">Partner Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -665,7 +690,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                     </td>
 
                     {/* Actions Column: Active/Inactive, Reset PIN, Adjust */}
-                    <td className="py-3.5 px-3 text-right">
+                    <td className="py-3.5 px-3 text-right min-w-[270px] bg-white lg:sticky lg:right-0 lg:z-10 lg:border-l lg:border-gray-200">
                       <div className="flex items-center justify-end gap-1.5 flex-wrap">
                         {/* 1. Active / Inactive Partner Status Toggle */}
                         <button
@@ -720,6 +745,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
             )}
             </tbody>
           </table>
+        </div>
         </div>
 
       </div>

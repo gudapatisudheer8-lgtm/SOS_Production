@@ -20,3 +20,9 @@ An isolated test gateway verifies application behavior, not actual Replit Previe
 **Why:** an isolated project/plan save passed, but the user subsequently encountered a Replit access-page redirect and CORS failure in the real Preview.
 
 **How to apply:** verify same-origin API routing through the actual Preview/shared router as well. Protected-endpoint probes with invalid credentials can confirm API JSON responses without changing customer data. Distinguish platform access redirects from application session failures.
+
+Finish workflow restarts before browser verification. A component harness mounted only in browser memory disappears when Vite reloads the page.
+
+**Why:** A restart interrupted a responsive layout check and removed the temporary harness; that blank harness was not evidence of a persistent application failure.
+
+**How to apply:** Avoid edits and restarts during captures. Isolated component rendering can check presentation without customer writes, but does not verify authenticated saving or the complete dashboard.
