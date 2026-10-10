@@ -218,18 +218,12 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   // Project ID established upfront for strict account isolation and mapping
   const [projectId] = useState<string>(() => `proj-${Date.now().toString().slice(-6)}`);
 
-  // Dedicated Project Accounts available in this modal:
-  // - Cash accounts (field_petty_cash / Cash Safe Vault) are available for all projects of this firm
-  // - Existing bank accounts already assigned to other projects are filtered out so they never leak into this new project!
+  // Only this draft's accounts are available. Its Cash ledger is provisioned
+  // by the server on creation, never borrowed from another project.
   const [pendingAccounts, setPendingAccounts] = useState<FirmAccount[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const availableFirmAccounts = [...pendingAccounts, ...firmAccounts].filter((a) => {
-    if (a.firmId !== firm.id) return false;
-    if (a.accountType === 'field_petty_cash') return true;
-    if (a.linkedProjectId && a.linkedProjectId !== '' && a.linkedProjectId !== 'all' && a.linkedProjectId !== projectId) {
-      return false; // belongs to another existing project
-    }
-    return true;
+    return a.firmId === firm.id && a.linkedProjectId === projectId;
   });
   const [selectedFirmAccountId, setSelectedFirmAccountId] = useState<string>(() => {
     const primary = availableFirmAccounts.find((a) => a.isPrimary);

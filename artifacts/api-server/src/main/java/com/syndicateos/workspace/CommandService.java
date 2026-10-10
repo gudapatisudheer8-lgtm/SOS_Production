@@ -24,8 +24,9 @@ public class CommandService {
     private final com.syndicateos.erp.ErpService erp;
     private final ProjectSetupService setup;
     private final com.syndicateos.configuration.BusinessMasterService masters;
-    public CommandService(JdbcTemplate jdbc,TransactionTemplate tx,ConfigurationService config,WorkspaceReader access,PasswordEncoder encoder,com.syndicateos.erp.ErpService erp,ProjectSetupService setup,com.syndicateos.configuration.BusinessMasterService masters) {
-        this.jdbc=jdbc; this.tx=tx; this.config=config; this.access=access; this.encoder=encoder; this.erp=erp;this.setup=setup;this.masters=masters;
+    private final com.syndicateos.erp.ProjectCashAccountService cash;
+    public CommandService(JdbcTemplate jdbc,TransactionTemplate tx,ConfigurationService config,WorkspaceReader access,PasswordEncoder encoder,com.syndicateos.erp.ErpService erp,ProjectSetupService setup,com.syndicateos.configuration.BusinessMasterService masters,com.syndicateos.erp.ProjectCashAccountService cash) {
+        this.jdbc=jdbc; this.tx=tx; this.config=config; this.access=access; this.encoder=encoder; this.erp=erp;this.setup=setup;this.masters=masters;this.cash=cash;
     }
     public Map<String,Object> execute(SessionAccount actor,String action,JsonNode input) {
         actor.business();
@@ -133,6 +134,7 @@ public class CommandService {
         UUID project=UUID.randomUUID();
         jdbc.update("INSERT INTO sos.projects(id,firm_id,sector_id,name,location,details,created_by) VALUES (?,?,?,?,?,?::jsonb,?)",
             project,actor.firmId(),sector,Values.text(input,"name",160),location(input),details(input),actor.identityId());
+        cash.ensure(actor,project);
         config.audit(actor,"PROJECT_CREATED",actor.firmId(),release);
         return ok(Map.of("id",project));
     }

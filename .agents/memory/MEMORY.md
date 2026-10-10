@@ -6,5 +6,5 @@
 - [Expo preview settling](expo-preview-verification.md) — quick mobile captures can stop at font loading; verify the settled page before diagnosing a broken login.
 - [ERP delivery decisions](erp-delivery-decisions.md) — immutable cleared money, independent approvals, and private attachment backups on the existing AWS deployment.
 - [Database configuration](database-configuration.md) — business choices/forms/policies belong in versioned PostgreSQL; no mock application records or silent firm upgrades.
-- [Simple open plotting](simple-open-plotting.md) — compact reference-inspired forms, calculated project-bounded partner capital, and five-field bank entry for both roles.
+- [Simple open plotting](simple-open-plotting.md) — compact forms, project-bounded partner capital, simple project bank entry, and a default Cash ledger per project.
 - [EC2 update handoffs](ec2-update-handoffs.md) — use current package names and inline checksum verification; keep fail-fast checks inside a subshell.

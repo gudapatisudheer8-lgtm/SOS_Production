@@ -233,7 +233,13 @@ function App() {
     const plotRows = (initialPlots || []) as any[];
     const unitRows = (initialUnits || []) as any[];
     const groups = buildGroups(def, plotRows.length ? plotRows : unitRows, '');
-    const planKeys = groups.length ? {} : { floorPlans, plotDistribution };
+    // An untouched zero-count matrix is not project configuration. Actual plots
+    // are sent as inventory groups; never discard an unconfigured nonempty plan.
+    const hasDistributedPlots = Object.entries(plotDistribution || {}).some(
+      ([key, value]) => key.endsWith('PlotsCount') && Number(value) > 0);
+    const planKeys = groups.length ? {} : {
+      floorPlans, plotDistribution: hasDistributedPlots ? plotDistribution : undefined,
+    };
     const settings = pickConfigured(def.settingsFields || [], { layoutAmenities, amenities, ...planKeys, autoGenerateInventory: groups.length > 0 }, 'Project settings');
     const accounts = (initialAccounts || []).map((a) => pickConfigured(def.accountFields || [], {
       bankName: a.bankName, accountName: a.accountName, accountNumber: a.accountNumber, ifscCode: a.ifscCode,

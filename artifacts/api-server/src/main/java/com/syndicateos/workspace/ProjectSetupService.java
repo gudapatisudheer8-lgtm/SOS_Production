@@ -26,9 +26,10 @@ public class ProjectSetupService {
     private final ErpService erp;
     private final PasswordEncoder encoder;
     private final TransactionTemplate tx;
+    private final com.syndicateos.erp.ProjectCashAccountService cash;
     public ProjectSetupService(JdbcTemplate jdbc,ObjectMapper json,WorkspaceReader access,
-        ConfigurationService config,ErpService erp,PasswordEncoder encoder,TransactionTemplate tx) {
-        this.jdbc=jdbc;this.json=json;this.access=access;this.config=config;this.erp=erp;this.encoder=encoder;this.tx=tx;
+        ConfigurationService config,ErpService erp,PasswordEncoder encoder,TransactionTemplate tx,com.syndicateos.erp.ProjectCashAccountService cash) {
+        this.jdbc=jdbc;this.json=json;this.access=access;this.config=config;this.erp=erp;this.encoder=encoder;this.tx=tx;this.cash=cash;
     }
     public Map<String,Object> execute(SessionAccount actor,String action,JsonNode input) {
         actor.business();
@@ -203,9 +204,10 @@ public class ProjectSetupService {
         ObjectNode plan=erpSettings.putObject("projectPlan");plan.set("groups",setup.path("groups"));plan.set("values",values);
         jdbc.update("INSERT INTO sos.erp_project_settings(project_id,data) VALUES (?,?::jsonb) ON CONFLICT(project_id) DO UPDATE SET data=excluded.data,revision=sos.erp_project_settings.revision+1",
             id,erpSettings.toString());
+        cash.ensure(actor,id);
         config.audit(actor,"PROJECT_SETUP_FINALIZED",actor.firmId(),release);
         return ok(Map.of("id",id,"revision",(Integer)project.get("revision")+1,"setupState","READY","access",credentials,
-            "counts",Map.of("partners",setup.path("partners").size(),"accounts",setup.path("accounts").size(),"documents",setup.path("documents").size(),"inventory",inventory.size())));
+            "counts",Map.of("partners",setup.path("partners").size(),"accounts",setup.path("accounts").size()+1,"documents",setup.path("documents").size(),"inventory",inventory.size())));
     }
     private void bootstrap(SessionAccount actor,UUID project,String kind,JsonNode data,UUID request,int pos) {
         ObjectNode input=json.createObjectNode().put("projectId",project.toString()).put("kind",kind)

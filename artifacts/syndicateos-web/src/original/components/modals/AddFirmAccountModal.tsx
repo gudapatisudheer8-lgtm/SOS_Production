@@ -1,4 +1,4 @@
-import { MasterOptions } from '../../../adapter/config';
+import { MasterOptions, masterItem } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { FirmAccount, FirmAccountType, TenantFirm, Project } from '../../types';
 import {
@@ -27,22 +27,6 @@ interface AddFirmAccountModalProps {
   onAddAccount: (account: FirmAccount) => void | boolean | Promise<boolean>;
 }
 
-const BANK_OPTIONS = [
-  'State Bank of India',
-  'HDFC Bank',
-  'ICICI Bank',
-  'Axis Bank',
-  'Kotak Mahindra Bank',
-  'Punjab National Bank',
-  'Canara Bank',
-  'Union Bank of India',
-  'Bank of Baroda',
-  'IndusInd Bank',
-  'Federal Bank',
-  'Syndicate Cash Vault',
-  'Other Commercial Bank'
-];
-
 export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
   isOpen,
   onClose,
@@ -52,44 +36,32 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
   onAddAccount,
 }) => {
   const firmProjects = projects.filter((p) => p.firmId === firm.id);
-  const [targetProjectId, setTargetProjectId] = useState<string>(
-    activeProjectId || firmProjects[0]?.id || ''
-  );
+  const targetProjectId = activeProjectId || '';
   const currentProject = projects.find((p) => p.id === (targetProjectId || activeProjectId));
 
   const [accountName, setAccountName] = useState('');
   const [bankName, setBankName] = useState('');
-  const [accountType, setAccountType] = useState<FirmAccountType>('rera_escrow');
+  const [accountType, setAccountType] = useState<FirmAccountType>(
+    masterItem('project_account_defaults', 'standard')?.metadata.bankAccountType as FirmAccountType
+  );
   const [accountNumber, setAccountNumber] = useState('');
   const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [branchName, setBranchName] = useState('');
-  const [city, setCity] = useState(firm.state === 'Andhra Pradesh' ? 'Vijayawada' : 'Hyderabad');
+  const [city, setCity] = useState('');
   const [openingBalance, setOpeningBalance] = useState<number>(0);
   const [upiId, setUpiId] = useState('');
   const [isPrimary, setIsPrimary] = useState(false);
   const [notes, setNotes] = useState('');
-  const [signatories, setSignatories] = useState<string[]>([
-    `${firm.accountantName || 'Accountant'} (Accountant)`
-  ]);
+  const [signatories, setSignatories] = useState<string[]>([]);
   const [newSignatoryInput, setNewSignatoryInput] = useState('');
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
-  // Auto-generate suggested account name
   const handleBankOrTypeChange = (newBank: string, newType: FirmAccountType) => {
     setBankName(newBank);
     setAccountType(newType);
-    if (!accountName || accountName.includes('Account')) {
-      const typeLabel = 
-        newType === 'rera_escrow' ? 'RERA Escrow' :
-        newType === 'syndicate_capital_pool' ? 'Syndicate Capital Pool' :
-        newType === 'current_operational' ? 'Current Operational' :
-        newType === 'field_petty_cash' ? 'Site Petty Cash Treasury' : 'Tax & Statutory';
-      const suffix = currentProject ? currentProject.code : firm.code;
-      setAccountName(`${newBank === 'Syndicate Cash Vault' ? 'Field Cash Vault' : newBank} ${typeLabel} - ${suffix}`);
-    }
   };
 
   const handleAddSignatory = () => {
@@ -106,6 +78,10 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!accountType || accountType === masterItem('project_account_defaults', 'standard')?.metadata.cashAccountType) {
+      setError('Project bank-account defaults are not configured.');
+      return;
+    }
 
     if (!accountName.trim()) {
       setError('Please provide a descriptive Account Name or Title.');
@@ -129,8 +105,8 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
 
     const resolvedProjectId = targetProjectId || activeProjectId || '';
 
-    if (accountType !== 'field_petty_cash' && firmProjects.length > 0 && !resolvedProjectId) {
-      setError('Please select which Project this bank account belongs to.');
+    if (!resolvedProjectId) {
+      setError('Open this form from a selected project. Firm-level accounts cannot be created.');
       return;
     }
 
@@ -138,19 +114,19 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
       id: `acc-${firm.code.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString().slice(-5)}`,
       firmId: firm.id,
       accountName: accountName.trim(),
-      bankName: accountType === 'field_petty_cash' && bankName !== 'Syndicate Cash Vault' ? 'Syndicate Cash Vault' : bankName,
+      bankName,
       accountType,
-      accountNumber: accountType === 'field_petty_cash' ? (accountNumber.trim() || `VAULT-${firm.code}-${Date.now().toString().slice(-4)}`) : accountNumber.trim(),
-      ifscCode: accountType === 'field_petty_cash' ? (ifscCode.trim() || 'CASH0000001') : ifscCode.trim().toUpperCase(),
-      branchName: branchName.trim() || (accountType === 'field_petty_cash' ? 'Project Site Office' : 'Main Commercial Branch'),
-      city: city.trim() || firm.location,
+      accountNumber: accountNumber.trim(),
+      ifscCode: ifscCode.trim().toUpperCase(),
+      branchName: branchName.trim(),
+      city: city.trim(),
       currentBalance: Math.max(0, Number(openingBalance) || 0),
       openingBalance: Math.max(0, Number(openingBalance) || 0),
       upiId: upiId.trim() || undefined,
       linkedProjectId: resolvedProjectId,
       isPrimary,
       status: 'active',
-      authorizedSignatories: signatories.length > 0 ? signatories : [`${firm.managingPartnerName} (Managing Partner)`],
+      authorizedSignatories: signatories,
       createdDate: new Date().toISOString().split('T')[0],
       notes: notes.trim() || undefined,
       recentTransactions: openingBalance > 0 ? [
@@ -214,41 +190,6 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
             </div>
           )}
 
-          {/* Associated Project Designation (Mapped to Project Only) */}
-          {firmProjects.length > 0 && (
-            <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-black uppercase tracking-wider text-gray-900 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Designated Project / Venture</span>
-                </label>
-                <span className="text-[10px] font-bold text-gray-500 uppercase">Project Isolation</span>
-              </div>
-              <select
-                value={targetProjectId}
-                onChange={(e) => {
-                  setTargetProjectId(e.target.value);
-                  const selectedProj = projects.find((p) => p.id === e.target.value);
-                  if (selectedProj && (!accountName || accountName.includes(' - '))) {
-                    const typeLabel =
-                      accountType === 'rera_escrow' ? 'RERA Escrow' :
-                      accountType === 'syndicate_capital_pool' ? 'Syndicate Capital Pool' :
-                      accountType === 'current_operational' ? 'Current Operational' :
-                      accountType === 'field_petty_cash' ? 'Site Petty Cash Treasury' : 'Tax & Statutory';
-                    setAccountName(`${bankName === 'Syndicate Cash Vault' ? 'Field Cash Vault' : bankName} ${typeLabel} - ${selectedProj.code}`);
-                  }
-                }}
-                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:ring-2 focus:ring-[#FFB800] outline-none"
-              >
-                {firmProjects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    [{p.code}] {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Account Details & Bank Selection */}
           <div className="space-y-4">
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
@@ -259,19 +200,6 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Project Account Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={accountType}
-                  onChange={(e) => handleBankOrTypeChange(bankName, e.target.value as FirmAccountType)}
-                  className="w-full text-xs font-bold text-gray-900 border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
-                >
-                  <MasterOptions group="firm_account_types" />
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
                   Bank / Depository Institution <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -279,9 +207,8 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
                   onChange={(e) => handleBankOrTypeChange(e.target.value, accountType)}
                   className="w-full text-xs font-bold text-gray-900 border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
                 >
-                  {BANK_OPTIONS.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
+                  <option value="">Select bank</option>
+                  <MasterOptions group="bank_names" />
                 </select>
               </div>
 

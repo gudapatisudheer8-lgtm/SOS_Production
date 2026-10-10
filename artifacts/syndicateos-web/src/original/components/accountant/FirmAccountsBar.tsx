@@ -316,7 +316,7 @@ export const FirmAccountsBar: React.FC<FirmAccountsBarProps> = ({
                         <div className="min-w-0">
                           <p className="font-mono font-bold text-gray-900 truncate">
                             {account.accountType === 'field_petty_cash'
-                              ? account.accountNumber
+                               ? 'Cash ledger'
                               : `•••• ${account.accountNumber.slice(-4) || account.accountNumber}`}
                           </p>
                           <p className="text-[10px] text-gray-500 font-mono uppercase truncate">

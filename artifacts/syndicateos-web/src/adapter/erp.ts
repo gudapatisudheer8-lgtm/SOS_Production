@@ -105,8 +105,12 @@ export async function loadAll(role: string): Promise<LoadedData> {
           const txs: FirmAccountTransaction[] = recs.filter((t) => t.kind === 'transactions' && String(t.data?.accountId) === id)
             .map((t) => ({ ...t.data, id: String(t.id), accountId: id, amount: num(t.data?.amount), balanceAfter: 0, status: t.status === 'approved' ? 'approved' : 'pending' }));
           out.accounts.push({ ...d, firmId: p.firmId, id, linkedProjectId: p.id, openingBalance: num(d.openingBalance),
+            bankName: String(d.bankName ?? ''), accountNumber: String(d.accountNumber ?? ''),
+            ifscCode: String(d.ifscCode ?? ''), branchName: String(d.branchName ?? ''), city: String(d.city ?? ''),
             currentBalance: balance.has(id) ? (balance.get(id) as number) : num(d.openingBalance), isPrimary: !!d.isPrimary,
-            status: r.status === 'approved' ? 'active' : 'frozen', authorizedSignatories: d.authorizedSignatories || [],
+            status: r.status === 'approved' ? 'active' : 'frozen',
+            authorizedSignatories: Array.isArray(d.authorizedSignatories) ? d.authorizedSignatories
+              : d.authorizedSignatories ? [String(d.authorizedSignatories)] : [],
             createdDate: r.createdAt, recentTransactions: txs } as FirmAccount);
           break;
         }
@@ -160,7 +164,16 @@ export function pickConfigured(fields: any[], data: Record<string, any>, label: 
     const empty = v === undefined || v === null || v === '' || v === 0 || v === false || (Array.isArray(v) && !v.length);
     if (empty) continue;
     const k = keys.has(k0) ? k0 : aliases[k0] && keys.has(aliases[k0]) ? aliases[k0] : k0;
-    if (keys.has(k)) { out[k] = v; continue; }
+    if (keys.has(k)) {
+      const field = fields.find((f: any) => f.key === k);
+      // Domain dates must remain dates, even when the original UI supplies
+      // a persisted SQL/ISO timestamp. Leave invalid values for validation.
+      out[k] = field?.type === 'date' && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}[T ]/.test(v)
+        ? v.slice(0, 10)
+        : field?.type === 'text' && Array.isArray(v) && v.every((item) => typeof item === 'string')
+          ? v.join(', ') : v;
+      continue;
+    }
     if (UI_KEYS.has(k0)) continue;
     rejected.push(k0);
   }

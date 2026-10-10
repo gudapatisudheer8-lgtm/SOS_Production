@@ -271,7 +271,8 @@ class OnboardingIntegrationTest {
         assertEquals(2,complete.path("entity").path("counts").path("inventory").asInt());
         assertTrue(complete.path("entity").path("access").get(0).path("reused").asBoolean());
         command("project.setup-finalize",finalizeInput,accountant,200);
-        assertEquals(5,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid",Integer.class,id));
+        assertEquals(6,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid",Integer.class,id));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.project_cash_accounts WHERE project_id=?::uuid",Integer.class,id));
         assertEquals(1,complete.path("entity").path("counts").path("documents").asInt());
         assertEquals(attachmentId,jdbc.queryForObject("SELECT data->>'attachmentId' FROM sos.erp_records WHERE project_id=?::uuid AND kind='documents'",String.class,id));
         JsonNode erp=request("GET","/erp/"+id,null,accountant,200);
@@ -295,9 +296,9 @@ class OnboardingIntegrationTest {
         JsonNode preserved=json.readTree(jdbc.queryForObject("SELECT data::text FROM sos.project_setup_sections WHERE project_id=?::uuid",String.class,id));
         assertEquals(historical.path("groups"),preserved.path("groups"));
         assertEquals(historical.path("accounts"),preserved.path("accounts"));
-        assertEquals(5,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid",Integer.class,id));
-        assertEquals("1000.00",erp.path("balances").get(0).path("balance").asText());
-        String acct=erp.path("balances").get(0).path("accountId").asText();
+        assertEquals(6,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid",Integer.class,id));
+        String acct=jdbc.queryForObject("SELECT r.id::text FROM sos.erp_records r JOIN sos.project_cash_accounts c ON c.project_id=r.project_id WHERE r.project_id=?::uuid AND r.kind='accounts' AND r.id<>c.account_record_id",String.class,id);
+        assertEquals("1000.00",accountBalance(erp,acct));
         String plot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' LIMIT 1",String.class,id);
         Object booking=Map.of("projectId",id,"kind","bookings","requestId",java.util.UUID.randomUUID().toString(),
             "data",Map.of("inventoryId",plot,"buyerName","Integration buyer","buyerPhone","9888880099","advanceReceived","100.00",
@@ -305,10 +306,10 @@ class OnboardingIntegrationTest {
         String bookingId=command("erp.save",booking,accountant,200).path("entity").path("id").asText();
         command("erp.save",Map.of("projectId",id,"kind","bookings","requestId",java.util.UUID.randomUUID().toString(),
             "data",((Map<?,?>)booking).get("data")),accountant,409);
-        assertEquals("1000.00",request("GET","/erp/"+id,null,accountant,200).path("balances").get(0).path("balance").asText());
+        assertEquals("1000.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
         command("erp.review",Map.of("projectId",id,"recordId",bookingId,"revision",1,"decision","approved"),accountant,400);
         command("erp.review",Map.of("projectId",id,"recordId",bookingId,"revision",1,"decision","approved"),partner,200);
-        assertEquals("1100.00",request("GET","/erp/"+id,null,accountant,200).path("balances").get(0).path("balance").asText());
+        assertEquals("1100.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
         String otherPlot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND id<>?::uuid LIMIT 1",String.class,id,plot);
         Map<String,Object> lifecycleData=Map.of("inventoryId",otherPlot,"buyerName","Lifecycle test buyer","buyerPhone","9888880099",
             "advanceReceived","0.00","ratePerSqYard","11.00","accountId",acct,"paymentMode","UPI","date","2026-10-09");
@@ -330,20 +331,25 @@ class OnboardingIntegrationTest {
             "requestId",java.util.UUID.randomUUID().toString(),"data",lifecycleData),accountant,409);
         assertEquals("rejected",jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?::uuid",String.class,competingBooking));
         assertEquals("active",jdbc.queryForObject("SELECT state FROM sos.erp_inventory_reservations WHERE booking_id=?::uuid",String.class,newCompetitor));
-        assertEquals("1100.00",request("GET","/erp/"+id,null,accountant,200).path("balances").get(0).path("balance").asText());
+        assertEquals("1100.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
         String expense=saveRecord(partner,id,"expenses",Map.of("partnerId",partnerId,"amount","25.00","category","Misc",
             "date","2026-10-09","note","Individual-funded integration expense","paymentSource","individual","paymentMode","UPI"));
         command("erp.review",Map.of("projectId",id,"recordId",expense,"revision",1,"decision","approved"),accountant,200);
         String reimbursement=saveRecord(partner,id,"reimbursements",Map.of("expenseId",expense,"accountId",acct,"amount","25.00","date","2026-10-09","paymentMode","UPI"));
         command("erp.review",Map.of("projectId",id,"recordId",reimbursement,"revision",1,"decision","approved"),partner,400);
         command("erp.review",Map.of("projectId",id,"recordId",reimbursement,"revision",1,"decision","approved"),accountant,200);
-        assertEquals("1075.00",request("GET","/erp/"+id,null,accountant,200).path("balances").get(0).path("balance").asText());
+        assertEquals("1075.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE project_id=?::uuid AND ledger_code='expenses'",Integer.class,id));
         command("erp.save",Map.of("projectId",id,"kind","reimbursements","requestId",java.util.UUID.randomUUID().toString(),
             "data",Map.of("expenseId",expense,"accountId",acct,"amount","0.01","date","2026-10-09","paymentMode","UPI")),accountant,400);
     }
     private String saveRecord(String token,String project,String kind,Map<String,Object> data) {
         return command("erp.save",Map.of("projectId",project,"kind",kind,"data",data,"requestId",java.util.UUID.randomUUID().toString()),token,200).path("entity").path("id").asText();
+    }
+    private String accountBalance(JsonNode erp,String account) {
+        for(JsonNode balance:erp.path("balances"))
+            if(account.equals(balance.path("accountId").asText())) return balance.path("balance").asText();
+        throw new AssertionError("Project account balance is missing.");
     }
     private void verifyErp(String accountant,String partner,String outsider,String project,String partnerId) {
         request("GET","/erp/"+project,null,outsider,403);
@@ -358,11 +364,11 @@ class OnboardingIntegrationTest {
         command("erp.review",Map.of("projectId",project,"recordId",inv,"revision",1,"decision","approved"),accountant,200);
         command("erp.review",Map.of("projectId",project,"recordId",inv,"revision",1,"decision","approved"),accountant,409);
         JsonNode erp=request("GET","/erp/"+project,null,accountant,200);
-        assertEquals("1000.10",erp.path("balances").get(0).path("balance").asText());
+        assertEquals("1000.10",accountBalance(erp,account));
         String expense=saveRecord(partner,project,"expenses",Map.of("partnerId",partnerId,"amount","100.01","date","2026-10-09",
             "category","Material","note","Verified site materials","paymentSource","project_bank","accountId",account,"paymentMode","UPI"));
         command("erp.review",Map.of("projectId",project,"recordId",expense,"revision",1,"decision","approved"),accountant,200);
-        assertEquals("900.09",request("GET","/erp/"+project,null,partner,200).path("balances").get(0).path("balance").asText());
+        assertEquals("900.09",accountBalance(request("GET","/erp/"+project,null,partner,200),account));
         command("erp.delete",Map.of("projectId",project,"recordId",expense,"revision",2),accountant,403);
         String overdraft=saveRecord(partner,project,"drawings",Map.of("partnerId",partnerId,"amount","901.00","date","2026-10-09",
             "accountId",account,"payoutMode","Bank Transfer","destinationAccountDetails","Personal account","purpose","Overdraft check"));
@@ -373,9 +379,31 @@ class OnboardingIntegrationTest {
             "advanceReceived","50.02","accountId",account,"paymentMode","UPI","date","2026-10-09"));
         command("erp.review",Map.of("projectId",project,"recordId",booking,"revision",1,"decision","approved"),accountant,200);
         assertEquals("booked",jdbc.queryForObject("SELECT data->>'status' FROM sos.erp_records WHERE id=?::uuid",String.class,unit));
-        assertEquals("950.11",request("GET","/erp/"+project,null,partner,200).path("balances").get(0).path("balance").asText());
+        assertEquals("950.11",accountBalance(request("GET","/erp/"+project,null,partner,200),account));
         command("erp.inventory-stage",Map.of("projectId",project,"recordId",unit,"revision",2,"status","registered","currentMilestone","Handover"),partner,403);
         command("erp.inventory-stage",Map.of("projectId",project,"recordId",unit,"revision",2,"status","registered","currentMilestone","Handover"),accountant,200);
+        String cash=jdbc.queryForObject("SELECT account_record_id::text FROM sos.project_cash_accounts WHERE project_id=?::uuid",String.class,project);
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.project_cash_accounts WHERE project_id=?::uuid",Integer.class,project));
+        assertEquals(false,jdbc.queryForObject("SELECT jsonb_exists(data,'accountNumber') FROM sos.erp_records WHERE id=?::uuid",Boolean.class,cash));
+        command("erp.delete",Map.of("projectId",project,"recordId",cash,"revision",1),accountant,400);
+        command("erp.save",Map.of("projectId",project,"kind","investments","requestId",java.util.UUID.randomUUID().toString(),
+            "data",Map.of("partnerId",partnerId,"amount","10.00","accountId",cash,"date","2026-10-09","purpose","Non-cash guard","paymentMode","UPI")),partner,400);
+        String otherCash=jdbc.queryForObject("SELECT account_record_id::text FROM sos.project_cash_accounts WHERE project_id<>?::uuid LIMIT 1",String.class,project);
+        command("erp.save",Map.of("projectId",project,"kind","investments","requestId",java.util.UUID.randomUUID().toString(),
+            "data",Map.of("partnerId",partnerId,"amount","10.00","accountId",otherCash,"date","2026-10-09","purpose","Project isolation guard","paymentMode","Cash")),partner,403);
+        String cashRequest=java.util.UUID.randomUUID().toString();
+        Object cashInput=Map.of("projectId",project,"kind","investments","requestId",cashRequest,
+            "data",Map.of("partnerId",partnerId,"amount","125.00","accountId",account,"date","2026-10-09","purpose","Cash capital","paymentMode","Cash"));
+        String cashInvestment=command("erp.save",cashInput,partner,200).path("entity").path("id").asText();
+        assertEquals(cashInvestment,command("erp.save",cashInput,partner,200).path("entity").path("id").asText());
+        assertEquals(cash,jdbc.queryForObject("SELECT account_id::text FROM sos.erp_records WHERE id=?::uuid",String.class,cashInvestment));
+        command("erp.review",Map.of("projectId",project,"recordId",cashInvestment,"revision",1,"decision","approved"),accountant,200);
+        String cashExpense=saveRecord(partner,project,"expenses",Map.of("partnerId",partnerId,"amount","25.00","date","2026-10-09",
+            "category","Material","note","Cash paid materials","paymentSource","project_bank","paymentMode","Cash / Spot Voucher"));
+        assertEquals(cash,jdbc.queryForObject("SELECT account_id::text FROM sos.erp_records WHERE id=?::uuid",String.class,cashExpense));
+        command("erp.review",Map.of("projectId",project,"recordId",cashExpense,"revision",1,"decision","approved"),accountant,200);
+        assertEquals(new java.math.BigDecimal("100.00"),jdbc.queryForObject("SELECT sum(debit-credit) FROM sos.erp_postings WHERE account_id=?::uuid AND ledger_code='bank'",java.math.BigDecimal.class,cash));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.project_cash_accounts WHERE project_id=?::uuid",Integer.class,project));
         command("erp.settings",Map.of("projectId",project,"revision",0,"settings",Map.of("equitySplitMode","proportional",
             "projectPlan",Map.of("units",Map.of("floorsCount","1","flats",java.util.List.of())))),accountant,200);
         assertEquals("100.0000",request("GET","/erp/"+project,null,partner,200).path("partners").get(1).path("equityPercent").asText());

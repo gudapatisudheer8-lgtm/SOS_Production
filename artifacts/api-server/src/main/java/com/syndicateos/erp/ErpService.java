@@ -20,8 +20,9 @@ public class ErpService {
     private final ObjectMapper json;
     private final ErpAccess access;
     private final TransactionTemplate tx;
-    public ErpService(JdbcTemplate jdbc,ObjectMapper json,ErpAccess access,TransactionTemplate tx) {
-        this.jdbc=jdbc; this.json=json; this.access=access; this.tx=tx;
+    private final ProjectCashAccountService cash;
+    public ErpService(JdbcTemplate jdbc,ObjectMapper json,ErpAccess access,TransactionTemplate tx,ProjectCashAccountService cash) {
+        this.jdbc=jdbc; this.json=json; this.access=access; this.tx=tx; this.cash=cash;
     }
     private JsonNode parse(Object value) {
         try { return json.readTree(value.toString()); }
@@ -140,6 +141,7 @@ public class ErpService {
                 return Map.of("status","ok","entity",Map.of("records",ids,"count",ids.size()));
             }
             var record=record(project,Values.id(input,"recordId"));
+            if(cash.isDefault((UUID)record.get("id"))) throw ApiProblem.invalid("The default project cash account cannot be edited or removed.");
             var definition=resource(release,(String)record.get("kind"));
             if(((Integer)record.get("revision"))!=Values.revision(input)) throw ApiProblem.conflict();
             if("erp.delete".equals(action)) {
@@ -173,7 +175,9 @@ public class ErpService {
             return ok(duplicate.getFirst().get("id"));
         }
         if(!role(def,"submit_roles",actor.role())) throw ApiProblem.denied();
-        ObjectNode data=validate(def,input.path("data"));
+        boolean hasAccount=false;
+        for(JsonNode field:parse(def.get("fields"))) if("accountId".equals(field.path("key").asText())) hasAccount=true;
+        ObjectNode data=validate(def,hasAccount?cash.route(actor,project,kind,input.path("data")):input.path("data"));
         UUID id=input.hasNonNull("recordId")?Values.id(input,"recordId"):UUID.randomUUID();
         Map<String,Object> previous=null;
         if(input.hasNonNull("recordId")) {
@@ -184,6 +188,8 @@ public class ErpService {
             if("accounts".equals(kind) && decimal(data.path("openingBalance"),false).compareTo(decimal(parse(previous.get("data")).path("openingBalance"),false))!=0)
                 throw ApiProblem.invalid("Opening balance is immutable. Record a documented correcting transaction.");
         }
+        if("accounts".equals(kind) && previous!=null && cash.isDefault(id))
+            throw ApiProblem.invalid("The default project cash account cannot be edited. Record a cash transaction instead.");
         UUID partner=optionalId(data,"partnerId"),account=optionalId(data,"accountId"),inventory=optionalId(data,"inventoryId");
         for(String field:List.of("attachmentId","receiptAttachmentId","voiceAttachmentId")) {
             UUID attachment=optionalId(data,field);
