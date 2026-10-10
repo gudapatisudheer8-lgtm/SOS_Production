@@ -1,8 +1,12 @@
 // Adapter between the original SyndicateOS web UI and the existing Spring Boot API.
-// All requests go through the artifact-scoped Vite proxy: <BASE_PATH>api/* -> Spring /api/*.
+// The API artifact is registered at /api on the same origin. Do not send API
+// requests through the web artifact's route or its development-only Vite proxy.
 import type { AuthenticatedAppUser } from '../original/types';
 
-const API_ROOT = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
+const API_ROOT = '/api';
+// An absolute same-origin URL also bypasses the legacy /api/* fetch bridge
+// during hot updates, without hardcoding any development or production host.
+const apiUrl = (path: string) => new URL(`${API_ROOT}${path}`, window.location.origin).href;
 const TOKEN_KEY = 'sos_web_session_token';
 let pendingCredential: string | null = null;
 const nativeFetch: typeof fetch = window.fetch.bind(window);
@@ -64,13 +68,18 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
   }
   let res: Response;
   try {
-    res = await nativeFetch(`${API_ROOT}${path}`, { method: init.method || (body ? 'POST' : 'GET'), headers, body, credentials: 'include' });
+    res = await nativeFetch(apiUrl(path), { method: init.method || (body ? 'POST' : 'GET'), headers, body, credentials: 'include', redirect: 'manual' });
   } catch {
-    throw new ApiError(0, 'NETWORK', 'Cannot reach the SyndicateOS API service. Check that the API server is running.');
+    throw new ApiError(0, 'NETWORK', 'The request could not reach the API. Check the Preview connection and retry.');
   }
+  assertNoAccessRedirect(res);
   const text = await res.text();
   let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  let parsed = true;
+  try { data = text ? JSON.parse(text) : null; } catch { parsed = false; }
+  if (res.ok && text && !parsed) {
+    throw new ApiError(res.status, 'UNEXPECTED_RESPONSE', 'Preview returned a web page instead of an API response. Reopen Preview in Replit and retry.');
+  }
   if (!res.ok) {
     if (res.status === 401 && token && !path.startsWith("/auth/login")) {
       clearSession();
@@ -81,6 +90,12 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
   return data as T;
 }
 
+function assertNoAccessRedirect(response: Response) {
+  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+    throw new ApiError(0, 'PREVIEW_ACCESS_REQUIRED', 'Preview access was redirected. Reopen Preview in Replit to restore access, then retry. This request has not completed.');
+  }
+}
+
 export function newRequestId(): string {
   return crypto.randomUUID();
 }
@@ -88,9 +103,10 @@ export function newRequestId(): string {
 /** Downloads private project files with the same bearer session as API calls. */
 export async function downloadProjectAttachment(projectId: string, attachmentId: string) {
   const token = getToken();
-  const response = await nativeFetch(`${API_ROOT}/erp/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'include',
+  const response = await nativeFetch(apiUrl(`/erp/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'include', redirect: 'manual',
   });
+  assertNoAccessRedirect(response);
   if (!response.ok) {
     const error = await response.json().catch(() => null);
     throw new ApiError(response.status, error?.error || 'DOWNLOAD_FAILED', error?.message || 'Could not download this project document.');
@@ -141,6 +157,12 @@ function json(status: number, body: unknown): Response {
 export function installOriginalFetchBridge() {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+    // These are real Spring endpoints, not legacy prototype operations.
+    // Request resolves relative URLs and prevents an older hot-loaded bridge
+    // from intercepting this forwarding call again.
+    if (/^\/api\/(?:commands(?:\/|$)|erp(?:\/|$)|configuration(?:\/|$)|workspace(?:\?|$)|healthz(?:\?|$)|readyz(?:\?|$))/.test(url)) {
+      return nativeFetch(new Request(input, { ...init, redirect: 'manual' }));
+    }
     if (!url.startsWith('/api/')) return nativeFetch(input as any, init);
     const body = init?.body && typeof init.body === 'string' ? JSON.parse(init.body) : {};
     try {

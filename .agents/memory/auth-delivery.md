@@ -14,3 +14,9 @@ Account provisioning and recovery must communicate the server-issued temporary P
 **Why:** leftover prototype login instructions made a newly provisioned accountant unable to sign in despite successful firm creation.
 
 **How to apply:** display issuance results transiently in the owner flow, explain that reused identities keep their existing PIN, and offer an explicitly confirmed owner reset if the notice was missed. Warn that resetting a shared identity affects its sessions across firms; never persist plaintext PINs.
+
+An isolated test gateway verifies application behavior, not actual Replit Preview access/routing.
+
+**Why:** an isolated project/plan save passed, but the user subsequently encountered a Replit access-page redirect and CORS failure in the real Preview.
+
+**How to apply:** verify same-origin API routing through the actual Preview/shared router as well. Protected-endpoint probes with invalid credentials can confirm API JSON responses without changing customer data. Distinguish platform access redirects from application session failures.

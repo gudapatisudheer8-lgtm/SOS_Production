@@ -72,13 +72,6 @@ export default defineConfig({
     fs: {
       strict: true,
     },
-    proxy: {
-      [`${basePath.replace(/\/$/, '')}/api`]: {
-        target: process.env.SOS_WEB_API_TARGET || 'http://127.0.0.1:8080',
-        changeOrigin: true,
-        rewrite: (p: string) => p.replace(basePath.replace(/\/$/, ''), ''),
-      },
-    },
   },
   preview: {
     port,
