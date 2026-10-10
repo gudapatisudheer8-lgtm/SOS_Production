@@ -27,6 +27,16 @@ import {
 } from 'lucide-react';
 import { MarketingPlotPortalModal } from '../marketing/MarketingPlotPortalModal';
 
+const savedRoadWidthLabel = (width?: number | string) => {
+  // Persisted project select values can be numeric strings, unlike plot widths.
+  const measurement = typeof width === 'string' && /^\d+(?:\.\d+)?$/.test(width.trim())
+    ? Number(width.trim())
+    : width;
+  return typeof measurement === 'number' && Number.isFinite(measurement) && measurement > 0
+    ? `${measurement} ft`
+    : 'Width unspecified';
+};
+
 interface VentureLayoutMasterGridProps {
   plots: Plot[];
   project?: Project;
@@ -38,7 +48,7 @@ interface VentureLayoutMasterGridProps {
 }
 
 export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = ({
-  plots,
+  plots: suppliedPlots,
   project,
   layoutCalc,
   firm,
@@ -46,6 +56,12 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
   floorRate = 0,
   onUpdatePlot,
 }) => {
+  // Never display another project's plot measurements when the selection changes.
+  const plots = useMemo(
+    () => suppliedPlots.filter((plot) => project && plot.projectId === project.id),
+    [suppliedPlots, project?.id],
+  );
+  const approachRoadWidth = savedRoadWidthLabel(project?.roadWidth);
   const [facingFilter, setFacingFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'blocked' | 'reserved' | 'sold'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -217,6 +233,10 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
             <span className="text-gray-500">Total:</span>
             <strong className="font-mono font-black text-emerald-800">{formatINR(totalValue)}</strong>
           </div>
+        </div>
+
+        <div className="mt-1 text-[10px] text-gray-600">
+          Plot road width: {savedRoadWidthLabel(plot.roadWidthFt)}
         </div>
 
         {/* If Blocked, Booked or Sold, show Buyer/Agent preview */}
@@ -635,7 +655,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
           </div>
 
           <p className="text-xs text-slate-400">
-            Official statutory LP demarcation blueprint showing exact survey boundaries, 40ft/33ft road alignments, and 10% statutory park reserves.
+            Uploaded layout document. Refer to the saved plan for survey boundaries, road alignments, and open-space details.
           </p>
         </div>
       )}
@@ -682,7 +702,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
       {viewMode === 'interactive_grid' && (
         /* REALISTIC VENTURE MASTER LAYOUT WITH ROADS & COMPASS */
         <div className="space-y-6">
-          {/* VENTURE ENTRY ARCH & 40 FT MAIN ROAD BOULEVARD */}
+          {/* VENTURE ENTRY & SAVED APPROACH ROAD WIDTH */}
           <div className="relative rounded-2xl overflow-hidden border border-amber-300/80 bg-gradient-to-r from-amber-50 via-slate-100 to-amber-50 p-3 sm:p-4 text-center shadow-xs">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -690,7 +710,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
                   ⛩️ Main Entrance Arch
                 </span>
                 <span className="text-xs font-black text-slate-900">
-                  40 Ft / 60 Ft Master Arterial Boulevard Road &amp; Security Post
+                  Approach Road — {approachRoadWidth}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono font-bold text-gray-700">
@@ -705,7 +725,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
             <div className="my-2 h-7 bg-slate-800 rounded-lg flex items-center justify-center relative overflow-hidden border border-slate-900 shadow-inner">
               <div className="w-full border-t-2 border-dashed border-amber-400 opacity-80" />
               <span className="absolute text-[10px] uppercase font-black tracking-widest text-white/90 bg-slate-900/90 px-3 py-0.5 rounded-full">
-                🛣️ 40 FT ARTERIAL APPROACH ROAD (BLACKTOP BT)
+                🛣️ Approach Road — {approachRoadWidth}
               </span>
             </div>
           </div>
@@ -740,11 +760,11 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
                 )}
               </div>
 
-              {/* INTERNAL 33 FT SECTOR AVENUE ROAD */}
+              {/* No saved mapping connects plot frontage widths to this schematic road. */}
               <div className="h-6 bg-slate-700 rounded-lg flex items-center justify-center relative overflow-hidden border border-slate-800 shadow-inner">
                 <div className="w-full border-t border-dashed border-white/60" />
                 <span className="absolute text-[9px] uppercase font-black tracking-widest text-white bg-slate-800 px-3 py-0.2 rounded-full">
-                  🚗 33 FT INTERNAL SECTOR ROAD (CONCRETE CC)
+                  🚗 Internal Sector Road — Width unspecified
                 </span>
               </div>
 
@@ -770,11 +790,11 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
                 </div>
               </div>
 
-              {/* CROSS 30 FT INTERNAL ROAD */}
+              {/* Do not substitute the approach width for an unmeasured internal road. */}
               <div className="h-6 bg-slate-700 rounded-lg flex items-center justify-center relative overflow-hidden border border-slate-800 shadow-inner">
                 <div className="w-full border-t border-dashed border-white/60" />
                 <span className="absolute text-[9px] uppercase font-black tracking-widest text-white bg-slate-800 px-3 py-0.2 rounded-full">
-                  🚙 30 FT INTERNAL ACCESS ROAD
+                  🚙 Internal Access Road — Width unspecified
                 </span>
               </div>
 

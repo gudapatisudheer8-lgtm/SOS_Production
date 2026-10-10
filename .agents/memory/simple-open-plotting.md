@@ -30,3 +30,9 @@ The Open Plotting overview must be read-only and reflect the selected project's 
 **Why:** The user found different values in this overview than those entered in the project form and explicitly requested cards or a correct non-editable view.
 
 **How to apply:** Show saved measurements and clearly labelled recorded inventory totals. Do not invent target selling rates, statutory deductions, net land or revenue estimates when those inputs are not recorded.
+
+Approach-road widths and plot frontage road widths are independent measurements. Do not assign either to schematic internal-road segments without a saved segment mapping; missing measurements must remain unspecified.
+
+**Why:** A saved approach width does not establish the width of every internal road, and facing-based visual sectors do not identify actual road segments.
+
+**How to apply:** Use the selected project's saved approach measurement and each plot's own saved width. Keep schematic road segments unspecified until their measurements are explicitly recorded.
