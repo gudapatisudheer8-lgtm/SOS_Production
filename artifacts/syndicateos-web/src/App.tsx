@@ -395,6 +395,7 @@ function App() {
     return run(label, () => erpReview(meta, decision, reason));
   };
   const handleApproveExpense = (id: string) => review(id, 'approved', 'Expense approval recorded');
+  const handleApproveBooking = (id: string) => review(id, 'approved', 'Booking receipt approval recorded');
   const handleRejectExpense = (id: string) => review(id, 'rejected', 'Expense rejected');
 
   // ---------- Investments ----------
@@ -514,6 +515,7 @@ function App() {
             onAddProject={handleAddProject}
             plots={data.plots}
             onUpdatePlot={handleUpdatePlot}
+            onApproveBooking={handleApproveBooking}
             layoutCalc={data.settings.layoutCalc ?? EMPTY_LAYOUT}
             onUpdateLayoutCalc={handleUpdateLayoutCalc}
             projectExpenses={data.projectExpenses}
@@ -581,6 +583,7 @@ function App() {
             onLogin={() => undefined}
             onLogout={handleSignOut}
             onUpdatePlot={handleUpdatePlot}
+            onApproveBooking={handleApproveBooking}
             projects={projects}
             selectedProjectId={activeProjectId}
             onSelectProject={setSelectedProjectId}

@@ -99,6 +99,7 @@ export interface FieldPartnerMobileViewProps {
   onLogin: (firmId: string, partnerId: string) => void;
   onLogout: () => void;
   onUpdatePlot?: (plot: Plot) => void | boolean | Promise<boolean>;
+  onApproveBooking?: (receiptId: string) => boolean | Promise<boolean>;
   onSelectFirm?: (firmId: string) => void;
   projects?: Project[];
   selectedProjectId?: string;
@@ -401,6 +402,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   onLogin,
   onLogout,
   onUpdatePlot,
+  onApproveBooking,
   onSelectFirm,
   projects = [],
   selectedProjectId,
@@ -1179,6 +1181,12 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             >
               {activePlots.length}
             </span>
+            {activePlots.some((p) => p.pendingBookingId) && (
+              <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white"
+                aria-label={`${activePlots.filter((p) => p.pendingBookingId).length} booking receipts pending approval`}>
+                {activePlots.filter((p) => p.pendingBookingId).length} Pending approval
+              </span>
+            )}
           </button>
 
           {/* Bar 5: Project Statements (Recreated same as in accountant dashboard) */}
@@ -2535,6 +2543,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
           <OpenPlottingModule
             plots={activePlots}
             onUpdatePlot={onUpdatePlot || (() => {})}
+            onApproveBooking={onApproveBooking}
             layoutCalc={
               layoutCalc || {
                 totalExtentValue: activeProject?.extentValue || 0,
@@ -2611,17 +2620,20 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
       {selectedMobilePlot && (
         <CustomerPlotBookingModal
           isOpen={!!selectedMobilePlot}
-          plot={selectedMobilePlot}
+          plot={activePlots.find((p) => p.id === selectedMobilePlot.id) || selectedMobilePlot}
           project={activeProject}
           firm={activeFirm}
           floorRate={activeProject?.floorRatePerSqYard || 0}
           firmAccounts={firmAccounts}
           onAddAccountTransaction={onAddAccountTransaction}
+          onApproveBooking={onApproveBooking}
           onClose={() => setSelectedMobilePlot(null)}
-          onConfirmBooking={(updatedPlot) => {
-            if (onUpdatePlot) onUpdatePlot(updatedPlot);
-            setSelectedMobilePlot(null);
-            showToast(lang === 'te' ? `ప్లాట్ #${updatedPlot.plotNumber} బుకింగ్ నిర్ధారించబడింది!` : `Plot #${updatedPlot.plotNumber} booking confirmed!`);
+          onConfirmBooking={async (updatedPlot) => {
+            if (!onUpdatePlot) return false;
+            const ok = await onUpdatePlot(updatedPlot);
+            if (ok === false) return false;
+            showToast(`Plot #${updatedPlot.plotNumber} booking submitted for approval`);
+            return true;
           }}
           onReleasePlot={(plotId) => {
             const plotToRelease = plots.find((p) => p.id === plotId);

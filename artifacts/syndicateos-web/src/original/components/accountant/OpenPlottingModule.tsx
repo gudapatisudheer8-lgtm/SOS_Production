@@ -31,6 +31,7 @@ import { CustomerPlotBookingModal } from '../modals/CustomerPlotBookingModal';
 interface OpenPlottingModuleProps {
   plots: Plot[];
   onUpdatePlot: (plot: Plot) => void | boolean | Promise<boolean>;
+  onApproveBooking?: (receiptId: string) => boolean | Promise<boolean>;
   layoutCalc: LayoutCalculation;
   onUpdateLayoutCalc: (calc: LayoutCalculation) => void | boolean | Promise<boolean>;
   projectExpenses?: ProjectExpense[];
@@ -46,6 +47,7 @@ interface OpenPlottingModuleProps {
 export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
   plots,
   onUpdatePlot,
+  onApproveBooking,
   layoutCalc,
   ledgerMode = 'internal_syndicate',
   project,
@@ -460,7 +462,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
       {customerBookingPlot && (
         <CustomerPlotBookingModal
           isOpen={!!customerBookingPlot}
-          plot={customerBookingPlot}
+          plot={plots.find((p) => p.id === customerBookingPlot.id) || customerBookingPlot}
           project={project}
           firm={effectiveFirm}
           floorRate={FLOOR_RATE_PER_SQYD}
@@ -468,6 +470,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
           onAddAccountTransaction={onAddAccountTransaction}
           onClose={() => setCustomerBookingPlot(null)}
           onConfirmBooking={(updatedPlot) => onUpdatePlot(updatedPlot)}
+          onApproveBooking={onApproveBooking}
           onReleasePlot={(plotId) => {
             const plotToRelease = plots.find((p) => p.id === plotId);
             if (!plotToRelease) return false;

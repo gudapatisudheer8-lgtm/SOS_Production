@@ -24,7 +24,7 @@ Check the testing runner's database target before using its database tools.
 
 Isolated browser checks must use the same frontend styling and API-route behavior as Preview.
 **Why:** a stripped-down test frontend produced false layout failures and an incorrectly scoped test expectation interrupted validation before the actual financial forms were checked.
-**How to apply:** isolate the database/backend without changing rendering; respect firm-code session boundaries and verify actual form controls rather than treating explanatory approval text as an editable workflow.
+**How to apply:** isolate the database/backend without changing rendering; respect firm-code session boundaries and verify actual form controls rather than treating explanatory approval text as an editable workflow. Allow the isolated browser's exact origin on its test API: changing a proxy's target host makes localhost cross-origin from Spring's perspective. Do not loosen the main application's origin policy to fix test-only HTTP 403 responses.
 
 Dashboard delivery requires verifying the firm's assigned release and rendered interface, not just API health.
 **Why:** additive configuration updates deliberately preserve existing firm assignments for compatibility; a healthy deployment can still display the old dashboard. Incorrect release names in rollout instructions caused unnecessary user effort.

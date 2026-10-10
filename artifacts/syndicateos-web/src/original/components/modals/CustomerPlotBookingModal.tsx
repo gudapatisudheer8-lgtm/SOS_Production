@@ -33,6 +33,7 @@ interface CustomerPlotBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirmBooking: (updatedPlot: Plot) => void | boolean | Promise<boolean>;
+  onApproveBooking?: (receiptId: string) => boolean | Promise<boolean>;
   onReleasePlot?: (plotId: number) => void | boolean | Promise<boolean>;
   firmAccounts?: FirmAccount[];
   onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void | boolean | Promise<boolean>;
@@ -46,6 +47,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
   isOpen,
   onClose,
   onConfirmBooking,
+  onApproveBooking,
   onReleasePlot,
   firmAccounts = [],
   onAddAccountTransaction,
@@ -82,6 +84,18 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
   const [notes, setNotes] = useState(plot.notes || '');
   const [showReceiptView, setShowReceiptView] = useState(false);
   const [copiedReceipt, setCopiedReceipt] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const canApproveReceipt = !!plot.pendingBookingId && !!onApproveBooking
+    && !!project?.reviewableRecordIds?.includes(plot.pendingBookingId);
+
+  const handleApproveReceipt = async () => {
+    if (!canApproveReceipt || approving || !plot.pendingBookingId || !onApproveBooking) return;
+    setApproving(true);
+    try {
+      const ok = await onApproveBooking(plot.pendingBookingId);
+      if (ok !== false) onClose();
+    } finally { setApproving(false); }
+  };
 
   const selectedAccount = availableAccounts.find((a) => a.id === selectedAccountId);
 
@@ -856,8 +870,9 @@ Thank you for booking with ${firm.name}.
               </div>
 
               {/* SUBMIT BUTTON ROW */}
+              </fieldset>
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-200">
-                {plot.status !== 'available' && (
+                {plot.status !== 'available' && !plot.pendingBookingId && (
                   <button
                     type="button"
                     onClick={handleRelease}
@@ -875,16 +890,24 @@ Thank you for booking with ${firm.name}.
                   >
                     Cancel
                   </button>
-                  <button
+                  {plot.pendingBookingId ? (
+                    canApproveReceipt ? (
+                      <button type="button" disabled={approving} onClick={() => void handleApproveReceipt()}
+                        className="px-6 py-2.5 bg-emerald-700 text-white font-bold rounded-xl text-xs disabled:opacity-50">
+                        {approving ? 'Recording approval…' : 'Approve Booking Receipt'}
+                      </button>
+                    ) : (
+                      <span className="text-xs font-bold text-amber-800">Awaiting an eligible reviewer</span>
+                    )
+                  ) : <button
                     type="submit"
                     className="px-6 py-2.5 bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black rounded-xl text-xs shadow-md border border-amber-600/30 flex items-center gap-2 active:scale-95 transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Confirm Booking &amp; Generate Token Slip</span>
-                  </button>
+                  </button>}
                 </div>
               </div>
-              </fieldset>
             </form>
           )}
         </div>

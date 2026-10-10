@@ -80,6 +80,7 @@ interface AccountantDashboardProps {
   onAddProject: (newProject: Project, initialPlots?: Plot[], initialUnits?: ApartmentUnit[], initialAccounts?: FirmAccount[]) => boolean | Promise<boolean>;
   plots: Plot[];
   onUpdatePlot: (plot: Plot) => void | boolean | Promise<boolean>;
+  onApproveBooking?: (receiptId: string) => boolean | Promise<boolean>;
   layoutCalc: LayoutCalculation;
   onUpdateLayoutCalc: (calc: LayoutCalculation) => void | boolean | Promise<boolean>;
   projectExpenses: ProjectExpense[];
@@ -135,6 +136,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   onAddProject,
   plots,
   onUpdatePlot,
+  onApproveBooking,
   layoutCalc,
   onUpdateLayoutCalc,
   projectExpenses,
@@ -1278,6 +1280,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
           <OpenPlottingModule
             plots={activePlots}
             onUpdatePlot={onUpdatePlot}
+            onApproveBooking={onApproveBooking}
             layoutCalc={activeLayoutCalc}
             onUpdateLayoutCalc={onUpdateLayoutCalc}
             projectExpenses={activeProjectExpenses}
