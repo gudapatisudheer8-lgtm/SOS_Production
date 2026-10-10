@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FirmAccountantsItem } from './firmAccountantsItem';
+import type { FirmMetadata } from './firmMetadata';
 import type { FirmStatus } from './firmStatus';
 
 export interface Firm {
@@ -14,5 +15,6 @@ export interface Firm {
   name: string;
   status: FirmStatus;
   revision: number;
+  metadata?: FirmMetadata;
   accountants: FirmAccountantsItem[];
 }

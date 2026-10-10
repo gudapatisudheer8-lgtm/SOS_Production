@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { Plot, Project, TenantFirm, FirmAccount, FirmAccountTransaction } from '../../types';
 import { formatINR } from '../../utils/formatters';
@@ -31,17 +32,17 @@ interface CustomerPlotBookingModalProps {
   floorRate?: number;
   isOpen: boolean;
   onClose: () => void;
-  onConfirmBooking: (updatedPlot: Plot) => void;
-  onReleasePlot?: (plotId: number) => void;
+  onConfirmBooking: (updatedPlot: Plot) => void | boolean | Promise<boolean>;
+  onReleasePlot?: (plotId: number) => void | boolean | Promise<boolean>;
   firmAccounts?: FirmAccount[];
-  onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void;
+  onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void | boolean | Promise<boolean>;
 }
 
 export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> = ({
   plot,
   project,
   firm,
-  floorRate = 17000,
+  floorRate = 0,
   isOpen,
   onClose,
   onConfirmBooking,
@@ -105,8 +106,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
         reviewedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
       },
     };
-    onConfirmBooking(updatedPlot);
-    onClose();
+    void Promise.resolve(onConfirmBooking(updatedPlot)).then((ok) => { if (ok !== false) onClose(); });
   };
 
   const handleRejectRateProposal = () => {
@@ -121,16 +121,12 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
           }
         : undefined,
     };
-    onConfirmBooking(updatedPlot);
-    onClose();
+    void Promise.resolve(onConfirmBooking(updatedPlot)).then((ok) => { if (ok !== false) onClose(); });
   };
 
   const handleReleaseBlock = () => {
     if (confirm(`Release block on ${plot.plotNumber} back to Available inventory?`)) {
-      if (onReleasePlot) {
-        onReleasePlot(plot.id);
-      } else {
-        onConfirmBooking({
+      const done = onReleasePlot ? onReleasePlot(plot.id) : onConfirmBooking({
           ...plot,
           status: 'available',
           buyerName: undefined,
@@ -147,8 +143,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
           notes: 'Block released back to available inventory.',
           marketingRequest: undefined,
         });
-      }
-      onClose();
+      void Promise.resolve(done).then((ok) => { if (ok !== false) onClose(); });
     }
   };
 
@@ -175,7 +170,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
     setAdvanceReceived(amount);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!buyerName.trim()) {
       alert('Please enter Customer / Buyer Name for the booking receipt.');
@@ -197,37 +192,14 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
       notes: notes.trim(),
     };
 
-    const tokenAmt = Number(advanceReceived) || 0;
-    if (tokenAmt > 0 && selectedAccountId && onAddAccountTransaction) {
-      const chosenAcc = availableAccounts.find((a) => a.id === selectedAccountId);
-      if (chosenAcc) {
-        const incomingTx: FirmAccountTransaction = {
-          id: `tx-plot-${plot.id}-${Date.now().toString().slice(-5)}`,
-          accountId: chosenAcc.id,
-          date: new Date().toISOString().split('T')[0],
-          type: 'credit',
-          amount: tokenAmt,
-          description: `Plot Booking Advance: ${plot.plotNumber} - Buyer: ${buyerName.trim()}`,
-          referenceNo: paymentRefNumber.trim() || `DEP-${Date.now().toString().slice(-6)}`,
-          category: 'plot_booking_advance',
-          partnerName: buyerName.trim(),
-          projectName: project?.name,
-          balanceAfter: chosenAcc.currentBalance + tokenAmt,
-        };
-        onAddAccountTransaction(chosenAcc.id, incomingTx);
-      }
-    }
-
-    onConfirmBooking(updatedPlot);
-    setShowReceiptView(true);
+    // The booking record carries the advance; the backend posts it to the ledger. No client-side receipt is simulated.
+    const savedOk = await onConfirmBooking(updatedPlot);
+    if (savedOk !== false) setShowReceiptView(true);
   };
 
   const handleRelease = () => {
     if (confirm(`Are you sure you want to release ${plot.plotNumber} back to Available inventory?`)) {
-      if (onReleasePlot) {
-        onReleasePlot(plot.id);
-      } else {
-        onConfirmBooking({
+      const done = onReleasePlot ? onReleasePlot(plot.id) : onConfirmBooking({
           ...plot,
           status: 'available',
           buyerName: undefined,
@@ -239,8 +211,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
           paymentMilestone: undefined,
           notes: 'Booking released back to inventory.',
         });
-      }
-      onClose();
+      void Promise.resolve(done).then((ok) => { if (ok !== false) onClose(); });
     }
   };
 
@@ -752,10 +723,7 @@ Thank you for booking with ${firm.name}.
                       onChange={(e) => handlePaymentModeChange(e.target.value as any)}
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none"
                     >
-                      <option value="UPI">Google Pay / PhonePe / UPI QR</option>
-                      <option value="Cash">Cash (Spot Site Advance)</option>
-                      <option value="Cheque">Bank Cheque</option>
-                      <option value="RTGS / NEFT">RTGS / NEFT Bank Transfer</option>
+                      <MasterOptions group="booking_payment_modes" />
                     </select>
                   </div>
 
@@ -839,9 +807,7 @@ Thank you for booking with ${firm.name}.
                     onChange={(e) => setStatus(e.target.value as any)}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none"
                   >
-                    <option value="reserved">Reserved / Token Advance</option>
-                    <option value="sold">Sold &amp; Registered</option>
-                    <option value="available">Available (Unbooked)</option>
+                    <MasterOptions group="plot_statuses" />
                   </select>
                 </div>
 
@@ -854,10 +820,7 @@ Thank you for booking with ${firm.name}.
                     onChange={(e) => setPaymentMilestone(e.target.value as any)}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none"
                   >
-                    <option value="Token Advance">Token Advance Received</option>
-                    <option value="Sale Agreement">Registered Agreement of Sale</option>
-                    <option value="Registration Pending">Registration Slot Booked</option>
-                    <option value="Registered & Cleared">Registered Sale Deed Executed</option>
+                    <MasterOptions group="booking_stages" />
                   </select>
                 </div>
               </div>

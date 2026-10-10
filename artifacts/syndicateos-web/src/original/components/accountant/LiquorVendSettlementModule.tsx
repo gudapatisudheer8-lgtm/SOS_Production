@@ -20,9 +20,9 @@ interface LiquorVendSettlementModuleProps {
   firm: TenantFirm;
   partners: SyndicatePartner[];
   settlements: LiquorDailySettlement[];
-  onAddSettlement: (settlement: LiquorDailySettlement) => void;
+  onAddSettlement: (settlement: LiquorDailySettlement) => void | boolean | Promise<boolean>;
   partnerStockDraws: PartnerStockDraw[];
-  onAddStockDraw: (draw: PartnerStockDraw) => void;
+  onAddStockDraw: (draw: PartnerStockDraw) => void | boolean | Promise<boolean>;
 }
 
 export const LiquorVendSettlementModule: React.FC<LiquorVendSettlementModuleProps> = ({
@@ -82,11 +82,9 @@ export const LiquorVendSettlementModule: React.FC<LiquorVendSettlementModuleProp
       counterShortage: computedShortage > 0 ? computedShortage : 0,
       settledBy,
       status: computedShortage > 0 ? 'variance_flagged' : 'reconciled',
-      bankDepositSlipNo: `SBI-DEP-${Math.floor(100000 + Math.random() * 900000)}`,
     };
 
-    onAddSettlement(newRecord);
-    setShowAddSettlementModal(false);
+    void Promise.resolve(onAddSettlement(newRecord)).then((ok) => { if (ok !== false) setShowAddSettlementModal(false); });
   };
 
   const handleCreateStockDraw = (e: React.FormEvent) => {
@@ -105,8 +103,7 @@ export const LiquorVendSettlementModule: React.FC<LiquorVendSettlementModuleProp
       authorizedBy: 'Managing Partner Quorum (Signed)',
     };
 
-    onAddStockDraw(newDraw);
-    setShowAddStockDrawModal(false);
+    void Promise.resolve(onAddStockDraw(newDraw)).then((ok) => { if (ok !== false) setShowAddStockDrawModal(false); });
   };
 
   return (

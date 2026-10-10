@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { ApartmentUnit, ApartmentPricingMatrix, FlatStatus, LedgerMode, Project, PlanUploadDocument } from '../../types';
 import { formatINR, formatIndianCompact } from '../../utils/formatters';
@@ -22,13 +23,12 @@ import {
   FileText
 } from 'lucide-react';
 import { DiscountAlertModal } from '../modals/DiscountAlertModal';
-import { SAMPLE_CONSTRUCTION_BLUEPRINT } from '../../data/sampleBlueprints';
 
 interface ConstructionModuleProps {
   units: ApartmentUnit[];
   onUpdateUnit: (unit: ApartmentUnit) => void;
   pricingMatrix: ApartmentPricingMatrix;
-  onUpdatePricingMatrix: (matrix: ApartmentPricingMatrix) => void;
+  onUpdatePricingMatrix: (matrix: ApartmentPricingMatrix) => void | boolean | Promise<boolean>;
   ledgerMode?: LedgerMode;
   project?: Project;
 }
@@ -65,7 +65,7 @@ export const ConstructionModule: React.FC<ConstructionModuleProps> = ({
   const defaultBlueprintUrl =
     projectBlueprints.length > 0 && projectBlueprints[0].dataUrl
       ? projectBlueprints[0].dataUrl
-      : SAMPLE_CONSTRUCTION_BLUEPRINT;
+      : '';
 
   const calculateUnitTotal = (unit: ApartmentUnit) => {
     const effectiveRate = unit.baseRate + unit.facingPremium + unit.floorRise;
@@ -104,9 +104,10 @@ export const ConstructionModule: React.FC<ConstructionModuleProps> = ({
     setSelectedUnit(null);
   };
 
-  const handleSavePricingMatrix = (e: React.FormEvent) => {
+  const handleSavePricingMatrix = async (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdatePricingMatrix(tempPricing);
+    const matrixSaved = await onUpdatePricingMatrix(tempPricing);
+    if (matrixSaved === false) return;
 
     // Recalculate units
     units.forEach((u) => {
@@ -422,9 +423,7 @@ export const ConstructionModule: React.FC<ConstructionModuleProps> = ({
                     }
                     className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 font-bold text-gray-900 text-xs"
                   >
-                    <option value="available">Available</option>
-                    <option value="booked">Booked (Token Advance)</option>
-                    <option value="registered">Registered (Sale Deed)</option>
+                    <MasterOptions group="flat_statuses" />
                   </select>
                 </div>
 
@@ -495,13 +494,7 @@ export const ConstructionModule: React.FC<ConstructionModuleProps> = ({
                     }
                     className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 text-xs font-bold text-gray-900"
                   >
-                    <option value="Token Advance">Token Advance</option>
-                    <option value="Plinth Level">Plinth Level (20%)</option>
-                    <option value="1st Slab">1st Slab (20%)</option>
-                    <option value="Brickwork">Brickwork (15%)</option>
-                    <option value="Plastering & Electrical">Plastering & Electrical (15%)</option>
-                    <option value="Flooring">Flooring (15%)</option>
-                    <option value="Handover">Handover (15%)</option>
+                    <MasterOptions group="construction_stages" />
                   </select>
                 </div>
               </div>

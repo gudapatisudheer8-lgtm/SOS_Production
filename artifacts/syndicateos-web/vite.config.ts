@@ -74,7 +74,7 @@ export default defineConfig({
     },
     proxy: {
       [`${basePath.replace(/\/$/, '')}/api`]: {
-        target: 'http://127.0.0.1:8080',
+        target: process.env.SOS_WEB_API_TARGET || 'http://127.0.0.1:8080',
         changeOrigin: true,
         rewrite: (p: string) => p.replace(basePath.replace(/\/$/, ''), ''),
       },

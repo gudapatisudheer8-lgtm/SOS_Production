@@ -1,3 +1,4 @@
+import { masterItem } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { PlotDistributionConfig, LayoutAmenity } from '../../types';
 import {
@@ -86,7 +87,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
     eastCount + northCount + westCount + southCount + cornerCount + commercialCount;
 
   const totalAmenitiesArea = amenities.reduce((sum, a) => sum + (Number(a.allocatedAreaSqYards) || 0), 0);
-  const estimatedRoadArea = Math.round(totalExtentSqYds * (roadWidth >= 40 ? 0.28 : 0.22));
+  const estimatedRoadArea = Math.round(totalExtentSqYds * ((masterItem('road_widths', roadWidth)?.metadata?.deductionPercent ?? 0) / 100));
 
   const handleUpdate = (field: keyof PlotDistributionConfig, val: number) => {
     const numVal = isNaN(val) ? 0 : Math.max(0, val);

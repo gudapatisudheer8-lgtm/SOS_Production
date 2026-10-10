@@ -1,3 +1,4 @@
+import { MasterOptions, masterNumber } from '../../../adapter/config';
 import React, { useState, useEffect } from 'react';
 import {
   TenantFirm,
@@ -75,23 +76,23 @@ interface AccountantDashboardProps {
   projects: Project[];
   selectedProjectId: string;
   onSelectProject: (projectId: string) => void;
-  onAddProject: (newProject: Project, initialPlots?: Plot[], initialUnits?: ApartmentUnit[]) => void;
+  onAddProject: (newProject: Project, initialPlots?: Plot[], initialUnits?: ApartmentUnit[], initialAccounts?: FirmAccount[]) => boolean | Promise<boolean>;
   plots: Plot[];
-  onUpdatePlot: (plot: Plot) => void;
+  onUpdatePlot: (plot: Plot) => void | boolean | Promise<boolean>;
   layoutCalc: LayoutCalculation;
-  onUpdateLayoutCalc: (calc: LayoutCalculation) => void;
+  onUpdateLayoutCalc: (calc: LayoutCalculation) => void | boolean | Promise<boolean>;
   projectExpenses: ProjectExpense[];
-  onAddProjectExpense: (expense: ProjectExpense) => void;
-  onUpdateProjectExpense: (expense: ProjectExpense) => void;
+  onAddProjectExpense: (expense: ProjectExpense) => void | boolean | Promise<boolean>;
+  onUpdateProjectExpense: (expense: ProjectExpense) => void | boolean | Promise<boolean>;
   apartmentUnits: ApartmentUnit[];
-  onUpdateApartmentUnit: (unit: ApartmentUnit) => void;
+  onUpdateApartmentUnit: (unit: ApartmentUnit) => void | boolean | Promise<boolean>;
   pricingMatrix: ApartmentPricingMatrix;
-  onUpdatePricingMatrix: (matrix: ApartmentPricingMatrix) => void;
+  onUpdatePricingMatrix: (matrix: ApartmentPricingMatrix) => void | boolean | Promise<boolean>;
   partners: SyndicatePartner[];
-  onUpdatePartner: (partner: SyndicatePartner) => void;
-  onAddPartnerMember?: (partner: SyndicatePartner) => void;
+  onUpdatePartner: (partner: SyndicatePartner) => void | boolean | Promise<boolean>;
+  onAddPartnerMember?: (partner: SyndicatePartner) => void | boolean | Promise<boolean>;
   splitMode: EquitySplitMode;
-  onToggleSplitMode: (mode: EquitySplitMode) => void;
+  onToggleSplitMode: (mode: EquitySplitMode) => void | boolean | Promise<boolean>;
   fieldExpenses: FieldExpenseLog[];
   onApproveExpense: (expenseId: string, signoff?: string) => void;
   onRejectExpense: (expenseId: string) => void;
@@ -99,15 +100,15 @@ interface AccountantDashboardProps {
   onToggleLedgerMode: (mode: LedgerMode) => void;
   auditLogs: AuditLogEntry[];
   liquorSettlements: LiquorDailySettlement[];
-  onAddLiquorSettlement: (settlement: LiquorDailySettlement) => void;
+  onAddLiquorSettlement: (settlement: LiquorDailySettlement) => void | boolean | Promise<boolean>;
   partnerStockDraws: PartnerStockDraw[];
-  onAddStockDraw: (draw: PartnerStockDraw) => void;
+  onAddStockDraw: (draw: PartnerStockDraw) => void | boolean | Promise<boolean>;
   firmAccounts?: FirmAccount[];
-  onAddFirmAccount?: (account: FirmAccount) => void;
-  onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void;
-  onEnrollExpense?: (expense: FieldExpenseLog) => void;
+  onAddFirmAccount?: (account: FirmAccount) => void | boolean | Promise<boolean>;
+  onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void | boolean | Promise<boolean>;
+  onEnrollExpense?: (expense: FieldExpenseLog, bankAccountId?: string) => void | boolean | Promise<boolean>;
   individualInvestments?: IndividualInvestmentRecord[];
-  onRecordIndividualInvestment?: (data: IndividualInvestmentData) => void;
+  onRecordIndividualInvestment?: (data: IndividualInvestmentData) => void | boolean | Promise<boolean>;
   onApproveIndividualInvestment?: (investmentId: string, approverName: string) => void;
   onRejectIndividualInvestment?: (investmentId: string, reason?: string) => void;
   onSignOut?: () => void;
@@ -271,7 +272,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
               ? 'managing_partner'
               : (master?.userRole || 'field_partner'),
             userStatus: (master?.userStatus as any) || (ps as any).userStatus || 'active',
-            pinCode: master?.pinCode || (ps as any).pinCode || '9999',
+            pinCode: master?.pinCode || (ps as any).pinCode || '',
             mustChangePin: master?.mustChangePin ?? (ps as any).mustChangePin ?? (master?.pinCode === '9999' || (ps as any).pinCode === '9999'),
             dailySpendingLimit: master?.dailySpendingLimit || 50000,
           };
@@ -286,15 +287,15 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
           activeProject.extentUnit === 'Units / Flats'
             ? 'Acres'
             : (activeProject.extentUnit as 'Acres' | 'Guntas / Cents' | 'Sq. Yards') || 'Acres',
-        roadWidth: activeProject.roadWidth || 30,
-        openSpacePercent: activeProject.openSpacePercent || 10,
+        roadWidth: (activeProject.roadWidth ?? masterNumber('layout_defaults', 'road_width') ?? 0) as any,
+        openSpacePercent: activeProject.openSpacePercent ?? masterNumber('layout_defaults', 'open_space_percent') ?? 0,
         floorRatePerSqYard: activeProject.floorRatePerSqYard || 0,
       }
     : {
         totalExtentValue: 0,
         unit: 'Acres',
-        roadWidth: 30,
-        openSpacePercent: 10,
+        roadWidth: 0 as any,
+        openSpacePercent: 0,
         floorRatePerSqYard: 0,
       };
 
@@ -320,7 +321,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   const soldPlotsCount = activePlots.filter((p) => p.status === 'sold').length;
 
   const totalPlotsSellableValue = activePlots.reduce((sum, p) => {
-    const rate = p.ratePerSqYard || (activeProject ? activeProject.floorRatePerSqYard : 17000) || 17000;
+    const rate = p.ratePerSqYard || (activeProject ? activeProject.floorRatePerSqYard : 0) || 0;
     return sum + p.areaSqYards * rate;
   }, 0);
   const totalPlotAdvancesCollected = activePlots.reduce((sum, p) => sum + (p.advanceReceived || 0), 0);
@@ -1687,13 +1688,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                       className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-800 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
                     >
                       <option value="all">All Cost Categories</option>
-                      <option value="Labor Wages">🔨 Labor Wages</option>
-                      <option value="Material">🧱 Material</option>
-                      <option value="Fuel">⛽ Fuel</option>
-                      <option value="Tractor/Machinery">🚜 Tractor / Machinery</option>
-                      <option value="Government/Fee">🏛️ Government / Fee</option>
-                      <option value="Food & Batta">🍱 Food &amp; Batta</option>
-                      <option value="Misc">📦 Misc</option>
+                      <MasterOptions group="expense_categories" />
                     </select>
 
                     {(expenseSearchQuery || expenseCategoryFilter !== 'all') && (
@@ -2037,34 +2032,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
         project={activeProject || undefined}
         partners={activeProjectPartners}
         firmAccounts={firmAccounts}
-        onEnrollExpense={(newExpense, bankAccountId) => {
-          onEnrollExpense(newExpense);
-          if (bankAccountId) {
-            const targetAcc = firmAccounts.find((a) => a.id === bankAccountId);
-            const balanceAfter = targetAcc ? targetAcc.currentBalance - newExpense.amount : 0;
-            const debitTx: FirmAccountTransaction = {
-              id: `tx-exp-${newExpense.id}`,
-              accountId: bankAccountId,
-              date: newExpense.date,
-              type: 'debit',
-              amount: newExpense.amount,
-              description: `Project Expense: [${newExpense.category}] ${newExpense.note}${newExpense.vendorName ? ` (Vendor: ${newExpense.vendorName})` : ''}`,
-              referenceNo: newExpense.taxInvoiceNo || `VCH-${newExpense.id.slice(-6).toUpperCase()}`,
-              category: 'SITE_OPERATIONAL_EXPENSE',
-              partnerName: newExpense.partnerName,
-              projectName: activeProject ? activeProject.name : 'Firm Operational Outlay',
-              balanceAfter,
-              enrolledBy: newExpense.partnerName || `${firm.accountantName || 'Accountant'} (Accountant)`,
-              approvedBy: newExpense.status === 'approved' ? `${firm.managingPartnerName || 'Managing Partner'}` : undefined,
-              status: newExpense.status === 'approved' ? 'approved' : 'pending',
-              paymentMode: newExpense.paymentMode,
-            };
-            onAddAccountTransaction(bankAccountId, debitTx);
-          }
-          if (newExpense.status === 'approved') {
-            onApproveExpense(newExpense.id, `${firm.accountantName || 'Accountant'} (Accountant)`);
-          }
-        }}
+        onEnrollExpense={(newExpense, bankAccountId) => onEnrollExpense(newExpense, bankAccountId)}
       />
 
       {/* Modal: + Individual Investment */}
@@ -2076,43 +2044,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
         partners={activeProjectPartners}
         firmAccounts={firmAccounts}
         initiatorRole="accountant"
-        onRecordInvestment={(data) => {
-          if (onRecordIndividualInvestment) {
-            onRecordIndividualInvestment(data);
-          } else {
-            const targetAcc = firmAccounts.find((a) => a.id === data.accountId);
-            const balanceAfter = targetAcc ? targetAcc.currentBalance + data.amount : data.amount;
-            const creditTx: FirmAccountTransaction = {
-              id: `tx-inv-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-              accountId: data.accountId,
-              date: data.date,
-              type: 'credit',
-              amount: data.amount,
-              description: `Individual Partner Investment: ${data.purpose} by ${data.partnerName}`,
-              referenceNo: data.referenceNo,
-              category: 'PARTNER_CAPITAL_CALL',
-              partnerName: data.partnerName,
-              projectName: activeProject ? activeProject.name : 'Syndicate Capital Pool',
-              balanceAfter,
-              enrolledBy: `${firm.accountantName || 'Accountant'} (Accountant)`,
-              approvedBy: `${firm.managingPartnerName || 'Managing Partner'}`,
-              status: 'approved',
-              paymentMode: data.paymentMode,
-              notes: data.notes,
-            };
-            onAddAccountTransaction(data.accountId, creditTx);
-
-            const target = partners.find((p) => p.id === data.partnerId);
-            if (target) {
-              const currentInv = target.actualInvested !== undefined ? target.actualInvested : 0;
-              onUpdatePartner({
-                ...target,
-                actualInvested: currentInv + data.amount,
-                initialCapital: Math.max(target.initialCapital, currentInv + data.amount),
-              });
-            }
-          }
-        }}
+        onRecordInvestment={(data) => (onRecordIndividualInvestment ? onRecordIndividualInvestment(data) : false)}
       />
 
       {/* Modal: Voucher Slip View & Print */}

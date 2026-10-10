@@ -11,6 +11,25 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /configuration/masters:
+    get:
+      operationId: getBusinessMasters
+      tags: [workspace]
+      description: Authenticated database-backed business choices and policy metadata. Owners also see disabled entries. Security permissions remain sector-release grants.
+      responses:
+        "200":
+          description: Consistent master catalog snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revision, items]
+                properties:
+                  revision: { type: integer, format: int64 }
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/BusinessMaster" }
+        default: { $ref: "#/components/responses/ApiFailure" }
   /erp/{projectId}/attachments:
     post:
       operationId: uploadProjectAttachment
@@ -144,6 +163,12 @@ paths:
         credentials.reset, sector.create, configuration.save, configuration.validate,
         configuration.publish. ACCOUNTANT: project.create, project.update, partner.add.
         All identities, roles, tenancy and permissions are derived on the server.
+        project.setup-create atomically validates and saves the entire project setup,
+        creates project-linked operational records and finalizes it. A failed create
+        leaves no draft. Use project.setup-save and project.setup-finalize for resumable drafts.
+        master.save is owner-only and requires revision when updating an existing choice.
+        partner.update and partner.status are accountant-only, require project membership
+        revision and affect only that project, never another firm's identity name.
       parameters:
         - { name: action, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -352,6 +377,17 @@ components:
       required: [data]
       properties:
         data: { type: object, additionalProperties: true }
+    BusinessMaster:
+      type: object
+      required: [group, key, label, position, enabled, revision, metadata]
+      properties:
+        group: { type: string, maxLength: 64 }
+        key: { type: string, maxLength: 160 }
+        label: { type: string, maxLength: 240 }
+        position: { type: integer, minimum: 0 }
+        enabled: { type: boolean }
+        revision: { type: integer, minimum: 1 }
+        metadata: { type: object, additionalProperties: true }
     CommandResult:
       type: object
       required: [status]
@@ -376,6 +412,16 @@ components:
         name: { type: string }
         status: { type: string, enum: [ACTIVE, SUSPENDED] }
         revision: { type: integer }
+        metadata:
+          type: object
+          properties:
+            gstin: { type: string }
+            panNumber: { type: string }
+            reraNumber: { type: string }
+            officeAddress: { type: string }
+            proprietorPhone: { type: string }
+            location: { type: string }
+            state: { type: string }
         accountants:
           type: array
           items:

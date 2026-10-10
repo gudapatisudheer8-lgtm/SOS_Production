@@ -46,6 +46,16 @@ public class ProjectSetupService {
             }
             Map<String,Object> result;
             if("project.setup-save".equals(action)) result=save(actor,input);
+            else if("project.setup-create".equals(action)) {
+                if (input.hasNonNull("projectId")) throw ApiProblem.invalid("Use setup-save for an existing project.");
+                Map<String,Object> saved=save(actor,input);
+                @SuppressWarnings("unchecked") Map<String,Object> draft=(Map<String,Object>)saved.get("entity");
+                ObjectNode finishInput=json.createObjectNode();
+                finishInput.put("projectId",draft.get("id").toString());
+                finishInput.put("revision",((Number)draft.get("revision")).intValue());
+                finishInput.put("requestId",request.toString());
+                result=finish(actor,finishInput);
+            }
             else if("project.setup-finalize".equals(action)) result=finish(actor,input);
             else throw ApiProblem.invalid("Unsupported project setup operation.");
             @SuppressWarnings("unchecked") Map<String,Object> entity=(Map<String,Object>)result.get("entity");

@@ -1,3 +1,4 @@
+import { MasterOptions, masterNumber } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { Plot, LayoutCalculation, ProjectExpense, PlotStatus, LedgerMode, Project, PlanUploadDocument, TenantFirm, FirmAccount, FirmAccountTransaction } from '../../types';
 import { formatINR, formatIndianCompact, calculateLayoutMetrics } from '../../utils/formatters';
@@ -24,15 +25,14 @@ import {
   TreePine
 } from 'lucide-react';
 import { DiscountAlertModal } from '../modals/DiscountAlertModal';
-import { SAMPLE_LAYOUT_BLUEPRINT } from '../../data/sampleBlueprints';
 import { VentureLayoutMasterGrid } from './VentureLayoutMasterGrid';
 import { CustomerPlotBookingModal } from '../modals/CustomerPlotBookingModal';
 
 interface OpenPlottingModuleProps {
   plots: Plot[];
-  onUpdatePlot: (plot: Plot) => void;
+  onUpdatePlot: (plot: Plot) => void | boolean | Promise<boolean>;
   layoutCalc: LayoutCalculation;
-  onUpdateLayoutCalc: (calc: LayoutCalculation) => void;
+  onUpdateLayoutCalc: (calc: LayoutCalculation) => void | boolean | Promise<boolean>;
   projectExpenses?: ProjectExpense[];
   onAddExpense?: (expense: ProjectExpense) => void;
   onUpdateExpense?: (expense: ProjectExpense) => void;
@@ -40,7 +40,7 @@ interface OpenPlottingModuleProps {
   project?: Project;
   firm?: TenantFirm;
   firmAccounts?: FirmAccount[];
-  onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void;
+  onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void | boolean | Promise<boolean>;
 }
 
 export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
@@ -95,10 +95,10 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
   const defaultBlueprintUrl =
     projectBlueprints.length > 0 && projectBlueprints[0].dataUrl
       ? projectBlueprints[0].dataUrl
-      : SAMPLE_LAYOUT_BLUEPRINT;
+      : '';
 
   // Floor Price Protection Modal state
-  const FLOOR_RATE_PER_SQYD = 17000;
+  const FLOOR_RATE_PER_SQYD = layoutCalc.floorRatePerSqYard || 0;
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [pendingDiscountPlot, setPendingDiscountPlot] = useState<Plot | null>(null);
 
@@ -118,7 +118,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
 
   const totalRealizedSales = plots.reduce((acc, p) => acc + (p.advanceReceived || 0), 0);
   const totalProjectedValue = plots.reduce((acc, p) => {
-    const rate = ledgerMode === 'official_tax' ? Math.min(p.ratePerSqYard, 12000) : p.ratePerSqYard;
+    const rate = ledgerMode === 'official_tax' ? (masterNumber('ledger_policy', 'official_tax_rate_cap') !== undefined ? Math.min(p.ratePerSqYard, masterNumber('ledger_policy', 'official_tax_rate_cap') as number) : p.ratePerSqYard) : p.ratePerSqYard;
     return acc + p.areaSqYards * rate;
   }, 0);
 
@@ -139,8 +139,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
       return;
     }
 
-    onUpdatePlot(selectedPlot);
-    setSelectedPlot(null);
+    void Promise.resolve(onUpdatePlot(selectedPlot)).then((ok) => { if (ok !== false) setSelectedPlot(null); });
   };
 
   const handleConfirmDiscountOverride = (approvedSignature: string) => {
@@ -150,9 +149,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
       discountApprovedBy: approvedSignature,
       notes: `${pendingDiscountPlot.notes || ''} [Floor Rate Override: Authorized by ${approvedSignature}]`,
     };
-    onUpdatePlot(updated);
-    setPendingDiscountPlot(null);
-    setSelectedPlot(null);
+    void Promise.resolve(onUpdatePlot(updated)).then((ok) => { if (ok !== false) { setPendingDiscountPlot(null); setSelectedPlot(null); } });
   };
 
   return (
@@ -226,9 +223,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
                 }
                 className="bg-white border border-gray-300 rounded-xl p-2 text-xs font-bold text-gray-950"
               >
-                <option value="Acres">Acres</option>
-                <option value="Guntas / Cents">Guntas</option>
-                <option value="Sq. Yards">Sq. Yds</option>
+                <MasterOptions group="extent_units" />
               </select>
             </div>
           </div>
@@ -247,10 +242,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
               }
               className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950"
             >
-              <option value={20}>20 Ft Road (22% deduction)</option>
-              <option value={30}>30 Ft Road (28% deduction)</option>
-              <option value={40}>40 Ft Master Plan (33% deduction)</option>
-              <option value={60}>60 Ft Arterial (38% deduction)</option>
+              <MasterOptions group="road_widths" format={(o) => `${o.label} (${o.metadata.deductionPercent}% deduction)`} />
             </select>
           </div>
 
@@ -388,9 +380,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
                     }
                     className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 font-bold text-gray-900 text-xs"
                   >
-                    <option value="available">Available</option>
-                    <option value="reserved">Reserved (Token Received)</option>
-                    <option value="sold">Sold (Agreement Done)</option>
+                    <MasterOptions group="plot_statuses" />
                   </select>
                 </div>
 
@@ -571,14 +561,12 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
           firmAccounts={firmAccounts}
           onAddAccountTransaction={onAddAccountTransaction}
           onClose={() => setCustomerBookingPlot(null)}
-          onConfirmBooking={(updatedPlot) => {
-            onUpdatePlot(updatedPlot);
-            setCustomerBookingPlot(null);
-          }}
+          onConfirmBooking={(updatedPlot) => onUpdatePlot(updatedPlot)}
           onReleasePlot={(plotId) => {
             const plotToRelease = plots.find((p) => p.id === plotId);
-            if (plotToRelease) {
-              onUpdatePlot({
+            if (!plotToRelease) return false;
+            {
+              return onUpdatePlot({
                 ...plotToRelease,
                 status: 'available',
                 buyerName: undefined,
@@ -591,7 +579,6 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
                 notes: 'Booking released back to available inventory.',
               });
             }
-            setCustomerBookingPlot(null);
           }}
         />
       )}

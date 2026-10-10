@@ -91,9 +91,9 @@ public class ErpService {
         List<Map<String,Object>> partners=new ArrayList<>();
         BigDecimal total=jdbc.queryForObject("SELECT coalesce(sum(amount),0) FROM sos.erp_records WHERE project_id=? AND kind='investments' AND status='approved'",BigDecimal.class,project);
         for(var p:jdbc.queryForList("""
-            SELECT i.id,i.display_name,i.mobile FROM sos.identities i JOIN sos.project_memberships pm ON pm.identity_id=i.id
+            SELECT i.id,coalesce(pm.display_name,i.display_name) AS display_name,i.mobile,pm.enabled,pm.revision FROM sos.identities i JOIN sos.project_memberships pm ON pm.identity_id=i.id
             JOIN sos.firm_memberships fm ON fm.identity_id=i.id AND fm.firm_id=pm.firm_id AND fm.role_code='PARTNER'
-            WHERE pm.project_id=? AND pm.enabled AND fm.enabled AND i.enabled ORDER BY i.display_name
+            WHERE pm.project_id=? AND fm.enabled AND i.enabled ORDER BY i.display_name
             """,project)) {
             UUID id=(UUID)p.get("id");
             BigDecimal invested=sum(project,id,"investments"),drawings=sum(project,id,"drawings").add(sum(project,id,"stock-draws"));
@@ -106,7 +106,8 @@ public class ErpService {
                 if(!profiles.isEmpty()) equity=decimal(parse(profiles.getFirst().get("data")).path("fixedEquityPercent"),false);
             }
             partners.add(Map.of("id",id,"name",p.get("display_name"),"mobile",p.get("mobile"),"invested",invested.toPlainString(),
-                "drawings",drawings.toPlainString(),"expenses",expenses.toPlainString(),"equityPercent",equity.toPlainString()));
+                "drawings",drawings.toPlainString(),"expenses",expenses.toPlainString(),"equityPercent",equity.toPlainString(),
+                "enabled",p.get("enabled"),"revision",p.get("revision")));
         }
         return partners;
     }

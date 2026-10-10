@@ -14,6 +14,10 @@ Keep disposable preview databases in ignored persistent local state and check ac
 **Why:** workspace restarts remove temporary files/processes; a stale postmaster PID can outlive its database process.
 **How to apply:** explicitly enable localhost-only development fixtures and never seed the customer's RDS.
 
+Run password-change and onboarding acceptance tests against a separate disposable database, not the owner's Preview account.
+**Why:** bootstrap secrets do not override an existing changed owner password; tests must not leave the user's account inaccessible or populate their application with test firms.
+**How to apply:** use synthetic identities on the isolated target and restore the Preview API proxy afterward. Verify browser saves through the real proxy, not only independent frontend/backend builds.
+
 Dashboard delivery requires verifying the firm's assigned release and rendered interface, not just API health.
 **Why:** additive configuration updates deliberately preserve existing firm assignments for compatibility; a healthy deployment can still display the old dashboard. Incorrect release names in rollout instructions caused unnecessary user effort.
 **How to apply:** use actual published release labels rather than planning terminology, keep activation owner-controlled, and distinguish successful installation from verified dashboard activation.

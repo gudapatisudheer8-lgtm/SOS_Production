@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldAlert, AlertTriangle, Key, CheckCircle, X, Users } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle, X, Users } from 'lucide-react';
 import { formatINR } from '../../utils/formatters';
 
 interface DiscountAlertModalProps {
@@ -23,10 +23,7 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
   unitExtent,
   extentUnit,
 }) => {
-  const [authPartner1, setAuthPartner1] = useState('');
-  const [authPartner2, setAuthPartner2] = useState('');
-  const [signPin, setSignPin] = useState('');
-  const [signNotes, setSignNotes] = useState('');
+    const [signNotes, setSignNotes] = useState('');
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -36,11 +33,11 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signPin || signPin.length < 4) {
-      setError('Please enter a valid 4-digit partner security PIN (e.g. 1234 or 9999).');
+    if (!signNotes.trim()) {
+      setError('Enter the justification for the rate concession.');
       return;
     }
-    const approvedSignature = `${authPartner1} & ${authPartner2} (Digital PIN Verified)`;
+    const approvedSignature = `Concession requested by signed-in user: ${signNotes.trim()} (pending server approval)`;
     onConfirmDiscountSale(approvedSignature);
     onClose();
   };
@@ -79,7 +76,7 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
                 <strong className="font-bold block text-sm text-red-700 mb-1">
                   Sub-Floor Price Warning for {unitLabel}
                 </strong>
-                Selling below project floor price diminishes the syndicate profit pool and triggers mandatory 2-partner consensus sign-off under the syndicate partnership deed.
+                Selling below project floor price diminishes the syndicate profit pool and requires approval through the server approval workflow. Your signed-in identity is recorded; no PIN is entered here.
               </div>
             </div>
           </div>
@@ -105,32 +102,8 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-amber-600" />
               <label className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                Multi-Partner Digital Authorization (Minimum 2 Signatures)
+                Rate Concession Request
               </label>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div>
-                <label className="text-[11px] text-gray-500 block mb-1">Authorizing Partner 1:</label>
-                <select
-                  value={authPartner1}
-                  onChange={(e) => setAuthPartner1(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs"
-                >
-                  <option value="">Select authorizing partner</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] text-gray-500 block mb-1">Authorizing Partner 2 (Co-Signer):</label>
-                <select
-                  value={authPartner2}
-                  onChange={(e) => setAuthPartner2(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs"
-                >
-                  <option value="">Select co-signing partner</option>
-                </select>
-              </div>
             </div>
 
             <div>
@@ -144,27 +117,7 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="text-[11px] text-gray-500 block mb-1">
-                Executive Authorization PIN (Enter 4 Digits):
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  maxLength={6}
-                  value={signPin}
-                  onChange={(e) => {
-                    setSignPin(e.target.value);
-                    setError('');
-                  }}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 pl-9 text-xs font-mono font-bold tracking-widest text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  placeholder="••••"
-                  autoFocus
-                />
-                <Key className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              </div>
-              {error && <p className="text-[11px] text-red-600 mt-1 font-medium">{error}</p>}
-            </div>
+            {error && <p className="text-[11px] text-red-600 mt-1 font-medium">{error}</p>}
           </div>
 
           {/* Action Buttons */}

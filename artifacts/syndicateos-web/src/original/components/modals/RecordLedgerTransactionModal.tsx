@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState, useMemo } from 'react';
 import { FirmAccount, FirmAccountTransaction, TenantFirm, Project } from '../../types';
 import {
@@ -25,7 +26,7 @@ interface RecordLedgerTransactionModalProps {
   accounts: FirmAccount[];
   projects: Project[];
   preselectedAccountId?: string;
-  onAddTransaction: (accountId: string, tx: FirmAccountTransaction) => void;
+  onAddTransaction: (accountId: string, tx: FirmAccountTransaction) => void | boolean | Promise<boolean>;
 }
 
 export const RecordLedgerTransactionModal: React.FC<RecordLedgerTransactionModalProps> = ({
@@ -118,8 +119,7 @@ export const RecordLedgerTransactionModal: React.FC<RecordLedgerTransactionModal
       paymentMode: paymentMode,
     };
 
-    onAddTransaction(currentAccount.id, newTx);
-    onClose();
+    void Promise.resolve(onAddTransaction(currentAccount.id, newTx)).then((ok) => { if (ok !== false) onClose(); });
   };
 
   return (
@@ -287,23 +287,11 @@ export const RecordLedgerTransactionModal: React.FC<RecordLedgerTransactionModal
               >
                 {txType === 'credit' ? (
                   <>
-                    <option value="plot_booking_advance">Customer Plot Booking Advance</option>
-                    <option value="flat_booking_advance">Customer Flat / Apartment Token</option>
-                    <option value="partner_capital">Partner Syndicate Capital Deposit</option>
-                    <option value="interest_credit">Bank Escrow Interest Credit</option>
-                    <option value="inter_account_transfer">Inter-Account Transfer (Inflow)</option>
-                    <option value="other">Other Ledger Receipt</option>
+                    <MasterOptions group="ledger_credit_purposes" />
                   </>
                 ) : (
                   <>
-                    <option value="vendor_payout">Civil Contractor &amp; Material Payout</option>
-                    <option value="contractor_payout">Labour &amp; Earthwork Contractor Payout</option>
-                    <option value="field_imprest">Field Cash Imprest / Petty Cash</option>
-                    <option value="statutory_fee">DTCP / HMDA / RERA Statutory Fees</option>
-                    <option value="partner_draw">Partner Capital Draw / Dividend</option>
-                    <option value="cash_withdrawal">Cash Withdrawal for On-Site Spends</option>
-                    <option value="inter_account_transfer">Inter-Account Transfer (Outflow)</option>
-                    <option value="other">Other Ledger Disbursement</option>
+                    <MasterOptions group="ledger_debit_purposes" />
                   </>
                 )}
               </select>
@@ -318,11 +306,7 @@ export const RecordLedgerTransactionModal: React.FC<RecordLedgerTransactionModal
                 onChange={(e) => setPaymentMode(e.target.value)}
                 className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:ring-2 focus:ring-[#FFB800] outline-none"
               >
-                <option value="NEFT/RTGS">NEFT / RTGS Bank Transfer</option>
-                <option value="UPI">UPI / QR (PhonePe / Google Pay)</option>
-                <option value="Cheque/DD">Bank Cheque / Demand Draft</option>
-                <option value="Direct Cash Deposit">Direct Cash / Vault Deposit</option>
-                <option value="Escrow Allocation">RERA 70:30 Escrow Allocation</option>
+                <MasterOptions group="ledger_payment_modes" />
               </select>
             </div>
           </div>

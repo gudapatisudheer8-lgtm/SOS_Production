@@ -33,7 +33,8 @@ public class WorkspaceReader {
                 ? jdbc.queryForList("SELECT i.id AS \"identityId\",i.display_name AS \"displayName\",i.mobile FROM sos.identities i JOIN sos.firm_memberships m ON m.identity_id=i.id WHERE m.firm_id=? AND m.role_code='ACCOUNTANT' AND m.enabled",firmId)
                 : List.of();
             outputFirms.add(Map.of("id",firmId,"clientCode",firm.get("client_code"),"name",firm.get("name"),
-                "status",firm.get("status"),"revision",firm.get("revision"),"accountants",accountants));
+                "status",firm.get("status"),"revision",firm.get("revision"),"accountants",accountants,
+                "metadata",config.parse(firm.get("metadata"))));
             for (Map<String,Object> assignment : jdbc.queryForList(
                 "SELECT a.*,s.name,s.enabled AS sector_enabled FROM sos.firm_sector_assignments a JOIN sos.sectors s ON s.id=a.sector_id WHERE a.firm_id=? ORDER BY s.name",firmId)) {
                 UUID sector=(UUID)assignment.get("sector_id"), release=(UUID)assignment.get("release_id");
@@ -90,12 +91,12 @@ public class WorkspaceReader {
             List<Map<String,Object>> partners=List.of();
             if ("OWNER".equals(actor.role()) || config.permitted(release,actor.role(),"partners.read")) {
                 if ("PARTNER".equals(actor.role())) partners=jdbc.queryForList(
-                    "SELECT i.id AS \"identityId\",i.display_name AS \"displayName\" FROM sos.identities i JOIN sos.project_memberships pm ON pm.identity_id=i.id WHERE pm.project_id=? AND pm.enabled AND i.id=?",project,actor.identityId());
+                    "SELECT i.id AS \"identityId\",coalesce(pm.display_name,i.display_name) AS \"displayName\",pm.revision,pm.enabled FROM sos.identities i JOIN sos.project_memberships pm ON pm.identity_id=i.id WHERE pm.project_id=? AND pm.enabled AND i.id=?",project,actor.identityId());
                 else partners=jdbc.queryForList("""
-                    SELECT i.id AS "identityId",i.display_name AS "displayName",i.mobile FROM sos.identities i
+                    SELECT i.id AS "identityId",coalesce(pm.display_name,i.display_name) AS "displayName",i.mobile,pm.revision,pm.enabled FROM sos.identities i
                     JOIN sos.project_memberships pm ON pm.identity_id=i.id JOIN sos.firm_memberships fm
                     ON fm.firm_id=pm.firm_id AND fm.identity_id=i.id AND fm.role_code='PARTNER'
-                    WHERE pm.project_id=? AND pm.enabled AND fm.enabled AND i.enabled ORDER BY i.display_name
+                    WHERE pm.project_id=? AND fm.enabled AND i.enabled ORDER BY i.display_name
                     """,project);
             }
             item.put("partners",partners); projects.add(item);

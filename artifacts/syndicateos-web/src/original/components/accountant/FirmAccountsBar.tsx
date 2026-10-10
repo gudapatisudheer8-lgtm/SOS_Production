@@ -32,7 +32,7 @@ interface FirmAccountsBarProps {
   activeProjectId: string;
   onOpenAddAccountModal: () => void;
   onOpenStatementModal: (account: FirmAccount) => void;
-  onAddTransaction?: (accountId: string, tx: any) => void;
+  onAddTransaction?: (accountId: string, tx: any) => void | boolean | Promise<boolean>;
 }
 
 export const FirmAccountsBar: React.FC<FirmAccountsBarProps> = ({

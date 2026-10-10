@@ -1,3 +1,4 @@
+import { MasterOptions, masterNumber } from '../../../adapter/config';
 import React, { useState } from 'react';
 import {
   TenantFirm,
@@ -60,9 +61,9 @@ interface AddProjectModalProps {
   onClose: () => void;
   firm: TenantFirm;
   existingPartners: SyndicatePartner[];
-  onAddProject: (newProject: Project, initialPlots?: Plot[], initialUnits?: ApartmentUnit[]) => void;
+  onAddProject: (newProject: Project, initialPlots?: Plot[], initialUnits?: ApartmentUnit[], initialAccounts?: FirmAccount[]) => boolean | Promise<boolean>;
   firmAccounts?: FirmAccount[];
-  onAddFirmAccount?: (account: FirmAccount) => void;
+  onAddFirmAccount?: (account: FirmAccount) => void | boolean | Promise<boolean>;
 }
 
 const AVATAR_COLORS = [
@@ -128,50 +129,7 @@ const createInitialFloorPlans = (numFloors: number, baseRate: number): FloorFlat
   return result;
 };
 
-const defaultConstructionAmenities: ProjectAmenity[] = [
-  {
-    id: 'amenity-clubhouse',
-    name: 'Grand Clubhouse & Reception Lounge',
-    plannedSqFt: 5000,
-    floorLocation: 'Ground + Stilt',
-    description: 'Central community hub with reception lounge & management office',
-  },
-  {
-    id: 'amenity-gym',
-    name: 'Fitness Centre & Gymnasium',
-    plannedSqFt: 2500,
-    floorLocation: 'Clubhouse Level 1',
-    description: 'Cardio, strength equipment & stretching studio',
-  },
-  {
-    id: 'amenity-pool',
-    name: 'Swimming Pool & Sun Deck',
-    plannedSqFt: 1800,
-    floorLocation: 'Clubhouse Deck',
-    description: 'Semi-olympic lap pool with kids wading section',
-  },
-  {
-    id: 'amenity-games',
-    name: 'Indoor Badminton & Games Room',
-    plannedSqFt: 1600,
-    floorLocation: 'Clubhouse Level 2',
-    description: 'Synthetic court, table tennis & billiards',
-  },
-  {
-    id: 'amenity-hall',
-    name: 'Multipurpose Banquet Hall',
-    plannedSqFt: 3000,
-    floorLocation: 'Ground Floor Block B',
-    description: 'A/C banquet hall with pantry for society events',
-  },
-  {
-    id: 'amenity-creche',
-    name: 'Children Play Area & Creche',
-    plannedSqFt: 1200,
-    floorLocation: 'Central Podium',
-    description: 'Safe soft play zone & outdoor rubberized tot-lot',
-  },
-];
+const defaultConstructionAmenities: ProjectAmenity[] = [];
 
 const defaultPlotDistribution: PlotDistributionConfig = {
   eastPlotsCount: 0,
@@ -193,26 +151,7 @@ const defaultPlotDistribution: PlotDistributionConfig = {
   premiumAreaSqYards: 0,
 };
 
-const defaultLayoutAmenities: LayoutAmenity[] = [
-  {
-    id: 'layout-amenity-park',
-    name: "Statutory 10% Children's Park & Green Belt",
-    allocatedAreaSqYards: 2904,
-    category: 'park',
-  },
-  {
-    id: 'layout-amenity-oht',
-    name: 'Overhead Water Tank (OHT 50,000L) & Sump Utility',
-    allocatedAreaSqYards: 400,
-    category: 'utilities',
-  },
-  {
-    id: 'layout-amenity-gate',
-    name: 'Gated Grand Entrance Plaza & Security Gatehouse',
-    allocatedAreaSqYards: 250,
-    category: 'clubhouse',
-  },
-];
+const defaultLayoutAmenities: LayoutAmenity[] = [];
 
 const defaultLiquorCounters: RetailCounterConfig[] = [
   { id: 'c-1', name: 'Excise Vend #01 - Highway Transit', category: 'High-Footfall Transit', sqFtArea: 450, dailySalesTarget: 400000, staffCount: 4 },
@@ -282,7 +221,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   // Dedicated Project Accounts available in this modal:
   // - Cash accounts (field_petty_cash / Cash Safe Vault) are available for all projects of this firm
   // - Existing bank accounts already assigned to other projects are filtered out so they never leak into this new project!
-  const availableFirmAccounts = firmAccounts.filter((a) => {
+  const [pendingAccounts, setPendingAccounts] = useState<FirmAccount[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const availableFirmAccounts = [...pendingAccounts, ...firmAccounts].filter((a) => {
     if (a.firmId !== firm.id) return false;
     if (a.accountType === 'field_petty_cash') return true;
     if (a.linkedProjectId && a.linkedProjectId !== '' && a.linkedProjectId !== 'all' && a.linkedProjectId !== projectId) {
@@ -326,8 +267,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     defaultSector === 'liquor_vends' ? 'Counters / Shops' :
     defaultSector === 'custom_infra' ? 'KM Stretch' : 'Acres'
   );
-  const [roadWidth, setRoadWidth] = useState<20 | 30 | 40 | 60>(30);
-  const [openSpacePercent, setOpenSpacePercent] = useState<number>(10);
+  const [roadWidth, setRoadWidth] = useState<20 | 30 | 40 | 60>((masterNumber('layout_defaults', 'road_width') ?? 0) as any);
+  const [openSpacePercent, setOpenSpacePercent] = useState<number>(masterNumber('layout_defaults', 'open_space_percent') ?? 0);
   const [floorRatePerSqYard, setFloorRatePerSqYard] = useState<number>(0);
   const [baseSqFtRate, setBaseSqFtRate] = useState<number>(0);
   const [totalEstimatedOutlay, setTotalEstimatedOutlay] = useState<number>(0);
@@ -621,8 +562,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setError('');
 
     if (!name.trim()) {
@@ -729,16 +671,12 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
           plotNumber: `Plot #${plotIdCounter}`,
           areaSqYards: eastArea,
           facing: 'East',
-          ratePerSqYard: floorRatePerSqYard + 750,
+          ratePerSqYard: floorRatePerSqYard,
           status: 'available',
           buyerName: undefined,
           buyerPhone: undefined,
           advanceReceived: undefined,
           paymentMilestone: undefined,
-          blockName: 'Sector A - East Avenue',
-          dimensions: "36' × 66'",
-          roadWidthFt: 40,
-          notes: 'Premium 40ft road East-facing plot.',
         });
         plotIdCounter++;
       }
@@ -754,12 +692,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
           plotNumber: `Plot #${plotIdCounter}`,
           areaSqYards: northArea,
           facing: 'North',
-          ratePerSqYard: floorRatePerSqYard + 500,
+          ratePerSqYard: floorRatePerSqYard,
           status: 'available',
-          blockName: 'Sector B - North Boulevard',
-          dimensions: "33' × 60'",
-          roadWidthFt: 33,
-          notes: 'Auspicious North-facing plot with 33ft CC road approach.',
         });
         plotIdCounter++;
       }
@@ -777,10 +711,6 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
           facing: 'West',
           ratePerSqYard: floorRatePerSqYard,
           status: 'available',
-          blockName: 'Sector C - West Avenue',
-          dimensions: "33' × 55'",
-          roadWidthFt: 33,
-          notes: 'Standard West-facing demarcated plot with 33ft road.',
         });
         plotIdCounter++;
       }
@@ -796,12 +726,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
           plotNumber: `Plot #${plotIdCounter}`,
           areaSqYards: southArea,
           facing: 'South',
-          ratePerSqYard: floorRatePerSqYard - 500,
+          ratePerSqYard: floorRatePerSqYard,
           status: 'available',
-          blockName: 'Sector D - South Row',
-          dimensions: "30' × 54'",
-          roadWidthFt: 30,
-          notes: 'Value-budget residential plot with 30ft road.',
         });
         plotIdCounter++;
       }
@@ -817,12 +743,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
           plotNumber: `Plot #${plotIdCounter}`,
           areaSqYards: cornerArea,
           facing: 'North-East Corner',
-          ratePerSqYard: floorRatePerSqYard + 1500,
+          ratePerSqYard: floorRatePerSqYard,
           status: 'available',
-          blockName: 'Corner Enclave',
-          dimensions: "40' × 74'",
-          roadWidthFt: 40,
-          notes: 'Auspicious North-East corner junction plot with dual road frontage.',
         });
         plotIdCounter++;
       }
@@ -838,12 +760,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
           plotNumber: `Plot #${plotIdCounter}`,
           areaSqYards: commercialArea,
           facing: 'North',
-          ratePerSqYard: floorRatePerSqYard + 3500,
+          ratePerSqYard: floorRatePerSqYard,
           status: 'available',
-          blockName: 'Commercial Frontage Plaza',
-          dimensions: "45' × 100'",
-          roadWidthFt: 60,
-          notes: 'Masterplan 60ft arterial road commercial frontage plot.',
         });
         plotIdCounter++;
       }
@@ -857,8 +775,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
           const isCorner = unit.facing === 'Corner';
           const isEast = unit.facing === 'East';
           const unitRate = unit.baseRate || baseSqFtRate;
-          const unitFacingPremium = isCorner ? facingPremium + 100 : isEast ? facingPremium : 50;
-          const floorRise = (floor.floorNumber - 1) * 50;
+          const unitFacingPremium = 0;
+          const floorRise = 0;
 
           initialUnits!.push({
             id: `apt-${newProject.id}-${unit.unitNumber.replace('#', '')}`,
@@ -872,8 +790,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
             baseRate: unitRate,
             facingPremium: unitFacingPremium,
             floorRise,
-            parkingFee: 250000,
-            amenitiesFee: 150000,
+            parkingFee: 0,
+            amenitiesFee: 0,
             status: 'available',
             buyerName: undefined,
             buyerPhone: undefined,
@@ -886,8 +804,13 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
       });
     }
 
-    onAddProject(newProject, initialPlots, initialUnits);
-    onClose();
+    setSubmitting(true);
+    try {
+      const ok = await onAddProject(newProject, initialPlots, initialUnits, pendingAccounts);
+      if (ok !== false) onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Helper for safe plot count
@@ -1069,18 +992,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                       onChange={(e) => handleSectorChange(e.target.value as SectorType)}
                       className="w-full px-3 py-2.5 bg-amber-50/70 border-2 border-amber-300 text-gray-950 font-bold rounded-xl text-xs focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
                     >
-                      {firm.sectors.includes('real_estate_open_plotting') && (
-                        <option value="real_estate_open_plotting">Real Estate - Open Plotting</option>
-                      )}
-                      {firm.sectors.includes('real_estate_construction') && (
-                        <option value="real_estate_construction">Apartments &amp; Construction</option>
-                      )}
-                      {firm.sectors.includes('liquor_vends') && (
-                        <option value="liquor_vends">Liquor Vends Register</option>
-                      )}
-                      {firm.sectors.includes('custom_infra') && (
-                        <option value="custom_infra">Custom Infra &amp; Civil Works</option>
-                      )}
+                      <MasterOptions group="sector_types" valueKey="uiCode" only={firm.sectors} />
                     </select>
                   </div>
 
@@ -1093,11 +1005,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                       onChange={(e) => setStatus(e.target.value as Project['status'])}
                       className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-950 focus:ring-2 focus:ring-[#FFB800] outline-none"
                     >
-                      <option value="planning">Planning &amp; Pre-acquisition</option>
-                      <option value="approvals">Statutory Clearances &amp; LP in Progress</option>
-                      <option value="active_sales">Active Sales, Booking &amp; Operations</option>
-                      <option value="development">Under Execution / Site Civil Development</option>
-                      <option value="completed">Completed / Handed Over</option>
+                      <MasterOptions group="project_statuses" />
                     </select>
                   </div>
 
@@ -1185,13 +1093,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                           onChange={(e) => setApprovalAuthority(e.target.value)}
                           className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-950 focus:ring-2 focus:ring-[#FFB800] outline-none"
                         >
-                          <option value="CRDA">CRDA (Capital Region Development Authority)</option>
-                          <option value="DTCP">DTCP (Directorate of Town &amp; Country Planning)</option>
-                          <option value="HMDA">HMDA (Hyderabad Metropolitan Dev Authority)</option>
-                          <option value="TG-RERA">TG-RERA (Telangana Real Estate Reg Authority)</option>
-                          <option value="AP-RERA">AP-RERA (Andhra Pradesh Real Estate Reg Authority)</option>
-                          <option value="Gram Panchayat">Gram Panchayat Conversion Layout</option>
-                          <option value="Municipal">Municipal Corporation</option>
+                          <MasterOptions group="layout_authorities" />
                         </select>
                       </div>
 
@@ -1228,9 +1130,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                             onChange={(e) => setExtentUnit(e.target.value)}
                             className="px-2 py-2 bg-white border border-gray-300 rounded-xl text-[11px] font-bold text-gray-700 outline-none"
                           >
-                            <option value="Acres">Acres</option>
-                            <option value="Sq. Yards">Sq.Yds</option>
-                            <option value="Guntas / Cents">Cents/Gts</option>
+                            <MasterOptions group="extent_units" />
                           </select>
                         </div>
                       </div>
@@ -1242,10 +1142,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                           onChange={(e) => setRoadWidth(Number(e.target.value) as any)}
                           className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-950 outline-none"
                         >
-                          <option value={20}>20 Ft Road</option>
-                          <option value={30}>30 Ft Road (Standard)</option>
-                          <option value={40}>40 Ft Wide Sector Road</option>
-                          <option value={60}>60 Ft Masterplan Arterial</option>
+                          <MasterOptions group="road_widths" />
                         </select>
                       </div>
 
@@ -1354,11 +1251,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                           onChange={(e) => setApprovalAuthority(e.target.value)}
                           className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-950 focus:ring-2 focus:ring-[#FFB800] outline-none"
                         >
-                          <option value="AP-RERA">AP-RERA (Andhra Pradesh Real Estate Reg Authority)</option>
-                          <option value="TG-RERA">TG-RERA (Telangana Real Estate Reg Authority)</option>
-                          <option value="Municipal">Municipal Corporation Building Sanction</option>
-                          <option value="HMDA">HMDA Building Sanction</option>
-                          <option value="CRDA">CRDA Building Sanction</option>
+                          <MasterOptions group="approval_authorities" />
                         </select>
                       </div>
 
@@ -1500,10 +1393,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                           onChange={(e) => setApprovalAuthority(e.target.value)}
                           className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-950 focus:ring-2 focus:ring-[#FFB800] outline-none"
                         >
-                          <option value="TG State Beverages Corp (TGSBCL)">TG State Beverages Corp (TGSBCL)</option>
-                          <option value="AP State Beverages Corp (APSBL)">AP State Beverages Corp (APSBL)</option>
-                          <option value="State Prohibition &amp; Excise Dept">State Prohibition &amp; Excise Dept</option>
-                          <option value="District Collectorate &amp; Excise">District Collectorate &amp; Excise Committee</option>
+                          <MasterOptions group="liquor_authorities" />
                         </select>
                       </div>
 
@@ -1617,12 +1507,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                           onChange={(e) => setApprovalAuthority(e.target.value)}
                           className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-950 focus:ring-2 focus:ring-[#FFB800] outline-none"
                         >
-                          <option value="Roads &amp; Buildings (R&amp;B) Dept">Roads &amp; Buildings (R&amp;B) Dept</option>
-                          <option value="Irrigation &amp; Water Resources">Irrigation &amp; Water Resources Dept</option>
-                          <option value="National Highways Authority (NHAI)">National Highways Authority (NHAI)</option>
-                          <option value="Municipal Corporation">Municipal Corporation Infra Works</option>
-                          <option value="State Warehousing &amp; Logistics Corp">State Warehousing &amp; Logistics Corp</option>
-                          <option value="Turnkey Industrial EPC">Turnkey Industrial EPC Principal</option>
+                          <MasterOptions group="infra_authorities" />
                         </select>
                       </div>
 
@@ -1648,9 +1533,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                           onChange={(e) => setContractType(e.target.value)}
                           className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-950 outline-none"
                         >
-                          <option value="Item-Rate Schedule (BoQ)">Item-Rate BoQ Schedule</option>
-                          <option value="EPC Turnkey Lump-Sum">EPC Turnkey Lump-Sum</option>
-                          <option value="Percentage Rate Over/Under">Percentage Rate (SSR)</option>
+                          <MasterOptions group="infra_contract_types" />
                         </select>
                       </div>
 
@@ -2218,10 +2101,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
               ...newAcc,
               linkedProjectId: projectId,
             };
-            if (onAddFirmAccount) {
-              onAddFirmAccount(mappedAcc);
-            }
+            setPendingAccounts((prev) => [...prev, mappedAcc]);
             setSelectedFirmAccountId(mappedAcc.id);
+            return true;
           }}
         />
       )}

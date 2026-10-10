@@ -13,14 +13,40 @@ import type { AuthenticatedAppUser } from '../../types';
 interface ProductionAuthGateProps {
   onLoginSuccess: (user: AuthenticatedAppUser) => void;
   availableFirmsCount?: number;
+  entry?: 'owner' | 'client';
 }
 
-type AuthStep = 'welcome' | 'firm_code' | 'member_login' | 'super_admin_login' | 'set_pin';
+type AuthStep =  'firm_code' | 'member_login' | 'super_admin_login' | 'set_pin';
+
+const SixPin: React.FC<{ value: string; onChange: (v: string) => void; autoFocus?: boolean; label: string }> = ({ value, onChange, autoFocus, label }) => (
+  <label className="relative block cursor-text">
+    <span className="sr-only">{label}</span>
+    <div className="flex justify-between gap-2" aria-hidden="true">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className={`flex-1 h-14 rounded-2xl border bg-[#FAF9F5] flex items-center justify-center text-2xl font-black text-slate-900 shadow-inner ${i === value.length ? 'border-amber-600 ring-4 ring-amber-500/10' : 'border-stone-300'}`}>
+          {value[i] ? '\u2022' : <span className="text-stone-300">-</span>}
+        </div>
+      ))}
+    </div>
+    <input
+      type="password"
+      inputMode="numeric"
+      autoComplete="one-time-code"
+      pattern="[0-9]*"
+      value={value}
+      autoFocus={autoFocus}
+      onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+      maxLength={6}
+      className="absolute inset-0 w-full h-full opacity-0 cursor-text"
+    />
+  </label>
+);
 
 export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
   onLoginSuccess,
+  entry = 'client',
 }) => {
-  const [step, setStep] = useState<AuthStep>('welcome');
+  const [step, setStep] = useState<AuthStep>(entry === 'owner' ? 'super_admin_login' : 'firm_code');
   
   // Firm Code step state
   const [firmCodeInput, setFirmCodeInput] = useState('');
@@ -153,9 +179,10 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
     e.preventDefault();
     setAdminError('');
 
-    const cleanPhone = adminPhone.replace(/\D/g, '').slice(-10);
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      setAdminError('Please enter a valid 10-digit mobile number.');
+    const cleanPhone = adminPhone.trim();
+    const adminDigits = cleanPhone.replace(/\D/g, '');
+    if (adminDigits.length < 8 || adminDigits.length > 15) {
+      setAdminError('Enter your full mobile number, with country code if it is not an Indian number.');
       return;
     }
 
@@ -246,10 +273,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
       const data = await res.json();
       if (res.ok && data.success) {
-        onLoginSuccess({
-          ...pendingUser,
-          mustChangePin: false,
-        });
+        onLoginSuccess(data.user ? data.user : { ...pendingUser, mustChangePin: false });
       } else {
         setPinChangeError(data.error || 'Failed to update PIN. Please try again.');
       }
@@ -282,87 +306,11 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
           </p>
         </div>
 
-        {/* STEP 1: WELCOME SCREEN */}
-        {step === 'welcome' && (
-          <div className="bg-white border border-stone-200/90 rounded-3xl p-6 sm:p-8 shadow-xl shadow-stone-200/60 space-y-6">
-            <div className="text-center space-y-1.5">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Syndicate Portal Access
-              </h2>
-              <p className="text-xs sm:text-sm text-stone-600 max-w-md mx-auto leading-relaxed">
-                Select your designated portal to sign in with your registered mobile and security PIN.
-              </p>
-            </div>
-
-            {/* Portal Option Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-              {/* Option 1: Firm Portal */}
-              <button
-                type="button"
-                onClick={() => setStep('firm_code')}
-                className="group relative bg-[#FAF9F5] hover:bg-amber-50/50 border border-stone-200 hover:border-amber-400 p-5 rounded-2xl text-left transition-all shadow-xs hover:shadow-md flex flex-col justify-between cursor-pointer"
-              >
-                <div className="space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center border border-amber-200 group-hover:scale-105 transition-transform">
-                    <Building2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900 group-hover:text-amber-800 transition-colors">
-                      Firm Member Portal
-                    </h3>
-                    <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-                      For Field Partners, Firm Accountants & Managing Partners. Access via assigned <strong>Firm Code</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs font-bold text-amber-700">
-                  <span>Enter Firm Code</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </button>
-
-              {/* Option 2: Super Admin Console */}
-              <button
-                type="button"
-                onClick={() => setStep('super_admin_login')}
-                className="group relative bg-[#FAF9F5] hover:bg-slate-50 border border-stone-200 hover:border-slate-400 p-5 rounded-2xl text-left transition-all shadow-xs hover:shadow-md flex flex-col justify-between cursor-pointer"
-              >
-                <div className="space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-800 flex items-center justify-center border border-stone-300 group-hover:scale-105 transition-transform">
-                    <ShieldCheck className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900 group-hover:text-slate-800 transition-colors">
-                      Super Admin Console
-                    </h3>
-                    <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-                      Platform governance for tenant provisioning, system settings, and audit oversight.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-stone-200 flex items-center justify-between text-xs font-bold text-slate-700">
-                  <span>Sign In as Admin</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* STEP 2: FIRM CODE VALIDATION */}
         {step === 'firm_code' && (
           <div className="bg-white border border-stone-200/90 rounded-3xl p-6 sm:p-8 shadow-xl shadow-stone-200/60 space-y-6">
             <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setStep('welcome')}
-                className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-slate-900 transition-colors cursor-pointer font-medium"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Portals</span>
-              </button>
+              <span />
               <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                 Step 1 of 2
               </span>
@@ -457,7 +405,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
                   </div>
                   <h3 className="text-sm font-black text-slate-900">{verifiedFirm.name}</h3>
                   <div className="text-xs text-stone-600">
-                    Code: <strong className="text-slate-900">{verifiedFirm.code}</strong> • {verifiedFirm.location}
+                    Code: <strong className="text-slate-900">{verifiedFirm.code}</strong> {verifiedFirm.location ? ` • ${verifiedFirm.location}` : ''}
                   </div>
                 </div>
               </div>
@@ -501,17 +449,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
                 <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">
                   6-Digit Security PIN
                 </label>
-                <input
-                  type="password"
-                  value={memberPin}
-                  onChange={(e) => {
-                    setMemberPin(e.target.value.replace(/\D/g, '').slice(0, 6));
-                    setMemberError('');
-                  }}
-                  placeholder="••••"
-                  maxLength={isOwnerChange ? 72 : 6}
-                  className="w-full bg-[#FAF9F5] border border-stone-300 focus:bg-white focus:border-amber-600 rounded-2xl px-4 py-3 text-xl font-mono text-center tracking-widest text-slate-900 placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 shadow-inner"
-                />
+                <SixPin label="6-digit security PIN" value={memberPin} autoFocus={false} onChange={(v) => { setMemberPin(v); setMemberError(''); }} />
               </div>
 
               {memberError && (
@@ -546,14 +484,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
         {step === 'super_admin_login' && (
           <div className="bg-white border border-stone-200/90 rounded-3xl p-6 sm:p-8 shadow-xl shadow-stone-200/60 space-y-6">
             <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setStep('welcome')}
-                className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-slate-900 transition-colors cursor-pointer font-medium"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Portals</span>
-              </button>
+              <span />
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-800 border border-stone-200">
                 Platform Admin
               </span>
@@ -562,7 +493,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">Super Admin Console</h2>
               <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-                Authorized for Platform Owner. Enter your registered mobile number and security PIN.
+                Authorized for the platform owner only. Enter your registered mobile number and owner password.
               </p>
             </div>
 
@@ -579,11 +510,11 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
                     type="tel"
                     value={adminPhone}
                     onChange={(e) => {
-                      setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                      setAdminPhone(e.target.value.replace(/[^\d+\s()-]/g, '').slice(0, 20));
                       setAdminError('');
                     }}
-                    placeholder="Enter 10-digit mobile number"
-                    maxLength={10}
+                    placeholder="Full mobile number"
+                    maxLength={20}
                     className="w-full bg-[#FAF9F5] border border-stone-300 focus:bg-white focus:border-slate-800 rounded-2xl pl-13 pr-4 py-3 text-base font-mono font-bold text-slate-900 placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-slate-500/10 tracking-wider shadow-inner"
                     autoFocus
                   />
@@ -616,7 +547,7 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
 
               <button
                 type="submit"
-                disabled={adminLoading || adminPhone.length < 10 || adminPin.length < 8}
+                disabled={adminLoading || adminPhone.replace(/\D/g, '').length < 8 || adminPin.length < 8}
                 className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black rounded-2xl py-3.5 text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 {adminLoading ? (
@@ -655,7 +586,8 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
                 <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">
                   {isOwnerChange ? 'New Password' : 'New 6-Digit Security PIN'}
                 </label>
-                <input
+                {isOwnerChange ? (
+<input
                   type="password"
                   value={newPin}
                   onChange={(e) => {
@@ -667,13 +599,17 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
                   className="w-full bg-[#FAF9F5] border border-stone-300 focus:bg-white focus:border-amber-600 rounded-2xl px-4 py-3 text-xl font-mono text-center tracking-widest text-slate-900 placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 shadow-inner"
                   autoFocus
                 />
+) : (
+<SixPin label="newPin" value={newPin} autoFocus onChange={(v) => { setNewPin(v); setPinChangeError(''); }} />
+)}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">
                   {isOwnerChange ? 'Confirm Password' : 'Confirm 6-Digit PIN'}
                 </label>
-                <input
+                {isOwnerChange ? (
+<input
                   type="password"
                   value={confirmPin}
                   onChange={(e) => {
@@ -684,6 +620,9 @@ export const ProductionAuthGate: React.FC<ProductionAuthGateProps> = ({
                   maxLength={isOwnerChange ? 72 : 6}
                   className="w-full bg-[#FAF9F5] border border-stone-300 focus:bg-white focus:border-amber-600 rounded-2xl px-4 py-3 text-xl font-mono text-center tracking-widest text-slate-900 placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 shadow-inner"
                 />
+) : (
+<SixPin label="confirmPin" value={confirmPin}  onChange={(v) => { setConfirmPin(v); setPinChangeError(''); }} />
+)}
               </div>
 
               {pinChangeError && (

@@ -14,10 +14,12 @@ public class WorkspaceController {
     private final WorkspaceReader reader;
     private final CommandService commands;
     private final ConfigurationService config;
-    public WorkspaceController(WorkspaceReader reader,CommandService commands,ConfigurationService config) {
-        this.reader=reader; this.commands=commands; this.config=config;
+    private final com.syndicateos.configuration.BusinessMasterService masters;
+    public WorkspaceController(WorkspaceReader reader,CommandService commands,ConfigurationService config,com.syndicateos.configuration.BusinessMasterService masters) {
+        this.reader=reader; this.commands=commands; this.config=config; this.masters=masters;
     }
     @GetMapping("/workspace") public Map<String,Object> workspace(@AuthenticationPrincipal SessionAccount actor) { return reader.workspace(actor); }
+    @GetMapping("/configuration/masters") public Map<String,Object> masters(@AuthenticationPrincipal SessionAccount actor) { return masters.read(actor); }
     public record CommandInput(JsonNode data) {}
     @PostMapping("/commands/{action}") public Map<String,Object> command(@AuthenticationPrincipal SessionAccount actor,
         @PathVariable String action,@RequestBody CommandInput input) { return commands.execute(actor,action,input.data()); }

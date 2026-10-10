@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { FirmAccount, FirmAccountTransaction, TenantFirm } from '../../types';
 import {
@@ -21,7 +22,7 @@ interface FirmAccountStatementModalProps {
   onClose: () => void;
   account: FirmAccount;
   firm: TenantFirm;
-  onAddTransaction: (accountId: string, tx: FirmAccountTransaction) => void;
+  onAddTransaction: (accountId: string, tx: FirmAccountTransaction) => void | boolean | Promise<boolean>;
 }
 
 export const FirmAccountStatementModal: React.FC<FirmAccountStatementModalProps> = ({
@@ -70,12 +71,14 @@ export const FirmAccountStatementModal: React.FC<FirmAccountStatementModalProps>
       balanceAfter: newBalance,
     };
 
-    onAddTransaction(account.id, newTx);
-    setTxAmount(0);
-    setTxDesc('');
-    setTxRef('');
-    setTxPartner('');
-    setShowAddTx(false);
+    void Promise.resolve(onAddTransaction(account.id, newTx)).then((ok) => {
+      if (ok === false) return;
+      setTxAmount(0);
+      setTxDesc('');
+      setTxRef('');
+      setTxPartner('');
+      setShowAddTx(false);
+    });
   };
 
   const transactions = account.recentTransactions || [];
@@ -201,13 +204,7 @@ export const FirmAccountStatementModal: React.FC<FirmAccountStatementModalProps>
                   onChange={(e) => setTxCategory(e.target.value as any)}
                   className="w-full text-xs font-bold border border-gray-300 rounded-xl p-2 bg-white"
                 >
-                  <option value="partner_capital">Partner Capital Deposit</option>
-                  <option value="plot_booking_advance">Plot Booking Advance</option>
-                  <option value="vendor_payout">Vendor / Earthwork Payout</option>
-                  <option value="statutory_fee">Statutory RERA / LP Fee</option>
-                  <option value="cash_withdrawal">Site Cash Vault Imprest</option>
-                  <option value="inter_account_transfer">Inter-Account Transfer</option>
-                  <option value="other">Other Bank Transaction</option>
+                  <MasterOptions group="statement_entry_purposes" />
                 </select>
               </div>
 

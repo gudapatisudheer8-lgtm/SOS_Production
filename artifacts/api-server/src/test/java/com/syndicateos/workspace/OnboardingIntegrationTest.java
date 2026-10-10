@@ -45,6 +45,18 @@ class OnboardingIntegrationTest {
         String owner=login("OWNER","9888880000","Owner-integration-123","",200).path("token").asText();
         request("GET","/workspace",null,owner,403);
         owner=change(owner,"Owner-integration-123","Owner-updated-123");
+        request("GET","/configuration/masters",null,null,401);
+        assertTrue(request("GET","/configuration/masters",null,owner,200).path("items").isArray());
+        Object master=Map.of("group","integration_choices","key","review","label","Review",
+            "position",0,"enabled",true,"metadata",Map.of());
+        command("master.save",master,owner,200);
+        command("master.save",master,owner,409);
+        command("master.save",Map.of("group","integration_choices","key","review","label","Reviewed",
+            "position",0,"enabled",true,"metadata",Map.of(),"revision",1),owner,200);
+        command("master.save",Map.of("group","integration_choices","key","review","label","Stale edit",
+            "position",0,"enabled",true,"metadata",Map.of(),"revision",1),owner,409);
+        command("master.save",Map.of("group","integration_choices","key","unsafe","label","Unsafe",
+            "position",0,"enabled",true,"metadata",Map.of("password","must-not-be-stored")),owner,400);
         request("POST","/auth/credential",Map.of("currentCredential","Owner-updated-123","newCredential","123456"),owner,400);
         request("POST","/auth/company",Map.of("clientCode","MISSING"),null,404);
         request("POST","/auth/company",Map.of("clientCode",""),null,400);
@@ -94,6 +106,8 @@ class OnboardingIntegrationTest {
         command("project.create",Map.of("sectorId",other.path("id").asText(),"name","Unassigned sector"),accountant,403);
         command("project.create",Map.of("sectorId",sectorId,"name","Bad data","details",Map.of("unconfiguredField",123)),accountant,400);
         workspace=request("GET","/workspace",null,accountant,200);
+        request("GET","/configuration/masters",null,accountant,200);
+        command("master.save",master,accountant,403);
         assertEquals(0,workspace.path("projects").get(0).path("details").path(detailKey).asInt());
         assertEquals("",workspace.path("projects").get(0).path("location").asText());
         command("project.update",Map.of("projectId",projectA,"revision",1,"status","ACTIVE","name","Edited project","location","","details",details),accountant,200);
@@ -111,6 +125,21 @@ class OnboardingIntegrationTest {
         workspace=request("GET","/workspace",null,partner,200);
         assertEquals(1,workspace.path("projects").size());
         assertFalse(workspace.path("projects").get(0).path("partners").get(0).has("mobile"));
+        String partnerId=partnerLogin.path("account").path("identityId").asText();
+        command("partner.update",Map.of("projectId",projectA,"partnerId",partnerId,"revision",1,"name","Scoped partner"),partner,403);
+        command("partner.update",Map.of("projectId",projectA,"partnerId",partnerId,"revision",1,"name","Scoped partner"),accountant,200);
+        command("partner.update",Map.of("projectId",projectA,"partnerId",partnerId,"revision",1,"name","Stale name"),accountant,409);
+        assertEquals("Scoped partner",request("GET","/workspace",null,partner,200).path("projects").get(0).path("partners").get(0).path("displayName").asText());
+        assertEquals("Test partner",jdbc.queryForObject("SELECT display_name FROM sos.identities WHERE id=?::uuid",String.class,partnerId));
+        command("partner.status",Map.of("projectId",projectA,"partnerId",partnerId,"revision",2,"enabled",false),accountant,200);
+        request("GET","/workspace",null,partner,401);
+        command("partner.status",Map.of("projectId",projectA,"partnerId",partnerId,"revision",3,"enabled",true),accountant,200);
+        assertEquals(1,request("GET","/workspace",null,partner,200).path("projects").size());
+        command("firm.update",Map.of("firmId",firmA,"revision",1,"name","Test firm A","status","ACTIVE",
+            "metadata",Map.of("location","Verified location","officeAddress","Verified address")),owner,200);
+        assertEquals("Verified location",request("GET","/workspace",null,accountant,200).path("firms").get(0).path("metadata").path("location").asText());
+        command("firm.update",Map.of("firmId",firmA,"revision",2,"name","Test firm A","status","ACTIVE",
+            "metadata",Map.of("unrecognizedField","must not disappear")),owner,400);
         assertEquals(1,workspace.path("interfaces").get(0).path("configuration").path("interfaces").size());
         command("project.create",Map.of("sectorId",sectorId,"name","Role escalation"),partner,403);
         JsonNode firmB=command("firm.create",Map.of("name","Test firm B","clientCode","TEST-B","accountantName","Existing accountant",
@@ -141,7 +170,7 @@ class OnboardingIntegrationTest {
         verifyErp(accountant,partner,partnerB,projectA,partnerCreated.path("entity").path("identityId").asText());
         verifyCompleteSetup(owner,accountant,partner,partnerB,firmA,other.path("id").asText(),
             partnerCreated.path("entity").path("identityId").asText());
-        command("firm.update",Map.of("firmId",firmA,"name","Test firm A","status","SUSPENDED","revision",1),owner,200);
+        command("firm.update",Map.of("firmId",firmA,"name","Test firm A","status","SUSPENDED","revision",2),owner,200);
         request("POST","/auth/company",Map.of("clientCode","TEST-A"),null,404);
         request("GET","/workspace",null,accountant,401);
         request("GET","/workspace",null,partner,401);
@@ -193,6 +222,12 @@ class OnboardingIntegrationTest {
         var badIfsc=input.deepCopy().put("requestId",java.util.UUID.randomUUID().toString());
         ((com.fasterxml.jackson.databind.node.ObjectNode)badIfsc.path("setup").path("accounts").get(0)).put("ifscCode","NOT-AN-IFSC");
         command("project.setup-save",badIfsc,accountant,400);
+        int projectsBefore=jdbc.queryForObject("SELECT count(*) FROM sos.projects",Integer.class);
+        var incomplete=input.deepCopy().put("requestId",java.util.UUID.randomUUID().toString());
+        ((ObjectNode)incomplete.path("setup").path("partners").get(0)).put("fixedEquityPercent",50).put("initialCapital",500);
+        command("project.setup-create",incomplete,accountant,400);
+        assertEquals(projectsBefore,jdbc.queryForObject("SELECT count(*) FROM sos.projects",Integer.class),
+            "A failed atomic create must not leave a draft or child records.");
         JsonNode saved=command("project.setup-save",input,accountant,200);
         String id=saved.path("entity").path("id").asText();
         assertEquals(id,command("project.setup-save",input,accountant,200).path("entity").path("id").asText());

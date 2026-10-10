@@ -25,7 +25,6 @@ import {
   Lock,
   AlertCircle
 } from 'lucide-react';
-import { SAMPLE_LAYOUT_BLUEPRINT } from '../../data/sampleBlueprints';
 import { MarketingPlotPortalModal } from '../marketing/MarketingPlotPortalModal';
 
 interface VentureLayoutMasterGridProps {
@@ -35,7 +34,7 @@ interface VentureLayoutMasterGridProps {
   firm: TenantFirm;
   onSelectPlot: (plot: Plot) => void;
   floorRate?: number;
-  onUpdatePlot?: (plot: Plot) => void;
+  onUpdatePlot?: (plot: Plot) => void | boolean | Promise<boolean>;
 }
 
 export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = ({
@@ -44,7 +43,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
   layoutCalc,
   firm,
   onSelectPlot,
-  floorRate = 17000,
+  floorRate = 0,
   onUpdatePlot,
 }) => {
   const [facingFilter, setFacingFilter] = useState<string>('all');
@@ -70,7 +69,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
   const blueprintUrl =
     projectBlueprints.length > 0 && projectBlueprints[0].dataUrl
       ? projectBlueprints[0].dataUrl
-      : SAMPLE_LAYOUT_BLUEPRINT;
+      : '';
 
   // Filtered plots
   const filteredPlots = useMemo(() => {
@@ -628,11 +627,11 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
           </div>
 
           <div className="bg-slate-900 rounded-2xl overflow-hidden p-2 flex items-center justify-center min-h-[460px]">
-            <img
+            {(blueprintUrl) ? <img
               src={blueprintUrl}
               alt="Sanctioned Master Plan Blueprint"
               className="max-h-[600px] w-auto object-contain rounded-xl shadow-lg border border-slate-800"
-            />
+            /> : <p className="text-xs font-bold text-stone-400">No plan document uploaded yet.</p>}
           </div>
 
           <p className="text-xs text-slate-400">
@@ -655,11 +654,11 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
               </span>
             </div>
             <div className="bg-slate-900 rounded-2xl p-2 flex items-center justify-center min-h-[380px]">
-              <img
+              {(blueprintUrl) ? <img
                 src={blueprintUrl}
                 alt="Sanctioned Layout Blueprint"
                 className="max-h-[500px] w-auto object-contain rounded-xl"
-              />
+              /> : <p className="text-xs font-bold text-stone-400">No plan document uploaded yet.</p>}
             </div>
           </div>
 

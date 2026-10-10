@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   SyndicatePartner,
@@ -96,26 +97,26 @@ export interface FieldPartnerMobileViewProps {
   session: { firmId: string; partnerId: string } | null;
   onLogin: (firmId: string, partnerId: string) => void;
   onLogout: () => void;
-  onUpdatePlot?: (plot: Plot) => void;
+  onUpdatePlot?: (plot: Plot) => void | boolean | Promise<boolean>;
   onSelectFirm?: (firmId: string) => void;
   projects?: Project[];
   selectedProjectId?: string;
   onSelectProject?: (projectId: string) => void;
   layoutCalc?: LayoutCalculation;
-  onUpdateLayoutCalc?: (calc: LayoutCalculation) => void;
+  onUpdateLayoutCalc?: (calc: LayoutCalculation) => void | boolean | Promise<boolean>;
   projectExpenses?: ProjectExpense[];
-  onAddProjectExpense?: (expense: ProjectExpense) => void;
-  onUpdateProjectExpense?: (expense: ProjectExpense) => void;
+  onAddProjectExpense?: (expense: ProjectExpense) => void | boolean | Promise<boolean>;
+  onUpdateProjectExpense?: (expense: ProjectExpense) => void | boolean | Promise<boolean>;
   firmAccounts?: FirmAccount[];
   partnerStockDraws?: PartnerStockDraw[];
-  onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void;
-  onAddStockDraw?: (draw: PartnerStockDraw) => void;
+  onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void | boolean | Promise<boolean>;
+  onAddStockDraw?: (draw: PartnerStockDraw) => void | boolean | Promise<boolean>;
   onApproveExpense?: (expenseId: string, signoff?: string) => void;
   onRejectExpense?: (expenseId: string) => void;
   ledgerMode?: LedgerMode;
-  onUpdatePartner?: (partner: SyndicatePartner) => void;
+  onUpdatePartner?: (partner: SyndicatePartner) => void | boolean | Promise<boolean>;
   individualInvestments?: IndividualInvestmentRecord[];
-  onRecordIndividualInvestment?: (data: IndividualInvestmentData) => void;
+  onRecordIndividualInvestment?: (data: IndividualInvestmentData) => void | boolean | Promise<boolean>;
   onApproveIndividualInvestment?: (investmentId: string, approverName: string) => void;
   onRejectIndividualInvestment?: (investmentId: string, reason?: string) => void;
 }
@@ -543,68 +544,6 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   const [loginPin, setLoginPin] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
 
-  // Mandatory PIN reset prompt state for partners whose PIN was reset by accountant to 9999
-  const [promptPinResetUser, setPromptPinResetUser] = useState<SyndicatePartner | null>(null);
-  const [fieldNewPin, setFieldNewPin] = useState('');
-  const [fieldConfirmPin, setFieldConfirmPin] = useState('');
-  const [fieldPinChangeError, setFieldPinChangeError] = useState('');
-  const [isSavingFieldPin, setIsSavingFieldPin] = useState(false);
-
-  const handleSaveFieldPartnerNewPin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFieldPinChangeError('');
-
-    if (!promptPinResetUser) return;
-
-    if (!fieldNewPin || fieldNewPin.length !== 4 || !/^\d{4}$/.test(fieldNewPin)) {
-      setFieldPinChangeError('New PIN must be exactly 4 numeric digits.');
-      return;
-    }
-
-    if (fieldNewPin === '9999') {
-      setFieldPinChangeError('Please choose a personal PIN different from default 9999.');
-      return;
-    }
-
-    if (fieldNewPin !== fieldConfirmPin) {
-      setFieldPinChangeError('PIN confirmation does not match. Please re-enter.');
-      return;
-    }
-
-    setIsSavingFieldPin(true);
-    try {
-      if (promptPinResetUser.phone) {
-        await fetch('/api/auth/change-pin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: promptPinResetUser.phone,
-            newPin: fieldNewPin.trim(),
-          }),
-        });
-      }
-
-      const updated = {
-        ...promptPinResetUser,
-        pinCode: fieldNewPin.trim(),
-        mustChangePin: false,
-      };
-
-      if (onUpdatePartner) {
-        onUpdatePartner(updated);
-      }
-
-      showToast(`✓ Security PIN updated successfully for ${promptPinResetUser.name}!`);
-      const loggingInUserId = promptPinResetUser.id;
-      setPromptPinResetUser(null);
-      onLogin(loginFirmId, loggingInUserId);
-    } catch (err: any) {
-      setFieldPinChangeError(err?.message || 'Error updating PIN. Please try again.');
-    } finally {
-      setIsSavingFieldPin(false);
-    }
-  };
-
   // Expenses Tab form state: Payment Source (Project Bank vs Individual)
   const [expenseAmount, setExpenseAmount] = useState<string>('');
   const [expensePaymentSource, setExpensePaymentSource] = useState<'project_bank' | 'individual'>('project_bank');
@@ -987,257 +926,18 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     onBlockedAction?.('separate drawing disbursement (the ledger posts on approval).');
   };
 
-  // If user is NOT logged in, show Login Gate with language switcher
+  // Sign-in is handled only by the production auth gate (server-verified). No local credential path exists here.
   if (!session || !currentPartner) {
-    const targetUserForHint = partners.find((p) => p.id === loginPartnerId) || firmAvailableUsers[0];
-
     return (
-      <div className="max-w-lg mx-auto py-8 space-y-6 animate-fade-in text-xs">
-        <div className="bg-white rounded-3xl shadow-xl border border-amber-300 overflow-hidden">
-          <div className="bg-[#FFB800] p-6 text-gray-950 border-b border-amber-500/40">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#111827] text-[#FFB800] flex items-center justify-center shadow-md">
-                  <Smartphone className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black tracking-tight">{t('loginTitle')}</h2>
-                  <p className="text-xs text-gray-900 font-bold">{t('loginSubtitle')}</p>
-                </div>
-              </div>
-
-              {/* Language Switch Button at Top */}
-              <div className="flex items-center bg-black/10 rounded-2xl p-1 border border-amber-600/30">
-                <button
-                  type="button"
-                  onClick={() => handleLanguageChange('en')}
-                  className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    lang === 'en' ? 'bg-[#111827] text-white shadow-sm' : 'text-gray-900 font-bold hover:text-black'
-                  }`}
-                >
-                  English
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleLanguageChange('te')}
-                  className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    lang === 'te' ? 'bg-[#111827] text-white shadow-sm' : 'text-gray-900 font-bold hover:text-black'
-                  }`}
-                >
-                  తెలుగు
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setLoginError('');
-              const targetUser =
-                partners.find((p) => String(p.id) === String(loginPartnerId)) ||
-                firmAvailableUsers.find((p) => String(p.id) === String(loginPartnerId));
-              if (!targetUser) return;
-
-              // Check if partner user is deactivated/inactive
-              if (targetUser.userStatus === 'inactive' || targetUser.userStatus === 'suspended') {
-                setLoginError(`Partner profile "${targetUser.name}" is currently Inactive. Access suspended. Contact your Firm Accountant to activate.`);
-                return;
-              }
-
-              const expectedPin = targetUser.pinCode || '9999';
-              const input = loginPin.trim();
-
-              const isValid = input === expectedPin || input === '9999' || input === '1234';
-              if (!isValid) {
-                setLoginError(`${t('invalidPin')} ${expectedPin}`);
-                return;
-              }
-
-              // Check if partner PIN must be changed (either mustChangePin flag or default 9999)
-              const requiresPinReset = targetUser.mustChangePin || expectedPin === '9999' || input === '9999';
-              if (requiresPinReset) {
-                setPromptPinResetUser(targetUser);
-                setFieldNewPin('');
-                setFieldConfirmPin('');
-                setFieldPinChangeError('');
-                return;
-              }
-
-              onLogin(loginFirmId, targetUser.id);
-            }}
-            className="p-6 space-y-4"
-          >
-            <div>
-              <label className="block font-black text-gray-700 uppercase text-[10px] mb-1">
-                {t('selectFirm')}
-              </label>
-              <select
-                value={loginFirmId}
-                onChange={(e) => {
-                  setLoginFirmId(e.target.value);
-                  const users = partners.filter((p) => p.firmId === e.target.value);
-                  if (users[0]) setLoginPartnerId(users[0].id);
-                }}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-xs font-bold text-gray-950 outline-none"
-              >
-                {firms.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} ({f.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-black text-gray-700 uppercase text-[10px] mb-1">
-                {t('selectPartner')}
-              </label>
-              <select
-                value={loginPartnerId}
-                onChange={(e) => setLoginPartnerId(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-xs font-bold text-gray-950 outline-none"
-              >
-                {firmAvailableUsers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.roleDescription || 'Syndicate Partner'}){p.userStatus === 'inactive' ? ' - [Inactive / Suspended]' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-black text-gray-700 uppercase text-[10px] mb-1">
-                {t('securityPin')}
-              </label>
-              <input
-                type="password"
-                required
-                maxLength={6}
-                placeholder="••••"
-                value={loginPin}
-                onChange={(e) => setLoginPin(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-center text-lg tracking-widest font-mono font-black text-gray-950 outline-none"
-              >
-              </input>
-              {targetUserForHint && (
-                <span className="text-[11px] text-gray-500 mt-1 block">
-                  {targetUserForHint.pinCode === '9999' || targetUserForHint.mustChangePin ? (
-                    <span className="text-amber-800 font-bold">
-                      Accountant Reset PIN: <strong>9999</strong> (Mandatory PIN change prompt on login)
-                    </span>
-                  ) : (
-                    <>
-                      {t('demoPinHint')} {targetUserForHint.name.split(':')[0]}: <strong>{targetUserForHint.pinCode || '1234'}</strong>
-                    </>
-                  )}
-                </span>
-              )}
-            </div>
-
-            {loginError && (
-              <div className="bg-red-50 text-red-700 p-3 rounded-xl border border-red-200 text-xs font-bold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{loginError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-3.5 bg-[#111827] hover:bg-black text-[#FFB800] rounded-xl font-black text-xs shadow-md transition-all cursor-pointer"
-            >
-              {t('signInBtn')}
-            </button>
-          </form>
-
-          {/* MANDATORY RESET PIN MODAL (Prompted on next login when reset to default 9999) */}
-          {promptPinResetUser && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl shadow-2xl border border-amber-300 max-w-sm w-full overflow-hidden">
-                <div className="bg-[#FFB800] p-5 border-b border-amber-500/40 text-gray-950">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-2xl bg-gray-950 text-amber-400 flex items-center justify-center shadow-md">
-                      <KeyRound className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-black text-sm">Set Your New Security PIN</h3>
-                      <p className="text-[11px] text-gray-900 font-semibold">{promptPinResetUser.name}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSaveFieldPartnerNewPin} className="p-5 space-y-4 text-xs">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-950 leading-relaxed font-medium">
-                    ⚡ <strong>PIN Reset by Accountant:</strong> Your PIN was reset to default <strong>9999</strong>. Please create your confidential 4-digit PIN for future access.
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-700 mb-1 uppercase tracking-wider">
-                      New 4-Digit Security PIN
-                    </label>
-                    <input
-                      type="password"
-                      value={fieldNewPin}
-                      onChange={(e) => {
-                        setFieldNewPin(e.target.value.replace(/\D/g, '').slice(0, 4));
-                        setFieldPinChangeError('');
-                      }}
-                      placeholder="••••"
-                      maxLength={4}
-                      className="w-full bg-gray-50 border border-gray-300 focus:bg-white focus:border-amber-600 rounded-xl px-4 py-2.5 text-lg font-mono text-center tracking-widest text-gray-950 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                      autoFocus
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-700 mb-1 uppercase tracking-wider">
-                      Confirm New 4-Digit PIN
-                    </label>
-                    <input
-                      type="password"
-                      value={fieldConfirmPin}
-                      onChange={(e) => {
-                        setFieldConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4));
-                        setFieldPinChangeError('');
-                      }}
-                      placeholder="••••"
-                      maxLength={4}
-                      className="w-full bg-gray-50 border border-gray-300 focus:bg-white focus:border-amber-600 rounded-xl px-4 py-2.5 text-lg font-mono text-center tracking-widest text-gray-950 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                    />
-                  </div>
-
-                  {fieldPinChangeError && (
-                    <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-[11px] text-red-700 flex items-start gap-1.5 font-bold">
-                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                      <span>{fieldPinChangeError}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setPromptPinResetUser(null)}
-                      className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-bold cursor-pointer text-xs"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSavingFieldPin || fieldNewPin.length < 4 || fieldConfirmPin.length < 4}
-                      className="px-5 py-2.5 rounded-xl bg-gray-950 hover:bg-black text-[#FFB800] font-black cursor-pointer shadow-md text-xs flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      {isSavingFieldPin ? 'Saving...' : 'Confirm PIN & Login'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
+      <div className="max-w-lg mx-auto py-8 text-xs">
+        <div className="bg-white rounded-3xl border border-amber-300 p-8 text-center space-y-3">
+          <p className="font-black text-gray-950 text-sm">Partner profile not found for this session</p>
+          <p className="text-gray-600">Sign out and sign in again with your firm code, mobile number and PIN.</p>
+          <button type="button" onClick={onLogout} className="px-4 py-2 bg-[#FFB800] text-gray-950 rounded-full font-black">Sign out</button>
         </div>
       </div>
     );
   }
-
   return (
     <div className="max-w-7xl w-full mx-auto space-y-5 animate-fade-in text-xs pb-16">
       {/* Toast Notification */}
@@ -2306,16 +2006,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                       onChange={(e) => setExpenseCategory(e.target.value as any)}
                       className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none"
                     >
-                      <option value="Labor Wages">Labor Wages</option>
-                      <option value="Fuel / Diesel">Fuel / Diesel</option>
-                      <option value="Material / Transport">Material / Transport</option>
-                      <option value="Surveying & Demarcation">Surveying & Demarcation</option>
-                      <option value="DTCP / CRDA Liaison">DTCP / CRDA Liaison</option>
-                      <option value="Refreshments / Food">Refreshments / Food</option>
-                      <option value="Earthwork / JCB Rental">Earthwork / JCB Rental</option>
-                      <option value="Borewell / Electricity">Borewell / Electricity</option>
-                      <option value="Emergency Cash Payout">Emergency Cash Payout</option>
-                      <option value="Other Site Expense">Other Site Expense</option>
+                      <MasterOptions group="field_expense_heads" />
                     </select>
                   </div>
 
@@ -2328,10 +2019,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                       onChange={(e) => setExpensePaymentMode(e.target.value as any)}
                       className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none"
                     >
-                      <option value="Field Cash Imprest">Field Cash Imprest</option>
-                      <option value="UPI / QR Code">UPI / QR Code</option>
-                      <option value="Partner Personal Debit Card">Partner Personal Card</option>
-                      <option value="Direct Firm Bank Transfer">Direct Firm Bank Transfer</option>
+                      <MasterOptions group="field_payment_sources" />
                     </select>
                   </div>
                 </div>
@@ -2486,9 +2174,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                       onChange={(e) => setDrawPayoutMode(e.target.value as any)}
                       className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none"
                     >
-                      <option value="Bank Transfer">Bank Transfer (NEFT / RTGS)</option>
-                      <option value="Field Vault Cash">Field Vault Cash</option>
-                      <option value="Cheque">Bank Cheque / DD</option>
+                      <MasterOptions group="drawing_payment_modes" />
                     </select>
                   </div>
 
@@ -2784,12 +2470,11 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             onUpdatePlot={onUpdatePlot || (() => {})}
             layoutCalc={
               layoutCalc || {
-                totalExtentValue: activeProject?.extentValue || 5.0,
+                totalExtentValue: activeProject?.extentValue || 0,
                 unit: (activeProject?.extentUnit as any) || 'Acres',
-                roadWidth: 30,
-                openSpacePercent: 10,
-                floorRatePerSqYard: activeProject?.floorRatePerSqYard || 17000,
-                expectedRatePerSqYard: 19000,
+                roadWidth: 0 as any,
+                openSpacePercent: 0,
+                floorRatePerSqYard: activeProject?.floorRatePerSqYard || 0,
               }
             }
             onUpdateLayoutCalc={onUpdateLayoutCalc || (() => {})}
@@ -2861,7 +2546,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
           plot={selectedMobilePlot}
           project={activeProject}
           firm={activeFirm}
-          floorRate={activeProject?.floorRatePerSqYard || 17000}
+          floorRate={activeProject?.floorRatePerSqYard || 0}
           firmAccounts={firmAccounts}
           onAddAccountTransaction={onAddAccountTransaction}
           onClose={() => setSelectedMobilePlot(null)}

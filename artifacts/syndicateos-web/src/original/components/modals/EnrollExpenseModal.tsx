@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState } from 'react';
 import {
   TenantFirm,
@@ -29,7 +30,7 @@ interface EnrollExpenseModalProps {
   project: Project;
   partners: SyndicatePartner[];
   firmAccounts?: FirmAccount[];
-  onEnrollExpense: (expense: FieldExpenseLog, bankAccountId?: string) => void;
+  onEnrollExpense: (expense: FieldExpenseLog, bankAccountId?: string) => void | boolean | Promise<boolean>;
 }
 
 export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
@@ -102,8 +103,7 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
       enrolledBy: enrolledName,
     };
 
-    onEnrollExpense(newExpense, paymentSource === 'project_bank' ? (chosenAccount?.id || undefined) : undefined);
-    onClose();
+    void Promise.resolve(onEnrollExpense(newExpense, paymentSource === 'project_bank' ? (chosenAccount?.id || undefined) : undefined)).then((ok) => { if (ok !== false) onClose(); });
   };
 
   return (
@@ -268,13 +268,7 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
                 onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
                 className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
               >
-                <option value="Labor Wages">🔨 Labor Wages (Daily Wages, Masonry)</option>
-                <option value="Material">🧱 Material (Sand, Cement, Peg Stones)</option>
-                <option value="Fuel">⛽ Fuel (Diesel for Roller, JCB, Tractor)</option>
-                <option value="Tractor/Machinery">🚜 Tractor / Machinery Rent</option>
-                <option value="Government/Fee">🏛️ Government / Fee (Survey, LP Challan)</option>
-                <option value="Food & Batta">🍱 Food &amp; Batta (Worker Food &amp; Travel)</option>
-                <option value="Misc">📦 Misc (Hardware, Electrical, Incidentals)</option>
+                <MasterOptions group="expense_categories" />
               </select>
             </div>
 
@@ -345,10 +339,7 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
                 onChange={(e) => setPaymentMode(e.target.value)}
                 className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
               >
-                <option value="Cash / Spot Voucher">Cash / Site Imprest Voucher</option>
-                <option value="UPI / Online">UPI / PhonePe / GPay</option>
-                <option value="RTGS / NEFT">Bank Transfer (RTGS / NEFT)</option>
-                <option value="Cheque">Bank Cheque</option>
+                <MasterOptions group="expense_payment_modes" />
               </select>
             </div>
 

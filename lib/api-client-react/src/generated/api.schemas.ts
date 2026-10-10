@@ -184,6 +184,23 @@ export interface CommandInput {
   data: CommandInputData;
 }
 
+export type BusinessMasterMetadata = { [key: string]: unknown };
+
+export interface BusinessMaster {
+  /** @maxLength 64 */
+  group: string;
+  /** @maxLength 160 */
+  key: string;
+  /** @maxLength 240 */
+  label: string;
+  /** @minimum 0 */
+  position: number;
+  enabled: boolean;
+  /** @minimum 1 */
+  revision: number;
+  metadata: BusinessMasterMetadata;
+}
+
 export type CommandResultEntity = { [key: string]: unknown };
 
 export type CommandResultAccess = {
@@ -208,6 +225,16 @@ export const FirmStatus = {
   SUSPENDED: 'SUSPENDED',
 } as const;
 
+export type FirmMetadata = {
+  gstin?: string;
+  panNumber?: string;
+  reraNumber?: string;
+  officeAddress?: string;
+  proprietorPhone?: string;
+  location?: string;
+  state?: string;
+};
+
 export type FirmAccountantsItem = {
   identityId: string;
   displayName: string;
@@ -220,6 +247,7 @@ export interface Firm {
   name: string;
   status: FirmStatus;
   revision: number;
+  metadata?: FirmMetadata;
   accountants: FirmAccountantsItem[];
 }
 
@@ -449,6 +477,11 @@ export interface HealthStatus {
  * Explicit authentication, validation, conflict, permission or setup failure
  */
 export type ApiFailureResponse = ApiError;
+
+export type GetBusinessMasters200 = {
+  revision: number;
+  items: BusinessMaster[];
+};
 
 export type UploadProjectAttachmentBody = {
   file: Blob | File;

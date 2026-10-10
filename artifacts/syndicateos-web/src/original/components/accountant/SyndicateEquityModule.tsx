@@ -1,3 +1,4 @@
+import { masterItem } from '../../../adapter/config';
 import React, { useState, useMemo } from 'react';
 import {
   SyndicatePartner,
@@ -31,10 +32,6 @@ import {
   AlertCircle,
   RotateCcw
 } from 'lucide-react';
-import {
-  resetPartnerPinInSql,
-  togglePartnerStatusInSql
-} from '../../services/sqlSync';
 
 interface SyndicateEquityModuleProps {
   firm: TenantFirm;
@@ -45,10 +42,10 @@ interface SyndicateEquityModuleProps {
   totalProjectEstimatedValue?: number;
   totalProjectInvestedValue?: number;
   partners: SyndicatePartner[];
-  onUpdatePartner: (partner: SyndicatePartner) => void;
-  onAddPartnerMember?: (partner: SyndicatePartner) => void;
+  onUpdatePartner: (partner: SyndicatePartner) => void | boolean | Promise<boolean>;
+  onAddPartnerMember?: (partner: SyndicatePartner) => void | boolean | Promise<boolean>;
   splitMode: EquitySplitMode;
-  onToggleSplitMode: (mode: EquitySplitMode) => void;
+  onToggleSplitMode: (mode: EquitySplitMode) => void | boolean | Promise<boolean>;
   fieldExpenses?: FieldExpenseLog[];
   onApproveExpense?: (expenseId: string, signoffDetails?: string) => void;
   onRejectExpense?: (expenseId: string) => void;
@@ -85,7 +82,6 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
   const [newPartnerRole, setNewPartnerRole] = useState('Investor Partner');
   const [newPartnerEquity, setNewPartnerEquity] = useState<number>(0);
   const [newPartnerCapital, setNewPartnerCapital] = useState<number>(0);
-  const [newPartnerPin, setNewPartnerPin] = useState('1234');
   const [addPartnerError, setAddPartnerError] = useState('');
 
   // Partner Reset PIN and Active/Inactive Status State
@@ -103,15 +99,14 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
     try {
       const updated: SyndicatePartner = {
         ...targetPartner,
-        pinCode: '9999',
         mustChangePin: true,
-      };
+        __resetCredential: true,
+      } as SyndicatePartner;
 
-      onUpdatePartner(updated);
-      await resetPartnerPinInSql(targetPartner.phone, targetPartner.id);
-
+      const ok = await onUpdatePartner(updated);
+      if (ok === false) return;
       setPartnerForPinReset(null);
-      showToast(`✓ PIN for ${targetPartner.name} reset to default 9999. User will be prompted to set a new PIN on next login.`);
+      showToast(`Credential for ${targetPartner.name} reset. The one-time temporary PIN is shown in the notice banner.`);
     } catch (err) {
       showToast('Error resetting PIN. Please try again.');
     } finally {
@@ -126,9 +121,8 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
       userStatus: newStatus,
     };
 
-    onUpdatePartner(updated);
-    await togglePartnerStatusInSql(targetPartner.phone, targetPartner.id, newStatus);
-
+    const ok = await onUpdatePartner(updated);
+    if (ok === false) return;
     showToast(
       newStatus === 'active'
         ? `✓ ${targetPartner.name} marked as ACTIVE. Access restored.`
@@ -255,7 +249,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
     let totalExtentSqYards = extent;
     if (unit === 'Acres') totalExtentSqYards = extent * 4840;
     else if (unit === 'Guntas / Cents') totalExtentSqYards = extent * 121;
-    const roadAndOpenSpace = (layoutCalc?.roadWidth ? 30 : 30) + (layoutCalc?.openSpacePercent || 10);
+    const roadAndOpenSpace = (masterItem('road_widths', layoutCalc?.roadWidth)?.metadata?.deductionPercent ?? 0) + (layoutCalc?.openSpacePercent ?? 0);
     return Math.round(totalExtentSqYards * (1 - roadAndOpenSpace / 100));
   }, [plots, project, layoutCalc]);
 
@@ -324,7 +318,6 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                   setNewPartnerRole('Investor Partner');
                   setNewPartnerEquity(10);
                   setNewPartnerCapital(0);
-                  setNewPartnerPin('1234');
                   setAddPartnerError('');
                   setIsAddPartnerModalOpen(true);
                 }}
@@ -492,7 +485,6 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                             setNewPartnerRole('Investor Partner');
                             setNewPartnerEquity(10);
                             setNewPartnerCapital(0);
-                            setNewPartnerPin('1234');
                             setAddPartnerError('');
                             setIsAddPartnerModalOpen(true);
                           }}
@@ -534,14 +526,14 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                             {partner.pinCode && (
                               <span
                                 className={`text-[9px] px-1.5 py-0.5 border font-mono font-bold rounded-md ${
-                                  partner.mustChangePin || partner.pinCode === '9999'
+                                  partner.mustChangePin
                                     ? 'bg-amber-100 text-amber-900 border-amber-300'
                                     : 'bg-stone-100 text-stone-800 border-stone-300'
                                 }`}
-                                title={`Field Login PIN: ${partner.pinCode}`}
+                                title="Field login PIN is set by the partner"
                               >
-                                PIN: {partner.pinCode}
-                                {partner.mustChangePin || partner.pinCode === '9999' ? ' (Reset Req)' : ''}
+                                PIN set
+                                {partner.mustChangePin ? ' (Reset Req)' : ''}
                               </span>
                             )}
                             {partner.userStatus === 'inactive' && (
@@ -705,10 +697,10 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                           type="button"
                           onClick={() => setPartnerForPinReset(partner)}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-950 rounded-xl border border-amber-300 text-[11px] font-black transition-all cursor-pointer shadow-2xs"
-                          title="Reset security PIN to default 9999. Partner will automatically get prompted to reset PIN on next login."
+                          title="Issue a new temporary PIN. The partner must set their own PIN on next login."
                         >
                           <KeyRound className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                          <span>Reset PIN (9999)</span>
+                          <span>Reset PIN</span>
                         </button>
 
                         {/* 3. Adjust Ledger Button */}
@@ -754,10 +746,6 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                   <span className="text-gray-600">Partner User ID (Mobile):</span>
                   <strong className="text-gray-950 font-bold">{partnerForPinReset.phone}</strong>
                 </div>
-                <div className="flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-gray-600">New Default PIN:</span>
-                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-black text-xs font-mono">9999</span>
-                </div>
               </div>
 
               <div className="text-gray-600 leading-relaxed text-[11px] bg-gray-50 p-3 rounded-xl border border-gray-200">
@@ -765,7 +753,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                   ⚡ Accountant PIN Reset Procedure:
                 </p>
                 <ul className="list-disc pl-4 space-y-1 text-gray-700">
-                  <li>Partner PIN will automatically reset to <strong>9999</strong>.</li>
+                  <li>The server issues a one-time temporary 6-digit PIN, shown once in the notice banner.</li>
                   <li>On their next login, the partner will be <strong>automatically prompted to set a new PIN</strong> before entering the portal.</li>
                 </ul>
               </div>
@@ -785,7 +773,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                   className="px-4 py-2 rounded-xl bg-gray-950 hover:bg-black text-[#FFB800] font-black cursor-pointer shadow-md text-xs flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>{isResettingPin ? 'Resetting...' : 'Confirm Reset (9999)'}</span>
+                  <span>{isResettingPin ? 'Resetting...' : 'Confirm Reset'}</span>
                 </button>
               </div>
             </div>
@@ -825,8 +813,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                onUpdatePartner(selectedPartnerForAdjust);
-                setSelectedPartnerForAdjust(null);
+                void Promise.resolve(onUpdatePartner(selectedPartnerForAdjust)).then((ok) => { if (ok !== false) setSelectedPartnerForAdjust(null); });
               }}
               className="p-6 space-y-4 text-xs"
             >
@@ -1018,19 +1005,17 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                   roleDescription: newPartnerRole.trim() || 'Syndicate Partner',
                   avatarColor: 'bg-indigo-600',
                   initialCapital: Number(newPartnerCapital) || 0,
-                  actualInvested: Number(newPartnerCapital) || 0,
+                  actualInvested: 0,
                   fixedEquityPercent: Number(newPartnerEquity) || 0,
                   drawings: 0,
                   shareOfFieldExpenses: 0,
                   userRole: 'field_partner',
                   userStatus: 'active',
-                  pinCode: newPartnerPin || '9999',
-                  dailySpendingLimit: 50000,
+                  pinCode: '',
+                  dailySpendingLimit: undefined as unknown as number,
                 };
-                if (onAddPartnerMember) {
-                  onAddPartnerMember(newPartner);
-                }
-                setIsAddPartnerModalOpen(false);
+                if (!onAddPartnerMember) { setAddPartnerError('Adding partners is not available.'); return; }
+                void Promise.resolve(onAddPartnerMember(newPartner)).then((ok) => { if (ok !== false) setIsAddPartnerModalOpen(false); });
               }}
               className="p-6 space-y-4 text-xs"
             >
@@ -1064,27 +1049,14 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
                     className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-mono font-bold text-gray-950 focus:bg-white focus:border-amber-500 outline-none"
                   />
                 </div>
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1">Field Login PIN *</label>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    placeholder="9999"
-                    value={newPartnerPin}
-                    onChange={(e) => setNewPartnerPin(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-mono font-bold text-gray-950 focus:bg-white focus:border-amber-500 outline-none"
-                  />
-                  <span className="text-[10px] text-gray-500 mt-0.5 block">
-                    4-digit PIN for partner portal (default: 9999)
-                  </span>
-                </div>
+                <p className="text-[10px] text-gray-500">The server issues a one-time temporary 6-digit PIN after the partner is added.</p>
               </div>
 
               <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-start gap-2.5 text-[11px] text-amber-950">
                 <Smartphone className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                 <div>
                   <strong className="block font-bold">Automatic Partner Mobile User Enrollment:</strong>
-                  <span>When added to this project, the partner's mobile number ({newPartnerPhone || 'mobile'}) is automatically registered into the system as their unique Login User ID across this project and firm with default PIN ({newPartnerPin || '9999'}).</span>
+                  <span>When added to this project, the partner's mobile number ({newPartnerPhone || 'mobile'}) is automatically registered into the system as their unique Login User ID across this project and firm; the server issues a temporary PIN.</span>
                 </div>
               </div>
 

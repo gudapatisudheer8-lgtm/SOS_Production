@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { TenantFirm, SyndicatePartner } from '../../types';
 import {
@@ -208,9 +209,7 @@ export const AddFirmMemberModal: React.FC<AddFirmMemberModalProps> = ({
                 onChange={(e) => setUserRole(e.target.value as any)}
                 className="w-full bg-[#F4F4F6] border border-gray-300 rounded-2xl p-2.5 text-xs text-gray-950 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
               >
-                <option value="field_partner">Active Field Partner (On-Site & Sales)</option>
-                <option value="site_supervisor">Site Supervisor & Petty Cash Custodian</option>
-                <option value="investor_partner">Investor Partner with Field Access</option>
+                <MasterOptions group="partner_roles" />
               </select>
             </div>
           </div>

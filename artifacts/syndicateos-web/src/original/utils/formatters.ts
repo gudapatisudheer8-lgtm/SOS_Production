@@ -1,3 +1,4 @@
+import { masterItem } from '../../adapter/config';
 /**
  * Utilities for Indian Rupee currency formatting, Land Area calculations,
  * and Tally Prime XML sanitization.
@@ -40,6 +41,8 @@ export function convertToSqYards(value: number, unit: 'Acres' | 'Sq. Yards' | 'G
   return value;
 }
 
+
+
 export function calculateLayoutMetrics(
   totalExtentValue: number,
   unit: 'Acres' | 'Sq. Yards' | 'Guntas / Cents',
@@ -49,11 +52,9 @@ export function calculateLayoutMetrics(
   const grossSqYards = convertToSqYards(totalExtentValue, unit);
   
   // Standard road width deduction percentages based on DTCP/HMDA layout standards
-  let roadLossPercent = 25;
-  if (roadWidth === 20) roadLossPercent = 22;
-  else if (roadWidth === 30) roadLossPercent = 28;
-  else if (roadWidth === 40) roadLossPercent = 33;
-  else if (roadWidth === 60) roadLossPercent = 38;
+  // Road deduction policy comes from the road_widths master (database), never from client constants.
+  const configuredLoss = masterItem('road_widths', roadWidth)?.metadata?.deductionPercent;
+  const roadLossPercent: number = typeof configuredLoss === 'number' ? configuredLoss : 0;
 
   const roadLossSqYards = Math.round(grossSqYards * (roadLossPercent / 100));
   const parkAmenityLossSqYards = Math.round(grossSqYards * (openSpacePercent / 100));

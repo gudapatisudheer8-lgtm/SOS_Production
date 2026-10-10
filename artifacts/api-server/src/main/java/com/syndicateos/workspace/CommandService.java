@@ -1,6 +1,7 @@
 package com.syndicateos.workspace;
 
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.syndicateos.auth.SessionAccount;
 import com.syndicateos.configuration.ConfigurationService;
 import com.syndicateos.core.*;
@@ -22,14 +23,15 @@ public class CommandService {
     private final PasswordEncoder encoder;
     private final com.syndicateos.erp.ErpService erp;
     private final ProjectSetupService setup;
-    public CommandService(JdbcTemplate jdbc,TransactionTemplate tx,ConfigurationService config,WorkspaceReader access,PasswordEncoder encoder,com.syndicateos.erp.ErpService erp,ProjectSetupService setup) {
-        this.jdbc=jdbc; this.tx=tx; this.config=config; this.access=access; this.encoder=encoder; this.erp=erp;this.setup=setup;
+    private final com.syndicateos.configuration.BusinessMasterService masters;
+    public CommandService(JdbcTemplate jdbc,TransactionTemplate tx,ConfigurationService config,WorkspaceReader access,PasswordEncoder encoder,com.syndicateos.erp.ErpService erp,ProjectSetupService setup,com.syndicateos.configuration.BusinessMasterService masters) {
+        this.jdbc=jdbc; this.tx=tx; this.config=config; this.access=access; this.encoder=encoder; this.erp=erp;this.setup=setup;this.masters=masters;
     }
     public Map<String,Object> execute(SessionAccount actor,String action,JsonNode input) {
         actor.business();
-        if (input==null || !input.isObject() || input.toString().length()>("erp.bulk-save".equals(action)?2_000_000:131072)) throw ApiProblem.invalid("Supply a bounded command data object.");
+        if (input==null || !input.isObject() || input.toString().length()>(Set.of("erp.bulk-save","project.setup-save","project.setup-create").contains(action)?2_000_000:131072)) throw ApiProblem.invalid("Supply a bounded command data object.");
         if(Set.of("erp.save","erp.bulk-save","erp.review","erp.delete","erp.settings","erp.inventory-stage").contains(action)) return erp.execute(actor,action,input);
-        if(Set.of("project.setup-save","project.setup-finalize").contains(action)) return setup.execute(actor,action,input);
+        if(Set.of("project.setup-save","project.setup-finalize","project.setup-create").contains(action)) return setup.execute(actor,action,input);
         return tx.execute(status -> switch(action) {
             case "firm.create" -> createFirm(actor,input);
             case "firm.update" -> updateFirm(actor,input);
@@ -42,6 +44,8 @@ public class CommandService {
             case "project.create" -> createProject(actor,input);
             case "project.update" -> updateProject(actor,input);
             case "partner.add" -> addPartner(actor,input);
+            case "partner.update","partner.status" -> updatePartner(actor,input);
+            case "master.save" -> masters.save(actor,input);
             default -> throw new ApiProblem(404,"UNKNOWN_COMMAND","This operation is not supported.");
         });
     }
@@ -52,6 +56,7 @@ public class CommandService {
         String name=Values.text(input,"name",160);
         if (!input.path("assignments").isArray() || input.path("assignments").isEmpty()) throw ApiProblem.invalid("Assign at least one published sector.");
         jdbc.update("INSERT INTO sos.firms(id,client_code,name,created_by) VALUES (?,?,?,?)",firm,code,name,actor.identityId());
+        jdbc.update("UPDATE sos.firms SET metadata=?::jsonb WHERE id=?",firmMetadata(input).toString(),firm);
         Map<String,Object> provision=provision(Values.mobile(Values.text(input,"accountantMobile",24)),Values.text(input,"accountantName",120));
         jdbc.update("INSERT INTO sos.firm_memberships(firm_id,identity_id,role_code) VALUES (?,?,'ACCOUNTANT')",firm,provision.get("id"));
         Set<UUID> unique=new HashSet<>();
@@ -81,8 +86,8 @@ public class CommandService {
     private Map<String,Object> updateFirm(SessionAccount actor,JsonNode input) {
         actor.owner(); UUID firm=Values.id(input,"firmId"); String state=Values.text(input,"status",20);
         if (!Set.of("ACTIVE","SUSPENDED").contains(state)) throw ApiProblem.invalid("Choose ACTIVE or SUSPENDED.");
-        if (jdbc.update("UPDATE sos.firms SET name=?,status=?,revision=revision+1 WHERE id=? AND revision=?",
-            Values.text(input,"name",160),state,firm,Values.revision(input))!=1) throw ApiProblem.conflict();
+        if (jdbc.update("UPDATE sos.firms SET name=?,status=?,metadata=metadata || ?::jsonb,revision=revision+1 WHERE id=? AND revision=?",
+            Values.text(input,"name",160),state,firmMetadata(input).toString(),firm,Values.revision(input))!=1) throw ApiProblem.conflict();
         if ("SUSPENDED".equals(state)) jdbc.update("UPDATE sos.auth_sessions SET revoked_at=now() WHERE firm_id=?",firm);
         config.audit(actor,"FIRM_"+state,firm,null);
         return ok(Map.of("id",firm,"status",state));
@@ -151,9 +156,75 @@ public class CommandService {
         Map<String,Object> provision=provision(Values.mobile(Values.text(input,"mobile",24)),Values.text(input,"name",120));
         UUID identity=(UUID)provision.get("id");
         jdbc.update("INSERT INTO sos.firm_memberships(firm_id,identity_id,role_code) VALUES (?,?,'PARTNER') ON CONFLICT(firm_id,identity_id,role_code) DO UPDATE SET enabled=true",actor.firmId(),identity);
-        jdbc.update("INSERT INTO sos.project_memberships(project_id,firm_id,identity_id) VALUES (?,?,?) ON CONFLICT(project_id,identity_id) DO UPDATE SET enabled=true",project,actor.firmId(),identity);
+        jdbc.update("INSERT INTO sos.project_memberships(project_id,firm_id,identity_id,display_name) VALUES (?,?,?,?) ON CONFLICT(project_id,identity_id) DO UPDATE SET enabled=true,display_name=excluded.display_name,revision=sos.project_memberships.revision+1",
+            project,actor.firmId(),identity,Values.text(input,"name",120));
+        if (input.has("profile")) {
+            if (!input.path("profile").isObject()) throw ApiProblem.invalid("Supply a partner profile object.");
+            ObjectNode profile=input.path("profile").deepCopy();
+            profile.put("partnerId",identity.toString());
+            ObjectNode command=(ObjectNode)config.parse("{}");
+            command.put("projectId",project.toString()).put("kind","partner-profiles").put("requestId",Values.id(input,"requestId").toString());
+            command.set("data",profile);
+            erp.execute(actor,"erp.save",command);
+        }
         config.audit(actor,"PARTNER_ADDED",actor.firmId(),release);
         return Map.of("status","ok","entity",Map.of("projectId",project,"identityId",identity),"access",provision.get("access"));
+    }
+    private ObjectNode firmMetadata(JsonNode input) {
+        ObjectNode result=(ObjectNode)config.parse("{}");
+        JsonNode metadata=input.path("metadata");
+        if (!metadata.isMissingNode() && !metadata.isObject()) throw ApiProblem.invalid("Firm metadata must be an object.");
+        Map<String,Integer> fields=Map.of("gstin",15,"panNumber",10,"reraNumber",120,"officeAddress",500,
+            "proprietorPhone",24,"location",160,"state",80);
+        for (var entry:fields.entrySet()) {
+            JsonNode value=metadata.has(entry.getKey()) ? metadata.get(entry.getKey()) : input.get(entry.getKey());
+            if (value==null) continue;
+            if (!value.isTextual() || value.asText().length()>entry.getValue()) throw ApiProblem.invalid("Invalid "+entry.getKey()+".");
+            String text=value.asText().trim();
+            if ("proprietorPhone".equals(entry.getKey()) && !text.isEmpty()) text=Values.mobile(text);
+            if ("panNumber".equals(entry.getKey()) && !text.isEmpty() && !text.toUpperCase(Locale.ROOT).matches("[A-Z]{5}[0-9]{4}[A-Z]"))
+                throw ApiProblem.invalid("Use a valid PAN number.");
+            if ("gstin".equals(entry.getKey()) && !text.isEmpty() && !text.toUpperCase(Locale.ROOT).matches("[0-9]{2}[A-Z0-9]{13}"))
+                throw ApiProblem.invalid("Use a valid GSTIN.");
+            result.put(entry.getKey(),text);
+        }
+        if (metadata.isObject()) metadata.fieldNames().forEachRemaining(key -> {
+            if (!fields.containsKey(key)) throw ApiProblem.invalid("Unknown firm metadata field: "+key);
+        });
+        return result;
+    }
+    private Map<String,Object> updatePartner(SessionAccount actor,JsonNode input) {
+        UUID project=Values.id(input,"projectId"),partner=Values.id(input,"partnerId");
+        Map<String,Object> projectRow=projectForAccountant(actor,project);
+        UUID release=access.accountantAccess(actor,(UUID)projectRow.get("firm_id"),(UUID)projectRow.get("sector_id"),"partners.write");
+        var rows=jdbc.queryForList("SELECT * FROM sos.project_memberships WHERE project_id=? AND identity_id=? FOR UPDATE",project,partner);
+        if (rows.isEmpty()) throw ApiProblem.denied();
+        var membership=rows.getFirst();
+        int revision=Values.revision(input);
+        if (((Integer)membership.get("revision"))!=revision) throw ApiProblem.conflict();
+        boolean enabled=input.has("enabled") ? input.path("enabled").asBoolean() : Boolean.TRUE.equals(membership.get("enabled"));
+        if (input.has("enabled") && !input.path("enabled").isBoolean()) throw ApiProblem.invalid("Enabled must be true or false.");
+        String name=input.has("name") ? Values.text(input,"name",120) : (String)membership.get("display_name");
+        if (input.has("profile")) {
+            if (!enabled) throw ApiProblem.invalid("Enable the project partner before updating their profile.");
+            if (!input.path("profile").isObject()) throw ApiProblem.invalid("Supply a partner profile object.");
+            ObjectNode profile=input.path("profile").deepCopy();
+            profile.put("partnerId",partner.toString());
+            var existing=jdbc.queryForList("SELECT id,revision FROM sos.erp_records WHERE project_id=? AND partner_id=? AND kind='partner-profiles' AND status<>'deleted'",project,partner);
+            ObjectNode command=(ObjectNode)config.parse("{}");
+            command.put("projectId",project.toString()).put("kind","partner-profiles").put("requestId",Values.id(input,"requestId").toString());
+            command.set("data",profile);
+            if (!existing.isEmpty()) {
+                command.put("recordId",existing.getFirst().get("id").toString());
+                if (!input.path("profileRevision").isIntegralNumber()) throw ApiProblem.invalid("Profile revision is required.");
+                command.put("revision",input.path("profileRevision").asInt());
+            }
+            erp.execute(actor,"erp.save",command);
+        }
+        if (jdbc.update("UPDATE sos.project_memberships SET enabled=?,display_name=?,revision=revision+1 WHERE project_id=? AND identity_id=? AND revision=?",
+            enabled,name,project,partner,revision)!=1) throw ApiProblem.conflict();
+        config.audit(actor,"PROJECT_PARTNER_UPDATED",actor.firmId(),release);
+        return ok(Map.of("projectId",project,"partnerId",partner,"revision",revision+1));
     }
     private Map<String,Object> projectForAccountant(SessionAccount actor,UUID project) {
         if (!"ACCOUNTANT".equals(actor.role())) throw ApiProblem.denied();

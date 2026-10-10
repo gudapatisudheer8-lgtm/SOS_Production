@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState, useMemo } from 'react';
 import {
   Project,
@@ -741,9 +742,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                 className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-2xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
               >
                 <option value="all">All Accounts &amp; Vaults</option>
-                <option value="rera_escrow">🏦 Commercial Bank &amp; Escrow</option>
-                <option value="petty_cash">💵 Cash in Hand &amp; Safe Vaults</option>
-                <option value="operational">Current Operational</option>
+                <MasterOptions group="statement_account_groups" />
               </select>
             </div>
 
@@ -756,10 +755,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                 className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-2xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
               >
                 <option value="all">All Categories</option>
-                <option value="booking_advances">🏡 Customer Booking Advances</option>
-                <option value="site_expenses">🏗️ Field &amp; Site Expenses</option>
-                <option value="partner_capital_draws">💼 Partner Capital &amp; Draws</option>
-                <option value="contractor_vendor">🚜 Contractor &amp; Vendor Bills</option>
+                <MasterOptions group="statement_categories" />
               </select>
             </div>
 

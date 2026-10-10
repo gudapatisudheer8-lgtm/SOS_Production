@@ -4,6 +4,7 @@ import type { AuthenticatedAppUser } from '../original/types';
 
 const API_ROOT = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 const TOKEN_KEY = 'sos_web_session_token';
+let pendingCredential: string | null = null;
 const nativeFetch: typeof fetch = window.fetch.bind(window);
 
 export class ApiError extends Error {
@@ -17,13 +18,37 @@ export class ApiError extends Error {
 }
 
 export function getToken(): string | null {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try { return window.sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
+// Session bearer lives in sessionStorage only (cleared when the tab closes). Failure to
+// persist or remove it is surfaced, never swallowed.
 export function setToken(token: string | null) {
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch { /* storage unavailable */ }
+    window.localStorage.removeItem(TOKEN_KEY); // purge tokens written by earlier builds
+    if (token) {
+      window.sessionStorage.setItem(TOKEN_KEY, token);
+      if (window.sessionStorage.getItem(TOKEN_KEY) !== token) throw new Error("verify");
+    } else window.sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    if (token) { try { window.sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } }
+    throw new ApiError(0, "STORAGE_UNAVAILABLE", "This browser blocked session storage, so you cannot be signed in securely. Enable site storage and try again.");
+  }
+}
+export function clearSession() {
+  pendingCredential = null;
+  try { window.sessionStorage.removeItem(TOKEN_KEY); } catch { /* nothing more can be done */ }
+  try { window.localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+}
+
+/** Client mobile: ten digits (+91 added). Owner: a full international number is kept as entered. */
+export function normalizeClientMobile(v: string): string { return "+91" + v.replace(/\D/g, "").slice(-10); }
+export function normalizeOwnerMobile(v: string): string {
+  const t = v.replace(/[\s()-]/g, "");
+  const digits = t.replace(/\D/g, "");
+  if (t.startsWith("+")) return "+" + digits;
+  if (/^[6-9]\d{9}$/.test(digits)) return "+91" + digits;
+  if (/^91[6-9]\d{9}$/.test(digits)) return "+" + digits;
+  return "+" + digits;
 }
 
 export async function api<T = any>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
@@ -45,6 +70,10 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = null; }
   if (!res.ok) {
+    if (res.status === 401 && token && !path.startsWith("/auth/login")) {
+      clearSession();
+      window.dispatchEvent(new CustomEvent("sos-session-expired"));
+    }
     throw new ApiError(res.status, data?.error || `HTTP_${res.status}`, data?.message || `Request failed (HTTP ${res.status}).`);
   }
   return data as T;
@@ -79,7 +108,6 @@ export function toAppUser(a: SessionAccount): AuthenticatedAppUser {
 }
 
 // Current credential is held in memory only, for the mandatory first-login change.
-let pendingCredential: string | null = null;
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -102,8 +130,8 @@ export function installOriginalFetchBridge() {
         const isMember = Boolean(body.firmCode);
         const r = await api<{ token: string; account: SessionAccount }>('/auth/login', {
           body: isMember
-            ? { role: 'CLIENT', mobile: body.phone, credential: body.pin, clientCode: body.firmCode }
-            : { role: 'OWNER', mobile: body.phone, credential: body.pin },
+            ? { role: 'CLIENT', mobile: normalizeClientMobile(String(body.phone)), credential: body.pin, clientCode: body.firmCode }
+            : { role: 'OWNER', mobile: normalizeOwnerMobile(String(body.phone)), credential: body.pin },
         });
         setToken(r.token);
         pendingCredential = r.account.mustChangeCredential ? body.pin : null;

@@ -8,6 +8,8 @@
 
 export * from './apiError';
 export * from './apiFailureResponse';
+export * from './businessMaster';
+export * from './businessMasterMetadata';
 export * from './commandInput';
 export * from './commandInputData';
 export * from './commandResult';
@@ -32,7 +34,9 @@ export * from './erpRecordData';
 export * from './erpResource';
 export * from './firm';
 export * from './firmAccountantsItem';
+export * from './firmMetadata';
 export * from './firmStatus';
+export * from './getBusinessMasters200';
 export * from './healthStatus';
 export * from './loginInput';
 export * from './loginInputRole';

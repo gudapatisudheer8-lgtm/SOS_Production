@@ -1,5 +1,6 @@
 // Maps Spring API workspace/ERP payloads into the original UI types, and wraps mutations.
 import { api, newRequestId } from './api';
+import { sectorUiCode } from './config';
 import type {
   TenantFirm, Project, Plot, ApartmentUnit, SyndicatePartner, FieldExpenseLog, AuditLogEntry,
   FirmAccount, FirmAccountTransaction, IndividualInvestmentRecord, LiquorDailySettlement,
@@ -7,11 +8,9 @@ import type {
 } from '../original/types';
 
 export function sectorTypeFromCode(code: string = ''): SectorType {
-  const c = code.toLowerCase();
-  if (c.includes('plot')) return 'real_estate_open_plotting';
-  if (c.includes('constr')) return 'real_estate_construction';
-  if (c.includes('liquor')) return 'liquor_vends';
-  return 'custom_infra';
+  const ui = sectorUiCode(code);
+  if (!ui) throw new Error(`Sector "${code}" has no matching sector_types master (matchTokens).`);
+  return ui as SectorType;
 }
 
 export interface RecordMeta { id: string; kind: string; revision: number; projectId: string; status: string }
@@ -50,10 +49,12 @@ export async function loadAll(role: string): Promise<LoadedData> {
     const sectors = Array.from(new Set(ifaces.map((i: any) => sectorTypeOf(i.sectorId, i.sectorName)))) as SectorType[];
     const acc = (f.accountants || [])[0];
     return {
-      id: String(f.id), name: f.name, code: f.clientCode, location: '', state: '' as any, sectors,
+      id: String(f.id), name: f.name, code: f.clientCode, location: f.metadata?.location || '', state: (f.metadata?.state || '') as any, sectors,
+      gstin: f.metadata?.gstin, panNumber: f.metadata?.panNumber, reraNumber: f.metadata?.reraNumber,
+      officeAddress: f.metadata?.officeAddress, proprietorPhone: f.metadata?.proprietorPhone,
       subscriptionPlan: '' as any, mrrAmount: 0,
       status: f.status === 'ACTIVE' ? 'active' : f.status === 'SUSPENDED' ? 'suspended' : 'inactive',
-      createdDate: '', managingPartnerName: '', managingPartnerPhone: '',
+      createdDate: '', managingPartnerName: '', managingPartnerPhone: f.metadata?.proprietorPhone || '',
       accountantName: acc?.displayName || '', accountantPhone: acc?.mobile || '',
       featureFlags: {
         enablePlotGrid: sectors.includes('real_estate_open_plotting'),
@@ -73,7 +74,7 @@ export async function loadAll(role: string): Promise<LoadedData> {
     startDate: p.details?.startDate || '', extentValue: num(p.details?.extentValue), extentUnit: p.details?.extentUnit || '',
     partners: (p.partners || []).map((m: any) => ({
       partnerId: String(m.identityId), name: m.displayName, phone: m.mobile || '', roleInProject: 'Partner',
-      equityPercent: 0, initialCapital: 0, drawings: 0, shareOfFieldExpenses: 0, avatarColor: 'bg-amber-500',
+      equityPercent: 0, initialCapital: 0, drawings: 0, shareOfFieldExpenses: 0, avatarColor: 'bg-amber-500', enabled: m.enabled,
     })),
     __sectorId: String(p.sectorId), __revision: p.revision, __setupState: p.setupState,
   } as Project));
@@ -125,8 +126,9 @@ export async function loadAll(role: string): Promise<LoadedData> {
         id: pid, firmId: p.firmId, name: m.name ?? '', phone: m.mobile ?? '', roleDescription: profile.roleDescription ?? 'Partner',
         avatarColor: 'bg-amber-500', initialCapital: num(profile.initialCapital), actualInvested: num(m.invested),
         fixedEquityPercent: num(m.equityPercent), drawings: num(m.drawings), shareOfFieldExpenses: num(m.expenses),
-        userRole: 'field_partner', userStatus: 'active',
-      });
+        userRole: 'field_partner', userStatus: m.enabled === false ? 'inactive' : 'active',
+        __projectId: p.id, __revision: m.revision, __profileRevision: recs.find((r) => r.kind === 'partner-profiles' && String(r.data?.partnerId) === pid)?.revision,
+      } as any);
     }
     for (const r of recs.filter((x) => x.kind === 'drawings')) {
       const d = r.data || {};
@@ -147,23 +149,23 @@ export async function loadAll(role: string): Promise<LoadedData> {
 const UI_KEYS = new Set(['id', 'firmId', 'projectId', 'status', 'recentTransactions', 'currentBalance', 'balanceAfter',
   'createdDate', 'requestedAt', 'submittedAt', 'avatarColor', 'enrolledBy', 'approvedBy', 'approvedAt', 'partnerName',
   'accountName', 'sourceAccountName', 'bankAccountName', 'projectName', 'deviceId', 'addedDate', 'addedBy']);
-const FINANCIAL = /amount|capital|rate|price|balance|value|fee|budget|spent|advance|percent|invested|outlay|premium|deposit|target|valuation|collected|shortage|sales|cost|equity|limit|rise/i;
 
 // Keep only configured fields. Financially significant non-empty values with no configured
 // field are rejected (never silently dropped).
-export function pickConfigured(fields: any[], data: Record<string, any>, label: string) {
+export function pickConfigured(fields: any[], data: Record<string, any>, label: string, aliases: Record<string, string> = {}) {
   const keys = new Set<string>((fields || []).map((f: any) => f.key));
   const out: Record<string, any> = {};
   const rejected: string[] = [];
-  for (const [k, v] of Object.entries(data)) {
-    if (v === undefined || v === null || v === '') continue;
+  for (const [k0, v] of Object.entries(data)) {
+    const empty = v === undefined || v === null || v === '' || v === 0 || v === false || (Array.isArray(v) && !v.length);
+    if (empty) continue;
+    const k = keys.has(k0) ? k0 : aliases[k0] && keys.has(aliases[k0]) ? aliases[k0] : k0;
     if (keys.has(k)) { out[k] = v; continue; }
-    if (UI_KEYS.has(k)) continue;
-    const significant = typeof v === 'number' ? v !== 0 : FINANCIAL.test(k) && (typeof v === 'string' || typeof v === 'boolean' ? Boolean(v) : true);
-    if (significant) rejected.push(k);
+    if (UI_KEYS.has(k0)) continue;
+    rejected.push(k0);
   }
   if (rejected.length) {
-    throw new Error(`Not saved: the backend's configured "${label}" form has no field for ${rejected.join(', ')}. Clear these values or have the owner add them to the sector release.`);
+    throw new Error(`Not saved: the configured "${label}" form has no field for ${rejected.join(', ')}. Clear these values or have the owner add them to the sector release.`);
   }
   return out;
 }
@@ -185,7 +187,7 @@ export function describeAccess(access: any): string | null {
 }
 
 export async function command<T = any>(action: string, body: Record<string, any>): Promise<T> {
-  return api<T>(`/commands/${action}`, { body });
+  return api<T>(`/commands/${action}`, { body: { data: body } });
 }
 
 export async function erpSave(erp: any, projectId: string, kind: string, data: Record<string, any>, existing?: RecordMeta) {

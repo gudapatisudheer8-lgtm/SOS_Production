@@ -1,3 +1,4 @@
+import { MasterOptions, masterItems } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { TenantFirm, SectorType, FeatureFlags, Role } from '../../types';
 import { formatINR, formatIndianCompact } from '../../utils/formatters';
@@ -40,9 +41,9 @@ import {
 
 interface SuperAdminViewProps {
   firms: TenantFirm[];
-  onAddFirm: (firm: TenantFirm) => void;
-  onUpdateFirm?: (firm: TenantFirm) => void;
-  onToggleFirmStatus?: (firmId: string) => void;
+  onAddFirm: (firm: TenantFirm) => void | boolean | Promise<boolean>;
+  onUpdateFirm?: (firm: TenantFirm) => void | boolean | Promise<boolean>;
+  onToggleFirmStatus?: (firmId: string) => void | boolean | Promise<boolean>;
   onUpdateFirmFlags: (firmId: string, flags: Partial<FeatureFlags>) => void;
   onSelectFirm?: (firmId: string) => void;
   activeFirmId?: string;
@@ -164,7 +165,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
       .toUpperCase()
       .replace(/[^A-Z0-9-]/g, '');
 
-    const mrr = newPlan === 'monthly' ? 2999 : newPlan === 'annual' ? 9999 : 24999;
+    const mrr = 0; // plan pricing is not persisted by the backend
     const finalProprietor = newProprietorName.trim() || managingPartnerName.trim() || 'Proprietor';
     const finalProprietorPhone = newProprietorPhone.trim() || managingPartnerPhone.trim() || '';
     const finalAccountantName = accountantName.trim();;
@@ -207,8 +208,8 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
       },
     };
 
-    onAddFirm(newFirm);
-
+    void Promise.resolve(onAddFirm(newFirm)).then((ok) => {
+    if (ok === false) return;
     setGeneratedCredentials({
       firmId: newFirm.id,
       firmCode: newFirm.code,
@@ -220,6 +221,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
       sectors: selectedSectors,
       gstin: newFirm.gstin,
       pan: newFirm.panNumber,
+    });
     });
   };
 
@@ -286,7 +288,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     e.preventDefault();
     if (!editingFirm || !editFirmName.trim()) return;
 
-    const mrr = editPlan === 'monthly' ? 2999 : editPlan === 'annual' ? 9999 : 24999;
+    const mrr = 0; // plan pricing is not persisted by the backend
     const finalPropName = editProprietorName.trim() || editManagingPartnerName.trim() || editingFirm.managingPartnerName;
     const finalPropPhone = editProprietorPhone.trim() || editManagingPartnerPhone.trim() || editingFirm.managingPartnerPhone;
 
@@ -321,7 +323,8 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     };
 
     if (onUpdateFirm) {
-      onUpdateFirm(updated);
+      void Promise.resolve(onUpdateFirm(updated)).then((ok) => { if (ok !== false) setEditingFirm(null); });
+      return;
     }
     setEditingFirm(null);
   };
@@ -330,28 +333,9 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     setEditingFirm(null);
   };
 
-  const sectorLabels: Record<SectorType, { title: string; desc: string; icon: string }> = {
-    real_estate_open_plotting: {
-      title: 'Real Estate - Open Plotting',
-      desc: 'DTCP/HMDA layout calculator, 20-plot grid, road deductions & buyer advances',
-      icon: '📐',
-    },
-    real_estate_construction: {
-      title: 'Real Estate - Construction / Apartments',
-      desc: 'Floors 1-5 unit matrix, base sq.ft rate matrix, facing premiums & milestones',
-      icon: '🏢',
-    },
-    liquor_vends: {
-      title: 'Liquor Vends Syndicate',
-      desc: 'Daily counter stock balancing, cash vs UPI, shortage tracking & partner barter draws',
-      icon: '🍾',
-    },
-    custom_infra: {
-      title: 'Custom Infrastructure Consortium',
-      desc: 'R&B road contracts, earthwork machinery & quarry weighbridge operations',
-      icon: '🚜',
-    },
-  };
+  const sectorLabels = Object.fromEntries(masterItems('sector_types').map((i) => [String(i.metadata?.uiCode), {
+    title: i.label, desc: String(i.metadata?.description ?? ''), icon: String(i.metadata?.icon ?? ''),
+  }])) as Record<SectorType, { title: string; desc: string; icon: string }>;
 
   return (
     <div className="space-y-6">
@@ -607,7 +591,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                             key={sec}
                             className="text-[10px] bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full border border-gray-200 flex items-center gap-1 font-semibold"
                           >
-                            <span>{sectorLabels[sec]?.icon || '📦'}</span>
+                            <span>{sectorLabels[sec]?.icon || ''}</span>
                             <span>{sec === 'real_estate_open_plotting' ? 'Plotting' : sec === 'real_estate_construction' ? 'Apartments' : sec === 'liquor_vends' ? 'Liquor' : 'Infra'}</span>
                           </span>
                         ))}
@@ -617,10 +601,10 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                     {/* Plan */}
                     <td className="py-4 px-3">
                       <div className="font-bold text-gray-900 capitalize">
-                        {firm.subscriptionPlan}
+                        {firm.subscriptionPlan || 'Plan not recorded'}
                       </div>
                       <div className="text-xs text-amber-800 font-mono font-bold">
-                        {formatINR(firm.mrrAmount)}/mo
+                        {firm.mrrAmount ? `${formatINR(firm.mrrAmount)}/mo` : '-'}
                       </div>
                     </td>
 
@@ -839,11 +823,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                         onChange={(e) => setNewBusinessType(e.target.value as any)}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-[#FFB800] outline-none"
                       >
-                        <option value="LLP">LLP (Limited Liability Partnership)</option>
-                        <option value="Proprietorship">Proprietorship (Sole Owner)</option>
-                        <option value="Partnership">Partnership Firm</option>
-                        <option value="Private Limited">Private Limited Company</option>
-                        <option value="Syndicate / Joint Venture">Syndicate / Joint Venture Consortium</option>
+                        <MasterOptions group="firm_entity_types" />
                       </select>
                     </div>
 
@@ -875,8 +855,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                         }}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-[#FFB800] outline-none"
                       >
-                        <option value="Andhra Pradesh">Andhra Pradesh (CRDA / DTCP)</option>
-                        <option value="Telangana">Telangana (HMDA / TG RERA)</option>
+                        <MasterOptions group="firm_states" />
                       </select>
                     </div>
 
@@ -1056,48 +1035,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   </div>
                 </div>
 
-                {/* Section 5: SaaS Subscription Tier */}
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1.5">5. SaaS Subscription Tier:</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNewPlan('monthly')}
-                      className={`p-2.5 rounded-xl border text-center transition-all ${
-                        newPlan === 'monthly'
-                          ? 'bg-amber-50 border-amber-400 font-black text-amber-900 ring-2 ring-amber-400/40'
-                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      <span className="block font-bold">Starter</span>
-                      <span className="text-[11px] font-mono">₹2,999/mo</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewPlan('annual')}
-                      className={`p-2.5 rounded-xl border text-center transition-all ${
-                        newPlan === 'annual'
-                          ? 'bg-amber-50 border-amber-400 font-black text-amber-900 ring-2 ring-amber-400/40'
-                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      <span className="block font-bold">Growth</span>
-                      <span className="text-[11px] font-mono">₹9,999/mo</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewPlan('enterprise')}
-                      className={`p-2.5 rounded-xl border text-center transition-all ${
-                        newPlan === 'enterprise'
-                          ? 'bg-amber-50 border-amber-400 font-black text-amber-900 ring-2 ring-amber-400/40'
-                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      <span className="block font-bold">Consortium</span>
-                      <span className="text-[11px] font-mono">₹24,999/yr</span>
-                    </button>
-                  </div>
-                </div>
+                <div><p className="text-[11px] text-stone-500 font-bold">Subscription plan: unavailable. The backend does not store a plan per firm yet.</p></div>
 
                 {/* Section 6: Sector Modules */}
                 <div>
@@ -1117,8 +1055,8 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                               : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                           }`}
                         >
-                          <span className="text-base">{sectorLabels[sec].icon}</span>
-                          <span className="truncate">{sectorLabels[sec].title.replace('Real Estate - ', '')}</span>
+                          <span className="text-base">{sectorLabels[sec]?.icon}</span>
+                          <span className="truncate">{(sectorLabels[sec]?.title ?? '').replace('Real Estate - ', '')}</span>
                           {isSelected && <Check className="w-3.5 h-3.5 text-amber-400 ml-auto shrink-0" />}
                         </button>
                       );
@@ -1366,11 +1304,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                     onChange={(e) => setEditBusinessType(e.target.value as any)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-[#FFB800] outline-none font-bold text-xs"
                   >
-                    <option value="LLP">LLP</option>
-                    <option value="Proprietorship">Proprietorship</option>
-                    <option value="Partnership">Partnership</option>
-                    <option value="Private Limited">Private Limited</option>
-                    <option value="Syndicate / Joint Venture">Syndicate / Joint Venture</option>
+                    <MasterOptions group="firm_entity_types" />
                   </select>
                 </div>
               </div>
@@ -1402,8 +1336,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                     onChange={(e) => setEditState(e.target.value as any)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-[#FFB800] outline-none font-medium"
                   >
-                    <option value="Andhra Pradesh">Andhra Pradesh (AP)</option>
-                    <option value="Telangana">Telangana (TG)</option>
+                    <MasterOptions group="firm_states" />
                   </select>
                 </div>
               </div>
@@ -1498,11 +1431,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                             : 'bg-gray-50/70 text-gray-600 border-gray-200 hover:bg-gray-100'
                         }`}
                       >
-                        <span className="text-xl shrink-0 mt-0.5">{sectorLabels[sec].icon}</span>
+                        <span className="text-xl shrink-0 mt-0.5">{sectorLabels[sec]?.icon}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <span className="font-extrabold text-xs text-gray-950 truncate">
-                              {sectorLabels[sec].title}
+                              {sectorLabels[sec]?.title}
                             </span>
                             <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ml-1 ${
                               isSelected ? 'bg-gray-950 border-gray-950 text-white' : 'border-gray-300 bg-white'
@@ -1511,7 +1444,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                             </div>
                           </div>
                           <p className="text-[10px] text-gray-500 line-clamp-2 mt-0.5">
-                            {sectorLabels[sec].desc}
+                            {sectorLabels[sec]?.desc}
                           </p>
                         </div>
                       </button>
@@ -1520,48 +1453,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 </div>
               </div>
 
-              {/* Subscription Tier */}
-              <div>
-                <label className="block text-gray-700 font-bold mb-1">SaaS Subscription Plan:</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditPlan('monthly')}
-                    className={`p-2.5 rounded-xl border text-center transition-all ${
-                      editPlan === 'monthly'
-                        ? 'bg-amber-50 border-amber-400 font-black text-amber-900 ring-1 ring-amber-400'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <span className="block font-bold">Starter</span>
-                    <span className="text-[11px] font-mono">₹2,999/mo</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditPlan('annual')}
-                    className={`p-2.5 rounded-xl border text-center transition-all ${
-                      editPlan === 'annual'
-                        ? 'bg-amber-50 border-amber-400 font-black text-amber-900 ring-1 ring-amber-400'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <span className="block font-bold">Growth</span>
-                    <span className="text-[11px] font-mono">₹9,999/mo</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditPlan('enterprise')}
-                    className={`p-2.5 rounded-xl border text-center transition-all ${
-                      editPlan === 'enterprise'
-                        ? 'bg-amber-50 border-amber-400 font-black text-amber-900 ring-1 ring-amber-400'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <span className="block font-bold">Consortium</span>
-                    <span className="text-[11px] font-mono">₹24,999/yr</span>
-                  </button>
-                </div>
-              </div>
+              <div><p className="text-[11px] text-stone-500 font-bold">Subscription plan: unavailable. The backend does not store a plan per firm yet.</p></div>
 
               {/* Modal Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-200">
@@ -1754,7 +1646,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-black text-gray-950">Active Business Engines</span>
                   <span className="text-xs font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full capitalize">
-                    {dossierFirm.subscriptionPlan} • {formatINR(dossierFirm.mrrAmount)}/mo
+                    {dossierFirm.subscriptionPlan || 'Plan not recorded'}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1763,7 +1655,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                       key={sec}
                       className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-gray-300 text-gray-800 flex items-center gap-1.5 shadow-2xs"
                     >
-                      <span>{sectorLabels[sec]?.icon || '📦'}</span>
+                      <span>{sectorLabels[sec]?.icon || ''}</span>
                       <span>{sectorLabels[sec]?.title || sec}</span>
                     </span>
                   ))}

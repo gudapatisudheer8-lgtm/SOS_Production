@@ -11,8 +11,10 @@ import { AccountantDashboard } from './original/components/accountant/Accountant
 import { FieldPartnerMobileView } from './original/components/fieldpartner/FieldPartnerMobileView';
 import type { IndividualInvestmentData } from './original/components/modals/IndividualInvestmentModal';
 import { Building2, Smartphone } from 'lucide-react';
-import { api, getToken, setToken, toAppUser, newRequestId } from './adapter/api';
-import { loadAll, erpSave, erpReview, command, filterFields, pickConfigured, describeAccess, type LoadedData } from './adapter/erp';
+import { api, getToken, clearSession, toAppUser, newRequestId, normalizeClientMobile } from './adapter/api';
+import { useConfig, sectorUiCode, masterNumber } from './adapter/config';
+import { MasterEditor } from './adapter/MasterEditor';
+import { loadAll, erpSave, erpReview, command, pickConfigured, describeAccess, type LoadedData } from './adapter/erp';
 
 const EMPTY_LAYOUT: LayoutCalculation = { totalExtentValue: 0, unit: 'Acres', roadWidth: 30, openSpacePercent: 10, floorRatePerSqYard: 0 };
 const EMPTY_MATRIX: ApartmentPricingMatrix = { baseSqFtRate: 0, eastPremium: 0, northPremium: 0, cornerPremium: 0, floorRisePerFloor: 0, carParkingFee: 0, amenitiesFee: 0, floorRatePerSqFt: 0 };
@@ -21,17 +23,18 @@ const EMPTY_MATRIX: ApartmentPricingMatrix = { baseSqFtRate: 0, eastPremium: 0, 
 const BLOCKED_ACTIONS = [
   'Owner sign-in into accountant / partner consoles (owner has no ERP scope)',
   'Feature flags: WhatsApp, Tally export, voice notes, audit lock, dual ledger',
-  'Partner profile edits (role, PIN, spending limit) beyond partner.add',
   'Marketing agent plot portal',
-  'Partner activation/deactivation',
   'Separate drawing disbursement (ledger posts on approval)',
   'Plan document / receipt uploads',
-  'Firm GSTIN, PAN, RERA, office address, proprietor details',
-  'Project floor plans, plot distribution and amenity layouts during setup',
-  'Partner capital/equity on quick “add partner” (use project setup or investments)',
 ];
 
 function App() {
+  const config = useConfig();
+  const loadConfigRef = useRef(config.load);
+  loadConfigRef.current = config.load;
+  const clearConfigRef = useRef(config.clear);
+  clearConfigRef.current = config.clear;
+  const entry: 'owner' | 'client' = /\/owner\/?$/.test(window.location.pathname) ? 'owner' : 'client';
   const [currentUser, setCurrentUser] = useState<AuthenticatedAppUser | null>(null);
   const [booting, setBooting] = useState(true);
   const [data, setData] = useState<LoadedData | null>(null);
@@ -61,8 +64,10 @@ function App() {
       setSelectedFirmId((prev) => prev || d.firms[0]?.id || '');
       setSelectedProjectId((prev) => prev || d.projects[0]?.id || '');
       if (d.loadErrors.length) showToast(`Some project ledgers could not load: ${d.loadErrors.join('; ')}`);
+      return d.loadErrors.length === 0;
     } catch (e: any) {
       setLoadError(e.message);
+      return false;
     }
   }, [showToast]);
 
@@ -76,20 +81,31 @@ function App() {
   useEffect(() => {
     if (!getToken()) { setBooting(false); return; }
     api<any>('/auth/me')
-      .then((acc) => { const u = toAppUser(acc.account ?? acc); setCurrentUser(u); return reload(u.role); })
-      .catch(() => setToken(null))
+      .then(async (acc) => { const u = toAppUser(acc.account ?? acc); setCurrentUser(u); if (await loadConfigRef.current()) await reload(u.role); })
+      .catch(() => { clearSession(); setCurrentUser(null); })
       .finally(() => setBooting(false));
   }, [reload]);
+
+  useEffect(() => {
+    const onExpired = () => {
+      clearConfigRef.current(); setCurrentUser(null); setData(null); setSelectedFirmId(''); setSelectedProjectId('');
+      setStickyNotice(null); setToastMessage('Your session expired. Sign in again.');
+    };
+    window.addEventListener('sos-session-expired', onExpired);
+    return () => window.removeEventListener('sos-session-expired', onExpired);
+  }, []);
 
   const handleLoginSuccess = (user: AuthenticatedAppUser) => {
     setCurrentUser(user);
     if (user.firmId) setSelectedFirmId(user.firmId);
-    reload(user.role);
+    void loadConfigRef.current().then((ok) => { if (ok) void reload(user.role); });
   };
 
   const handleSignOut = async () => {
     try { await api('/auth/logout', { method: 'POST' }); } catch { /* token may already be invalid */ }
-    setToken(null);
+    clearSession();
+    clearConfigRef.current();
+    setStickyNotice(null);
     setCurrentUser(null);
     setData(null);
     setSelectedFirmId('');
@@ -105,8 +121,13 @@ function App() {
       showToast(`✕ ${label} failed: ${e.message}`);
       return false;
     }
+    if (currentUser && !await reload(currentUser.role)) {
+      showToast(`${label} was saved, but the updated workspace could not load. Refresh to see the saved data; do not submit it again.`);
+      // The mutation persisted. Close the form to prevent a duplicate submission,
+      // while clearly withholding a successful refresh claim.
+      return true;
+    }
     showToast(`✓ ${label}`);
-    if (currentUser) await reload(currentUser.role);
     return true;
   }, [currentUser, reload, showToast]);
 
@@ -122,89 +143,134 @@ function App() {
   const pendingExpensesCount = useMemo(() => (data?.fieldExpenses ?? []).filter((e) => e.status === 'pending').length, [data]);
 
   // ---------- Owner ----------
+  const sectorCodeOf = (sectorId: any, fallback?: string) =>
+    (data?.workspace?.sectors || []).find((x: any) => String(x.id) === String(sectorId))?.code || fallback || '';
+  const firmMetadata = (f: any) => Object.fromEntries(Object.entries({
+    gstin: f.gstin?.trim().toUpperCase(), panNumber: f.panNumber?.trim().toUpperCase(), reraNumber: f.reraNumber?.trim(),
+    officeAddress: f.officeAddress?.trim(), proprietorPhone: (f.proprietorPhone || f.managingPartnerPhone)?.trim(),
+    location: f.location?.trim(), state: f.state,
+  }).filter(([, v]) => v));
+
   const handleAddFirm = (f: TenantFirm) => run(`Firm ${f.name} provisioned`, async () => {
     const ws = data?.workspace;
     const assignments = f.sectors.map((s) => {
-      const sector = (ws?.sectors || []).find((x: any) => {
-        const c = String(x.code).toLowerCase();
-        return s === 'real_estate_open_plotting' ? c.includes('plot') : s === 'real_estate_construction' ? c.includes('constr')
-          : s === 'liquor_vends' ? c.includes('liquor') : c.includes('infra') || c.includes('custom');
-      });
+      const sector = (ws?.sectors || []).find((x: any) => sectorUiCode(x.code) === s);
       const release = sector?.releases?.find((r: any) => r.state === 'PUBLISHED');
       if (!sector || !release) throw new Error(`No published sector release for ${s}.`);
       return { sectorId: sector.id, releaseId: release.id };
     });
-    const statutory = [['GSTIN', f.gstin], ['PAN', f.panNumber], ['RERA number', f.reraNumber], ['office address', f.officeAddress],
-      ['proprietor', f.proprietorPhone]].filter(([, v]) => v && String(v).trim()).map(([k]) => k);
-    if (statutory.length) throw new Error(`Not saved: the backend firm record has no field for ${statutory.join(', ')}. Clear these values to create the firm.`);
     if (!f.accountantName || !f.accountantPhone) throw new Error('Accountant name and mobile are required.');
     const r: any = await command('firm.create', {
-      clientCode: f.code, name: f.name, accountantMobile: f.accountantPhone.replace(/\D/g, '').slice(-10),
-      accountantName: f.accountantName, assignments,
+      clientCode: f.code, name: f.name, accountantMobile: normalizeClientMobile(f.accountantPhone),
+      accountantName: f.accountantName, assignments, ...firmMetadata(f),
     });
     const notice = describeAccess(r?.access);
     if (notice) setStickyNotice(`${f.name} (${f.code}) accountant — ${notice}`);
   });
 
   const handleUpdateFirm = (f: TenantFirm) => run(`Firm ${f.name} updated`, () =>
-    command('firm.update', { firmId: f.id, name: f.name, status: f.status === 'active' ? 'ACTIVE' : 'SUSPENDED', revision: (firms.find((x) => x.id === f.id) as any)?.__revision }));
+    command('firm.update', { firmId: f.id, name: f.name, status: f.status === 'active' ? 'ACTIVE' : 'SUSPENDED', revision: (firms.find((x) => x.id === f.id) as any)?.__revision, ...firmMetadata(f) }));
 
   const handleToggleFirmStatus = (firmId: string) => {
     const f = firms.find((x) => x.id === firmId) as any;
-    if (!f) return;
-    run(`Firm ${f.name} status changed`, () =>
-      command('firm.update', { firmId, name: f.name, status: f.status === 'active' ? 'SUSPENDED' : 'ACTIVE', revision: f.__revision }));
+    if (!f) return Promise.resolve(false);
+    return run(`Firm ${f.name} status changed`, () =>
+      command('firm.update', { firmId, name: f.name, status: f.status === 'active' ? 'SUSPENDED' : 'ACTIVE', revision: f.__revision, ...firmMetadata(f) }));
   };
 
   const handleUpdateFirmFlags = () => unsupported('feature flags are configured through sector releases, not per-firm toggles.');
 
   // ---------- Accountant: projects & partners ----------
-  const handleAddProject = (p: Project, initialPlots?: Plot[], initialUnits?: ApartmentUnit[]) => run(`Project ${p.name} created`, async () => {
-    const iface = (data?.workspace?.interfaces || []).find((i: any) => String(i.firmId) === p.firmId &&
-      (i.configuration?.projectSetup || true) && data?.workspace?.sectors?.find((s: any) => String(s.id) === String(i.sectorId)));
+  const DERIVED = ['id', 'firmId', 'projectId', 'plotNumber', 'unitNumber', 'status', 'buyerName', 'buyerPhone', 'advanceReceived', 'currentMilestone', 'roadWidthFt'];
+  const buildGroups = (def: any, rows: any[], prefix: string) => {
+    if (!rows.length) return [];
+    if (!def.inventory?.fields) throw new Error('This sector release has no inventory builder. Remove generated plots/units or ask the owner to configure one.');
+    const m = def.inventory.mappings || {};
+    const aliases: Record<string, string> = { areaSqYards: m.area, sftArea: m.area, ratePerSqYard: m.rate, floorNumber: 'floor', ratePerSqFt: m.rate };
+    const startDefault = def.inventory.fields.find((f: any) => f.key === 'startNumber')?.default ?? 1;
+    const groups: any[] = [];
+    let last = '';
+    rows.forEach((row, i) => {
+      const rest = Object.fromEntries(Object.entries(row).filter(([k]) => !DERIVED.includes(k)));
+      const sig = JSON.stringify(rest);
+      if (sig === last && groups.length) { groups[groups.length - 1][m.count] += 1; return; }
+      last = sig;
+      groups.push({ ...pickConfigured(def.inventory.fields, rest, 'Inventory', aliases), [m.count]: 1, startNumber: def.rules?.inventoryNumbering === 'sequential' ? startDefault : i + 1, ...(prefix ? { numberPrefix: prefix } : {}) });
+    });
+    return groups;
+  };
+
+  const handleAddProject = (p: Project, initialPlots?: Plot[], initialUnits?: ApartmentUnit[], initialAccounts?: FirmAccount[]) => run(`Project ${p.name} created`, async () => {
     const ifaces = (data?.workspace?.interfaces || []).filter((i: any) => String(i.firmId) === p.firmId);
-    const match = ifaces.find((i: any) => {
-      const n = String(i.sectorName).toLowerCase();
-      return p.sector === 'real_estate_open_plotting' ? n.includes('plot') : p.sector === 'real_estate_construction' ? n.includes('constr')
-        : p.sector === 'liquor_vends' ? n.includes('liquor') : n.includes('infra') || n.includes('custom');
-    }) || iface;
+    const match = ifaces.find((i: any) => sectorUiCode(sectorCodeOf(i.sectorId, i.sectorName)) === p.sector);
     if (!match) throw new Error('No sector assignment for this firm matches the project sector.');
     const def = match.configuration?.projectSetup;
     if (!def?.sections) throw new Error('The owner has not published a project setup form for this sector.');
-    const { id: _id, firmId: _f, partners, sector: _s, status: _st, code, ...rest } = p as any;
+    const { id: _id, firmId: _f, partners, sector: _s, status: stage, code, ...rest } = p as any;
     const allFields = def.sections.flatMap((sec: any) => sec.fields || []);
-    // Nested plan structures (floor plans, plot distribution, amenities, documents) are not setup fields.
-    const { floorPlans, plotDistribution, layoutAmenities, amenities, planDocuments, ...flat } = rest;
+    const { floorPlans, plotDistribution, layoutAmenities, amenities, planDocuments,
+      plotsCount: _pc, totalResidentialSft: _tr, totalAmenitiesSft: _ta, totalBuiltUpAreaSft: _tb, flatsPerFloor: _fp, ...flat } = rest;
     if (planDocuments?.length) throw new Error('Not saved: plan document upload is not available through the API yet. Remove attached plans.');
-    const values = pickConfigured(allFields, { ...flat, projectCode: code }, 'Project setup');
+    const hasField = (k: string) => allFields.some((f: any) => f.key === k);
+    const roadDeduction = hasField('roadDeductionPercent') && flat.roadWidth ? masterNumber('road_widths', String(flat.roadWidth), 'deductionPercent') : undefined;
+    const values = pickConfigured(allFields, { ...flat, roadWidth: flat.roadWidth === undefined ? undefined : String(flat.roadWidth), roadDeductionPercent: roadDeduction, projectCode: code, developmentStage: stage }, 'Project setup');
     const partnerRows = (partners || []).map((sh: any) => pickConfigured(def.partnerFields || [], {
-      name: sh.name, mobile: String(sh.phone).replace(/\D/g, '').slice(-10),
+      name: sh.name, mobile: normalizeClientMobile(String(sh.phone)),
       fixedEquityPercent: sh.equityPercent, initialCapital: sh.initialCapital, roleDescription: sh.roleInProject,
     }, 'Project partner'));
-    const setup = { values, settings: {}, groups: [], documents: [], accounts: [], partners: partnerRows };
-    void floorPlans; void plotDistribution; void layoutAmenities; void amenities;
-    const saved: any = await command('project.setup-save', { requestId: newRequestId(), sectorId: match.sectorId, setup });
-    const ent = saved?.entity || {};
-    const fin: any = await command('project.setup-finalize', { requestId: newRequestId(), projectId: ent.id, revision: ent.revision });
-    const notice = describeAccess(fin?.entity?.access);
+    const plotRows = (initialPlots || []) as any[];
+    const unitRows = (initialUnits || []) as any[];
+    const groups = buildGroups(def, plotRows.length ? plotRows : unitRows, '');
+    const planKeys = groups.length ? {} : { floorPlans, plotDistribution };
+    const settings = pickConfigured(def.settingsFields || [], { layoutAmenities, amenities, ...planKeys, autoGenerateInventory: groups.length > 0 }, 'Project settings');
+    const accounts = (initialAccounts || []).map((a) => pickConfigured(def.accountFields || [], {
+      bankName: a.bankName, accountName: a.accountName, accountNumber: a.accountNumber, ifscCode: a.ifscCode,
+      branchName: a.branchName, accountType: a.accountType, openingBalance: a.openingBalance, isPrimary: a.isPrimary,
+      notes: a.notes, city: a.city, upiId: a.upiId, authorizedSignatories: a.authorizedSignatories,
+      openingBalanceDate: a.createdDate,
+    }, 'Project account'));
+    const setup = { values, settings, groups, documents: [], accounts, partners: partnerRows };
+    const created: any = await command('project.setup-create', { requestId: newRequestId(), sectorId: match.sectorId, setup });
+    if (!created?.entity?.id) throw new Error('The server did not confirm the finalized project.');
+    const notice = describeAccess(created.entity.access);
     if (notice) setStickyNotice(`${p.name} partners — ${notice}`);
-    const rows = (initialPlots?.length ? initialPlots : initialUnits) as any[] | undefined;
-    if (rows?.length) {
-      const kind = initialPlots?.length ? 'plots' : 'units';
-      const erp = await api<any>(`/erp/${ent.id}`);
-      await command('erp.bulk-save', { projectId: ent.id, kind, requestId: newRequestId(), records: rows.map((r) => filterFields(erp, kind, r)) });
-    }
   });
 
   const handleAddPartnerMember = (m: SyndicatePartner) => run(`Partner ${m.name} added`, async () => {
     if (!activeProjectId) throw new Error('Select a project first.');
-    if (m.initialCapital || m.fixedEquityPercent) throw new Error('Not saved: quick add partner cannot store capital or equity. Clear them, or add the partner through project setup.');
-    const r: any = await command('partner.add', { projectId: activeProjectId, name: m.name, mobile: m.phone.replace(/\D/g, '').slice(-10) });
+    const res = (erpOf(activeProjectId)?.resources || []).find((r: any) => r.kind === 'partner-profiles');
+    const profile = res ? pickConfigured(res.fields, { roleDescription: m.roleDescription, initialCapital: m.initialCapital, fixedEquityPercent: m.fixedEquityPercent }, res.title || 'Partner profile') : undefined;
+    const r: any = await command('partner.add', { requestId: newRequestId(), projectId: activeProjectId, name: m.name, mobile: normalizeClientMobile(m.phone), ...(profile && Object.keys(profile).length ? { profile } : {}) });
     const notice = describeAccess(r?.access);
     if (notice) setStickyNotice(`${m.name} — ${notice}`);
   });
 
-  const handleUpdatePartner = () => unsupported('partner profile edits (no partner.update command).');
+  const handleUpdatePartner = (p: SyndicatePartner): Promise<boolean> => {
+    const prev: any = data?.partners.find((x) => x.id === p.id);
+    if (!prev) return Promise.resolve(unsupported('partner is not a saved backend record.'));
+    const projectId = prev.__projectId as string;
+    if ((p as any).__resetCredential) {
+      return run(`Credential for ${p.name} reset`, async () => {
+        const r: any = await command('credentials.reset', { identityId: p.id, projectId });
+        const notice = describeAccess(r?.access);
+        if (notice) setStickyNotice(`${p.name} — ${notice}`);
+      });
+    }
+    const wantEnabled = p.userStatus ? p.userStatus === 'active' : undefined;
+    if (wantEnabled !== undefined && wantEnabled !== (prev.userStatus === 'active')) {
+      return run(`Partner ${p.name} ${wantEnabled ? 'activated' : 'deactivated'}`, () =>
+        command('partner.status', { projectId, partnerId: p.id, revision: prev.__revision, enabled: wantEnabled, requestId: newRequestId(), profileRevision: prev.__profileRevision }));
+    }
+    return run(`Partner ${p.name} updated`, () => {
+      const res = (erpOf(projectId)?.resources || []).find((r: any) => r.kind === 'partner-profiles');
+      const profile = res ? pickConfigured(res.fields, {
+        roleDescription: p.roleDescription, initialCapital: p.initialCapital, fixedEquityPercent: p.fixedEquityPercent,
+        dailySpendingLimit: p.dailySpendingLimit, officialDeclaredCapital: p.officialDeclaredCapital,
+      }, res.title || 'Partner profile') : undefined;
+      if (!profile) throw new Error('This project has no configured partner profile form.');
+      return command('partner.update', { projectId, partnerId: p.id, revision: prev.__revision, name: p.name, profile, requestId: newRequestId(), profileRevision: prev.__profileRevision });
+    });
+  };
 
   // ---------- Inventory ----------
   const handleUpdatePlot = (plot: Plot) => {
@@ -292,7 +358,22 @@ function App() {
     return <div className="min-h-screen bg-[#FDFCF7]" />;
   }
   if (!currentUser) {
-    return <ProductionAuthGate onLoginSuccess={handleLoginSuccess} />;
+    return <ProductionAuthGate entry={entry} onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (config.status === 'unavailable') {
+    return (
+      <div className="min-h-screen bg-[#FDFCF7] flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl p-10 border border-red-200 text-center max-w-lg shadow-xl space-y-4">
+          <h3 className="text-base font-black text-gray-950">Business configuration unavailable</h3>
+          <p className="text-xs text-gray-600 leading-relaxed">{config.error}</p>
+          <div className="flex justify-center gap-2">
+            <button onClick={() => void config.load().then((ok) => { if (ok) void reload(currentUser.role); })} className="px-4 py-2 bg-[#FFB800] text-gray-950 rounded-full text-xs font-black">Retry</button>
+            <button onClick={handleSignOut} className="px-4 py-2 border border-stone-300 rounded-full text-xs font-bold">Sign out</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const partnerSession = currentUser.role === 'field_partner' && currentUser.firmId
@@ -311,12 +392,6 @@ function App() {
         currentUser={currentUser}
         onSignOut={handleSignOut}
       />
-
-      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
-        <div className="bg-amber-50 border border-amber-300 rounded-2xl px-4 py-2.5 text-[11px] font-bold text-amber-900">
-          Preview in progress — connected to the live SyndicateOS API. Some original workflows are not yet supported by the backend and will show a clear error instead of saving (see “unavailable actions”, bottom-left).
-        </div>
-      </div>
 
       {(loadError || stickyNotice) && (
         <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 space-y-2">
@@ -355,6 +430,7 @@ function App() {
             onSwitchRole={() => unsupported('owners cannot enter firm consoles; sign in as the firm accountant.')}
           />
         )}
+        {data && currentRole === 'super_admin' && <MasterEditor onNotify={showToast} />}
 
         {data && currentRole === 'accountant' && (currentFirm ? (
           <AccountantDashboard

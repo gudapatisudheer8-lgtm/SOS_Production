@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState, useMemo } from 'react';
 import { Plot, Project, TenantFirm, MarketingBookingRequest } from '../../types';
 import { formatINR, formatIndianCompact } from '../../utils/formatters';
@@ -40,19 +41,19 @@ export const MarketingPlotPortalModal: React.FC<MarketingPlotPortalModalProps> =
   plots,
   project,
   firm,
-  floorRate = 17000,
+  floorRate = 0,
   onSubmitProposal,
   isStandalone = false,
 }) => {
   // Agent Identification (remembered for seamless multi-proposal workflow)
   const [agentName, setAgentName] = useState(() => {
-    return localStorage.getItem('syndicate_marketing_agent_name') || 'K. Rajesh (Venture Connect)';
+    return localStorage.getItem('syndicate_marketing_agent_name') || '';
   });
   const [agentPhone, setAgentPhone] = useState(() => {
-    return localStorage.getItem('syndicate_marketing_agent_phone') || '+91 99887 11223';
+    return localStorage.getItem('syndicate_marketing_agent_phone') || '';
   });
   const [agentAgency, setAgentAgency] = useState(() => {
-    return localStorage.getItem('syndicate_marketing_agent_agency') || 'Venture Connect Channel Partners';
+    return localStorage.getItem('syndicate_marketing_agent_agency') || '';
   });
 
   // Filters
@@ -375,11 +376,7 @@ export const MarketingPlotPortalModal: React.FC<MarketingPlotPortalModalProps> =
               className="bg-slate-800 text-white border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
             >
               <option value="all">All Facings</option>
-              <option value="East">East Facing (Sunrise)</option>
-              <option value="North">North Facing (Kubera)</option>
-              <option value="West">West Facing</option>
-              <option value="South">South Facing</option>
-              <option value="Corner">Corner Plots (Premium)</option>
+              <MasterOptions group="plot_facings" />
             </select>
 
             <input

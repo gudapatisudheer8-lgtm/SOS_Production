@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { Wine, Store, Plus, Trash2, ShieldCheck, DollarSign } from 'lucide-react';
 import { formatINR } from '../../utils/formatters';
@@ -136,10 +137,7 @@ export const LiquorVendPlanBuilder: React.FC<LiquorVendPlanBuilderProps> = ({
                     onChange={(e) => handleUpdateCounter(idx, 'category', e.target.value)}
                     className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-900 outline-none"
                   >
-                    <option value="Premium Walk-in Lounge">Premium Walk-in Lounge</option>
-                    <option value="High-Footfall Transit">High-Footfall Transit</option>
-                    <option value="Highway Express">Highway Express</option>
-                    <option value="Urban Neighborhood">Urban Neighborhood</option>
+                    <MasterOptions group="liquor_outlet_categories" />
                   </select>
                 </div>
 

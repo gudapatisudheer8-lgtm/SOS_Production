@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { FirmAccount, FirmAccountType, TenantFirm, Project } from '../../types';
 import {
@@ -23,7 +24,7 @@ interface AddFirmAccountModalProps {
   firm: TenantFirm;
   projects: Project[];
   activeProjectId?: string;
-  onAddAccount: (account: FirmAccount) => void;
+  onAddAccount: (account: FirmAccount) => void | boolean | Promise<boolean>;
 }
 
 const BANK_OPTIONS = [
@@ -166,8 +167,7 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
       ] : []
     };
 
-    onAddAccount(newAccount);
-    onClose();
+    void Promise.resolve(onAddAccount(newAccount)).then((ok) => { if (ok !== false) onClose(); });
   };
 
   return (
@@ -266,11 +266,7 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
                   onChange={(e) => handleBankOrTypeChange(bankName, e.target.value as FirmAccountType)}
                   className="w-full text-xs font-bold text-gray-900 border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
                 >
-                  <option value="rera_escrow">RERA Statutory Escrow (70% protected)</option>
-                  <option value="syndicate_capital_pool">Syndicate Capital Pool (Partner Equity)</option>
-                  <option value="current_operational">Commercial Current A/c (Operations &amp; Vendor)</option>
-                  <option value="field_petty_cash">Site Petty Cash Treasury (Cash Imprest)</option>
-                  <option value="tax_statutory">Tax &amp; GST Statutory</option>
+                  <MasterOptions group="firm_account_types" />
                 </select>
               </div>
 

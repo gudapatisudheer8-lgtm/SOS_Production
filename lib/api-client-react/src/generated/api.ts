@@ -26,6 +26,7 @@ import type {
   CompanyLookupInput,
   CompanyLookupResult,
   CredentialInput,
+  GetBusinessMasters200,
   HealthStatus,
   LoginInput,
   LoginResult,
@@ -64,6 +65,80 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetBusinessMastersUrl = () => {
+
+
+
+
+  return `/api/configuration/masters`
+}
+
+/**
+ * Authenticated database-backed business choices and policy metadata. Owners also see disabled entries. Security permissions remain sector-release grants.
+ */
+export const getBusinessMasters = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetBusinessMasters200> => {
+
+  return customFetch<GetBusinessMasters200>(getGetBusinessMastersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBusinessMastersQueryKey = () => {
+    return [
+    `/api/configuration/masters`
+    ] as const;
+    }
+
+
+export const getGetBusinessMastersQueryOptions = <TData = Awaited<ReturnType<typeof getBusinessMasters>>, TError = ErrorType<ApiFailureResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBusinessMasters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBusinessMastersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBusinessMasters>>> = ({ signal }) => getBusinessMasters({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBusinessMasters>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBusinessMastersQueryResult = NonNullable<Awaited<ReturnType<typeof getBusinessMasters>>>
+export type GetBusinessMastersQueryError = ErrorType<ApiFailureResponse>
+
+
+
+export function useGetBusinessMasters<TData = Awaited<ReturnType<typeof getBusinessMasters>>, TError = ErrorType<ApiFailureResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBusinessMasters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBusinessMastersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getUploadProjectAttachmentUrl = (projectId: string,) => {
 

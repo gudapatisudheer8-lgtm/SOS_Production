@@ -8,6 +8,34 @@
 import * as zod from 'zod';
 
 
+/**
+ * Authenticated database-backed business choices and policy metadata. Owners also see disabled entries. Security permissions remain sector-release grants.
+ */
+export const getBusinessMastersResponseItemsItemGroupMax = 64;
+
+export const getBusinessMastersResponseItemsItemKeyMax = 160;
+
+export const getBusinessMastersResponseItemsItemLabelMax = 240;
+
+export const getBusinessMastersResponseItemsItemPositionMin = 0;
+
+
+
+
+export const GetBusinessMastersResponse = zod.object({
+  "revision": zod.number().int(),
+  "items": zod.array(zod.object({
+  "group": zod.string().max(getBusinessMastersResponseItemsItemGroupMax),
+  "key": zod.string().max(getBusinessMastersResponseItemsItemKeyMax),
+  "label": zod.string().max(getBusinessMastersResponseItemsItemLabelMax),
+  "position": zod.number().int().min(getBusinessMastersResponseItemsItemPositionMin),
+  "enabled": zod.boolean(),
+  "revision": zod.number().int().min(1),
+  "metadata": zod.record(zod.string(), zod.unknown())
+}))
+})
+
+
 export const GetProjectErpParams = zod.object({
   "projectId": zod.coerce.string().uuid()
 })
@@ -175,6 +203,15 @@ export const GetWorkspaceResponse = zod.object({
   "name": zod.string(),
   "status": zod.enum(['ACTIVE', 'SUSPENDED']),
   "revision": zod.number().int(),
+  "metadata": zod.object({
+  "gstin": zod.string().optional(),
+  "panNumber": zod.string().optional(),
+  "reraNumber": zod.string().optional(),
+  "officeAddress": zod.string().optional(),
+  "proprietorPhone": zod.string().optional(),
+  "location": zod.string().optional(),
+  "state": zod.string().optional()
+}).optional(),
   "accountants": zod.array(zod.object({
   "identityId": zod.string().uuid(),
   "displayName": zod.string(),

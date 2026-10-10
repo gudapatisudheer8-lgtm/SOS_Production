@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Maximize2
 } from 'lucide-react';
-import { SAMPLE_CONSTRUCTION_BLUEPRINT, SAMPLE_LAYOUT_BLUEPRINT } from '../../data/sampleBlueprints';
 
 interface PlanDocumentUploaderProps {
   documents: PlanUploadDocument[];
@@ -68,31 +67,6 @@ export const PlanDocumentUploader: React.FC<PlanDocumentUploaderProps> = ({
       };
       reader.readAsDataURL(file);
     });
-  };
-
-  const handleLoadSample = () => {
-    const isConstruction = sector === 'real_estate_construction';
-    const sampleDataUrl = isConstruction ? SAMPLE_CONSTRUCTION_BLUEPRINT : SAMPLE_LAYOUT_BLUEPRINT;
-    const sampleTitle = isConstruction
-      ? 'AP-RERA Sanctioned Architectural Floor Plan & Elevation (G+4 Standard Tower)'
-      : 'CRDA / DTCP Approved Master Layout Blueprint (6.0 Acres Demarcation)';
-
-    const sampleDoc: PlanUploadDocument = {
-      id: `doc-sample-${Date.now()}`,
-      fileName: isConstruction ? 'royal-residency-floor-blueprint.svg' : 'amaravati-master-layout-blueprint.svg',
-      fileType: 'image/svg+xml',
-      fileSize: 48500,
-      uploadedAt: new Date().toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }),
-      dataUrl: sampleDataUrl,
-      title: sampleTitle,
-      category: isConstruction ? 'floor_plan' : 'master_layout',
-    };
-
-    onChange([...documents, sampleDoc]);
   };
 
   const handleRemoveDoc = (id: string) => {
@@ -166,18 +140,6 @@ export const PlanDocumentUploader: React.FC<PlanDocumentUploaderProps> = ({
               <span>Browse Files to Upload</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleLoadSample}
-              className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-xs font-black border border-amber-300 transition-colors flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-700" />
-              <span>
-                {sector === 'real_estate_construction'
-                  ? 'Load Sample Building Blueprint'
-                  : 'Load Sample Master Layout Plan'}
-              </span>
-            </button>
           </div>
         </div>
       </div>

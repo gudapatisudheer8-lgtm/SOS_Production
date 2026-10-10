@@ -1,3 +1,4 @@
+import { MasterOptions } from '../../../adapter/config';
 import React, { useState, useEffect } from 'react';
 import {
   TenantFirm,
@@ -57,7 +58,7 @@ interface IndividualInvestmentModalProps {
   project: Project;
   partners: SyndicatePartner[];
   firmAccounts: FirmAccount[];
-  onRecordInvestment: (data: IndividualInvestmentData) => void;
+  onRecordInvestment: (data: IndividualInvestmentData) => void | boolean | Promise<boolean>;
   preSelectedPartnerId?: string;
   initiatorRole?: 'accountant' | 'field_partner' | 'managing_partner';
 }
@@ -74,32 +75,8 @@ const COMMON_PURPOSES = [
   'Electricity Transformer & Water Pipeline Outlay',
 ];
 
-const CASH_ACCOUNTS = [
-  {
-    id: 'cash_main_vault',
-    name: '💵 Cash in Hand / Main Office Cash Vault & Safe',
-    category: 'Venture Office Vault',
-    baseBal: 6500000,
-  },
-  {
-    id: 'cash_site_vault',
-    name: '💵 Cash in Hand / Site Office Imprest Cash (Mangalagiri Site)',
-    category: 'Field Site Cash Box',
-    baseBal: 2400000,
-  },
-  {
-    id: 'cash_sro_deal',
-    name: '💵 Cash in Hand / Direct Landowner / SRO Spot Cash Settlement',
-    category: 'Procurement Spot Cash',
-    baseBal: 4000000,
-  },
-  {
-    id: 'cash_field_imprest',
-    name: '💵 Cash in Hand / Field Partner Imprest Treasury',
-    category: 'Partner Imprest',
-    baseBal: 1200000,
-  },
-];
+// Cash vaults are real project accounts (field_petty_cash) supplied via firmAccounts; no built-in balances.
+const CASH_ACCOUNTS: { id: string; name: string; category: string; baseBal: number }[] = [];
 
 export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps> = ({
   isOpen,
@@ -121,7 +98,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
   );
 
   const existingCashAccount = (firmAccounts || []).find((a) => a.accountType === 'field_petty_cash');
-  const cashVaultBalance = existingCashAccount?.currentBalance ?? 4500000;
+  const cashVaultBalance = existingCashAccount?.currentBalance ?? 0;
 
   const defaultPartnerId = preSelectedPartnerId || partners[0]?.id || 'partner-custom';
   const defaultAccountId = 'cash_main_vault';
@@ -177,8 +154,8 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
   let chosenAccountName = '';
   if (isCashAccount) {
     const cashEntry = CASH_ACCOUNTS.find((c) => c.id === accountId);
-    chosenAccountName = cashEntry?.name || 'Cash in Hand / Main Office Cash Vault & Safe';
-    currentBal = existingCashAccount?.currentBalance ?? (cashEntry?.baseBal || cashVaultBalance);
+    chosenAccountName = cashEntry?.name || existingCashAccount?.accountName || 'Cash in Hand';
+    currentBal = existingCashAccount?.currentBalance ?? cashVaultBalance;
   } else {
     const bAcc = projectBankAccounts.find((a) => a.id === accountId) || projectBankAccounts[0];
     chosenAccountName = bAcc ? `${bAcc.bankName} - ${bAcc.accountName}` : 'Primary Project Account';
@@ -233,8 +210,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
       cashVaultLocation: isCashAccount ? chosenAccountName : undefined,
     };
 
-    onRecordInvestment(payload);
-    onClose();
+    void Promise.resolve(onRecordInvestment(payload)).then((ok) => { if (ok !== false) onClose(); });
   };
 
   return (
@@ -463,10 +439,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
                     onChange={(e) => setCashDenominations(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-gray-950 focus:ring-2 focus:ring-amber-500 outline-none cursor-pointer"
                   >
-                    <option value="₹500 Notes Bundles">₹500 Currency Notes Bundles (Verified Count)</option>
-                    <option value="₹500 & ₹200 Mixed Currency">₹500 &amp; ₹200 Mixed Currency Notes</option>
-                    <option value="₹200 & ₹100 Petty Cash Notes">₹200 &amp; ₹100 Petty Cash Notes</option>
-                    <option value="Direct Token Cash Packet">Direct Token Cash Packet for Landowner</option>
+                    <MasterOptions group="cash_denominations" />
                   </select>
                 </div>
               </div>
@@ -484,11 +457,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
               onChange={(e) => setPurpose(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
             >
-              {COMMON_PURPOSES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
+              <MasterOptions group="investment_purposes" />
               <option value="Other Custom Outlay">Other Custom Project Outlay</option>
             </select>
             {purpose === 'Other Custom Outlay' && (
@@ -517,32 +486,12 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
               >
                 {/* Cash Options */}
                 <optgroup label="💵 CASH PAYMENT OPTIONS">
-                  <option value="💵 Cash - Direct Currency Handover to Promoter / MD">
-                    💵 Cash - Direct Currency Handover to Promoter / MD
-                  </option>
-                  <option value="💵 Cash - Site Cash Vault Deposit">
-                    💵 Cash - Site Cash Vault Deposit
-                  </option>
-                  <option value="💵 Cash - SRO / Landowner Spot Cash Delivery">
-                    💵 Cash - SRO / Landowner Spot Cash Delivery
-                  </option>
-                  <option value="💵 Cash - Office Cash Counter / Spot Receipt">
-                    💵 Cash - Office Cash Counter / Spot Receipt
-                  </option>
-                  <option value="💵 Cash - Partner Personal Liquid Cash Infusion">
-                    💵 Cash - Partner Personal Liquid Cash Infusion
-                  </option>
+                  <MasterOptions group="cash_investment_modes" />
                 </optgroup>
 
                 {/* Digital / Banking Options */}
                 <optgroup label="🏦 BANKING & DIGITAL OPTIONS">
-                  <option value="🏦 Bank Wire (RTGS / NEFT)">🏦 Bank Wire (RTGS / NEFT)</option>
-                  <option value="⚡ IMPS Immediate Transfer">⚡ IMPS Immediate Transfer</option>
-                  <option value="📑 Bank Cheque / Demand Draft">📑 Bank Cheque / Demand Draft</option>
-                  <option value="📱 UPI / QR Transfer (PhonePe / GPay)">📱 UPI / QR Transfer (PhonePe / GPay)</option>
-                  <option value="🏧 Cash Deposit Directly into Project Bank Account">
-                    🏧 Cash Deposit Directly into Project Bank Account
-                  </option>
+                  <MasterOptions group="bank_investment_modes" />
                 </optgroup>
               </select>
             </div>
