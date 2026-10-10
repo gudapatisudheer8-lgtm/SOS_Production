@@ -336,3 +336,17 @@ mtime_ms = 1791655108047
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/ca5e02d3-848b-415a-83e9-1eb1d00ee1a6/8b2c68d3-d650-42de-92a7-b0adcc5ab9d0"
 storage_version_token = "1791655131813498"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "ovi2NQJia3RzTS1ywNXZx"
+uri = "file://generated-artifacts/ec2/sos-plan-retry-fix-20261010.tar.gz"
+type = "unspecified"
+title = "EC2 Plan Upload & Retry Fix"
+description = "Browser-verified upload failure → unchanged retry → finalization of the same draft, without duplicates. Adds supported-file checks and confirmed recovery of an unfinished project. Includes prior frontend fixes. No SQL, password reset, or API replacement."
+logical_id = "abcefba9-869f-44cb-8d1f-a4fc0624ca9f"
+content_hash = "sha256:4680bf497bd2fd426fb4062d25f1bcdb2b559da6cca5e390817f00602afcada0"
+size = 226110
+mtime_ms = 1791656040834
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/abcefba9-869f-44cb-8d1f-a4fc0624ca9f/cf269946-e88c-4f04-8674-7fc25f0e3062"
+storage_version_token = "1791656178432618"
+content_type = "application/octet-stream"

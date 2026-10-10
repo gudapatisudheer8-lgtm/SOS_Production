@@ -279,7 +279,20 @@ function App() {
       openingBalanceDate: a.createdDate,
     }, 'Project account'));
     const setup = { values, settings, groups, documents: [], accounts, partners: partnerRows };
-    const created: any = await projectPlanSaver.current.create(p.id, match.sectorId, setup, planDocuments || []);
+    const localDraftKey = `${p.id}:${String(code).trim().toUpperCase()}`;
+    const existing = (data?.workspace?.projects || []).find((row: any) =>
+      String(row.firmId) === p.firmId &&
+      String(row.details?.projectCode || '').trim().toUpperCase() === String(code).trim().toUpperCase());
+    let existingDraft: { id: string; revision: number } | undefined;
+    if (existing && !projectPlanSaver.current.hasDraft(localDraftKey)) {
+      if (existing.setupState !== 'DRAFT') throw new Error('A finalized project already uses this code. Open that project instead of creating it again.');
+      if (String(existing.sectorId) !== String(match.sectorId)) throw new Error('The unfinished project with this code belongs to another sector. Use a different code.');
+      if (!window.confirm(`An unfinished project already uses code "${code}". Continue that saved draft with the details in this form? No second project will be created.`)) {
+        throw new Error('Draft recovery cancelled. No project was created or changed.');
+      }
+      existingDraft = { id: String(existing.id), revision: Number(existing.revision) };
+    }
+    const created: any = await projectPlanSaver.current.create(localDraftKey, match.sectorId, setup, planDocuments || [], existingDraft);
     if (!created?.entity?.id) throw new Error('The server did not confirm the finalized project.');
     setSelectedProjectId(String(created.entity.id));
     const notice = describeAccess(created.entity.access);

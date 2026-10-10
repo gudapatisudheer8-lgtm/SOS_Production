@@ -580,8 +580,6 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
       }
     }
 
-    const projectId = `proj-${code.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString().slice(-4)}`;
-
     // Calculate aggregated metrics from custom construction plan
     const totalResidentialSft = floorPlans.reduce(
       (sum, f) => sum + f.units.reduce((uSum, u) => uSum + (Number(u.sftArea) || 0), 0),

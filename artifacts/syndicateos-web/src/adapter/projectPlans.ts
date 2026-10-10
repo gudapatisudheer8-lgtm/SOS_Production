@@ -1,6 +1,7 @@
 import { api, ApiError, newRequestId } from './api';
 import { command } from './erp';
 import type { PlanUploadDocument } from '../original/types';
+import { validatePlanFile } from './planFile';
 
 type Progress = {
   id?: string;
@@ -14,9 +15,11 @@ type Progress = {
 export class ProjectPlanSaver {
   private drafts = new Map<string, Progress>();
   clear() { this.drafts.clear(); }
+  hasDraft(localId: string) { return this.drafts.has(localId); }
 
-  async create(localId: string, sectorId: string, setup: any, plans: PlanUploadDocument[]) {
-    if (!plans.length && !this.drafts.has(localId)) {
+  async create(localId: string, sectorId: string, setup: any, plans: PlanUploadDocument[],
+    existingDraft?: { id: string; revision: number }) {
+    if (!plans.length && !this.drafts.has(localId) && !existingDraft) {
       return command('project.setup-create', { requestId: newRequestId(), sectorId, setup });
     }
     // Decode before saving a draft. File bytes are uploaded privately, not stored
@@ -27,7 +30,11 @@ export class ProjectPlanSaver {
       const bytes = Uint8Array.from(atob(match[2]), (value) => value.charCodeAt(0));
       return new File([bytes], plan.fileName, { type: match[1] });
     });
-    const progress: Progress = this.drafts.get(localId) || { uploads: new Map() };
+    // Reject unsupported/oversized files before any draft is created.
+    for (const file of files) await validatePlanFile(file);
+    const progress: Progress = this.drafts.get(localId) || {
+      uploads: new Map(), ...(existingDraft && { id: existingDraft.id, revision: existingDraft.revision }),
+    };
     this.drafts.set(localId, progress);
     if (progress.finalize) {
       const result = await command('project.setup-finalize', progress.finalize);
@@ -52,7 +59,12 @@ export class ProjectPlanSaver {
       if (!uploaded || uploaded.dataUrl !== plan.dataUrl) {
         const body = new FormData();
         body.append('file', files[index]);
-        const result = await api(`/erp/${progress.id}/attachments`, { body });
+        let result;
+        try {
+          result = await api(`/erp/${progress.id}/attachments`, { body });
+        } catch (error) {
+          throw new Error(`Plan "${plan.fileName}" could not upload: ${error instanceof Error ? error.message : String(error)} Your draft is retained; correct or remove the file and retry this form.`);
+        }
         uploaded = { dataUrl: plan.dataUrl!, attachmentId: result.id };
         progress.uploads.set(plan.id, uploaded);
       }

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { validatePlanFile } from '../../../adapter/planFile';
 import { PlanUploadDocument, SectorType } from '../../types';
 import {
   Upload,
@@ -28,15 +29,22 @@ export const PlanDocumentUploader: React.FC<PlanDocumentUploaderProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDocForPreview, setSelectedDocForPreview] = useState<PlanUploadDocument | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
-  const handleFileUpload = (files: FileList | null) => {
+  const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const newDocs: PlanUploadDocument[] = [];
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
+    setUploadError('');
+    try {
+      const selected = Array.from(files);
+      for (const file of selected) await validatePlanFile(file);
+      const newDocs = await Promise.all(selected.map(async (file) => {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error(`Could not read "${file.name}". Select it again.`));
+          reader.readAsDataURL(file);
+        });
         let defaultCategory: PlanUploadDocument['category'] = 'floor_plan';
         let defaultTitle = file.name.replace(/\.[^/.]+$/, '');
 
@@ -63,10 +71,14 @@ export const PlanDocumentUploader: React.FC<PlanDocumentUploaderProps> = ({
           category: defaultCategory,
         };
 
-        onChange([...documents, doc]);
-      };
-      reader.readAsDataURL(file);
-    });
+        return doc;
+      }));
+      onChange([...documents, ...newDocs]);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleRemoveDoc = (id: string) => {
@@ -90,6 +102,7 @@ export const PlanDocumentUploader: React.FC<PlanDocumentUploaderProps> = ({
 
   return (
     <div className="space-y-4">
+      {uploadError && <p role="alert" className="text-sm text-red-700 bg-red-50 p-3 rounded-xl">{uploadError}</p>}
       {/* Upload Zone & Action Bar */}
       <div
         onDragOver={(e) => {
@@ -111,7 +124,7 @@ export const PlanDocumentUploader: React.FC<PlanDocumentUploaderProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,application/pdf"
+          accept="image/png,image/jpeg,image/webp,application/pdf"
           multiple
           className="hidden"
           onChange={(e) => handleFileUpload(e.target.files)}
@@ -126,7 +139,7 @@ export const PlanDocumentUploader: React.FC<PlanDocumentUploaderProps> = ({
               Upload {sector === 'real_estate_construction' ? 'Building Architectural Plans & Elevation Blueprints' : sector === 'real_estate_open_plotting' ? 'DTCP / CRDA / HMDA Approved Master Layout Plans' : 'Venture Statutory Drawing / Sanctioned Map'}
             </h4>
             <p className="text-[11px] text-gray-500 mt-0.5">
-              Supports PNG, JPG, WEBP, SVG or PDF files (with instant high-resolution blueprint preview)
+              PDF, PNG, JPG or WebP · Maximum 10 MB per file
             </p>
           </div>
 

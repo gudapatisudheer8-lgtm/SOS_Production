@@ -26,3 +26,9 @@ For frontend-only EC2 hotfixes, retain the original checksummed release and swit
 **Why:** In-place replacement of frontend files invalidates the base installer's package checksums and can block later configuration or activation. A separate root also permits routing rollback without touching credentials, uploads, or the database.
 
 **How to apply:** Back up only the SOS routing snippet, validate syntax and exact frontend markers over HTTPS with bounded retries, and restore the prior routing on failure.
+
+Project-creation acceptance must include a rejected plan upload followed by retry, not only a valid small-file happy path.
+
+**Why:** A valid-plan test passed while real rejected uploads left drafts behind; changing the local form identifier on every submit then collided with the database's unique project code. File-picker advertisements also exceeded the API's accepted formats.
+
+**How to apply:** Validate plan type and size before persisting a draft, retain the same draft across retries, and obtain explicit confirmation before continuing an existing unfinished setup. Never remove code uniqueness or silently delete drafts to resolve a conflict.
