@@ -322,3 +322,17 @@ mtime_ms = 1791653594035
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/65d6eb13-01a6-46bc-a7ff-0288a24c4bf2/1834d9c7-f481-4c0b-ab2c-3651d7d507c3"
 storage_version_token = "1791653950475169"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "VHOm25hOgukJTK_OTrIEM"
+uri = "file://generated-artifacts/ec2/sos-project-setup-fix-20261010.tar.gz"
+type = "unspecified"
+title = "EC2 Project Setup Fix — Frontend Only"
+description = "Stops ledger requests for unfinished setup drafts. Complete project creation with a PNG plan, partners, plots, Cash and bank accounts verified in Preview. Includes the previous login fix; no SQL or API replacement."
+logical_id = "ca5e02d3-848b-415a-83e9-1eb1d00ee1a6"
+content_hash = "sha256:6b218dd2c82796a331731202fb6f45b9a011c84b80ca9de15aa5d794775ec0cc"
+size = 225147
+mtime_ms = 1791655108047
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/ca5e02d3-848b-415a-83e9-1eb1d00ee1a6/8b2c68d3-d650-42de-92a7-b0adcc5ab9d0"
+storage_version_token = "1791655131813498"
+content_type = "application/octet-stream"

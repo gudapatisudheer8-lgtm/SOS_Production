@@ -65,7 +65,9 @@ export async function loadAll(role: string): Promise<LoadedData> {
     } as TenantFirm;
   });
 
-  const projects: Project[] = (ws.projects || []).map((p: any) => ({
+  // Uploaded plans require a draft before finalization. Drafts have no live ERP
+  // ledger yet and must not be treated as operational projects by polling.
+  const projects: Project[] = (ws.projects || []).filter((p: any) => p.setupState !== 'DRAFT').map((p: any) => ({
     ...(p.details || {}),
     id: String(p.id), firmId: String(p.firmId), name: p.name, location: p.location || '',
     code: p.details?.projectCode || p.details?.code || '',

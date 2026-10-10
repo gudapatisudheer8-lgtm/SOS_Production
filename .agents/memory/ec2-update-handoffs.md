@@ -13,7 +13,7 @@ Treat package installation, database migration, firm configuration activation, a
 
 **Why:** The user repeatedly reported unchanged accountant forms after successful deployment logs. Independent review found both configuration-dependent rendering and genuine reference-layout gaps; attributing the complaint solely to deployment or caching would miss unfinished UI work.
 
-**How to apply:** Before another release handoff, verify the signed-in accountant and partner flows against the supplied original source and screenshots. Distinguish proven local behavior from unverified production activation. Do not send another archive merely to repeat a successful installation.
+**How to apply:** Before another release handoff, verify the signed-in accountant and partner flows against the supplied original source and screenshots. Fresh-install acceptance must include project creation with a plan attachment, partners, inventory, and Cash/bank accounts, not just login or attachment-free creation. Separate background ledger GET failures from setup/upload/finalize POST failures: the attachment workflow intentionally persists a draft before it has operational ledgers. Distinguish proven local behavior from unverified production activation. Do not send another archive merely to repeat a successful installation.
 
 Account for Nginx's asynchronous worker transition when verifying HTTPS immediately after a reload. A successful reload command does not guarantee the first request uses the new configuration.
 

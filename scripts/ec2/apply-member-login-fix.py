@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Install the member-login frontend fix without changing the API or database."""
+"""Install a versioned SOS frontend fix without changing the API or database."""
 import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,7 @@ def https(path):
 
 
 def main():
+    global FIX, DESTINATION
     if os.geteuid() != 0:
         sys.exit("Use sudo. No changes made.")
     for line in (SOURCE / "FILES.sha256").read_text().splitlines():
@@ -38,6 +40,11 @@ def main():
             sys.exit("Unsafe package path. No changes made.")
         if hashlib.sha256(file.read_bytes()).hexdigest() != expected:
             sys.exit(f"Checksum mismatch: {relative}. No changes made.")
+    package_release = json.loads((SOURCE / "web/release.json").read_text())
+    FIX = package_release.get("frontend_fix", "")
+    if package_release.get("release") != BASE_RELEASE or not re.fullmatch(r"[a-z0-9-]{1,80}", FIX):
+        sys.exit("Invalid frontend fix metadata. No changes made.")
+    DESTINATION = Path("/opt/syndicateos/frontend-fixes") / FIX / "web"
     release = json.loads(Path("/opt/syndicateos/current/web/release.json").read_text())
     if release.get("release") != BASE_RELEASE:
         sys.exit("This fix requires the confirmed fresh release. No changes made.")
@@ -45,7 +52,10 @@ def main():
     if json.loads(https("/api/readyz")).get("status") != "ready":
         sys.exit("Current API is not ready. No changes made.")
     original = SNIPPET.read_text()
-    old_root = "root /opt/syndicateos/current/web;"
+    roots = re.findall(r"(?m)^root (/opt/syndicateos/(?:current/web|frontend-fixes/[a-z0-9-]+/web));$", original)
+    if len(roots) != 1:
+        sys.exit("Unexpected Nginx root. Stop for review; no changes made.")
+    old_root = f"root {roots[0]};"
     new_root = f"root {DESTINATION};"
     if original.count(old_root) != 1 and original.count(new_root) != 1:
         sys.exit("Unexpected Nginx root. Stop for review; no changes made.")
@@ -84,7 +94,6 @@ def main():
                 if json.loads(https("/api/readyz")).get("status") != "ready":
                     raise ValueError("API readiness check failed.")
                 index = (DESTINATION / "index.html").read_text()
-                import re
                 script = re.search(r'src="(/assets/[^"]+\.js)"', index).group(1)
                 for path in ("/", "/owner"):
                     if script not in https(path):
@@ -102,7 +111,7 @@ def main():
         run(["systemctl", "reload", "nginx"])
         print("Verification failed; previous frontend routing restored.", file=sys.stderr)
         raise
-    print("Member-login frontend fix installed; HTTPS routes and API readiness passed.")
+    print(f"Frontend fix {FIX} installed; HTTPS routes and API readiness passed.")
     print("No database changes, password resets, or API restarts were performed.")
     print(f"Open https://{DOMAIN}/ in a private browser window.")
 
