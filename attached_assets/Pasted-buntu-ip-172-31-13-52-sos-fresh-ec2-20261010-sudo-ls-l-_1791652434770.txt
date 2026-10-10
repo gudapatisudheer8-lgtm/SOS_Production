@@ -1,0 +1,73 @@
+buntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$ sudo ls -l /etc/nginx/sites-enabled
+total 0
+lrwxrwxrwx 1 root root 34 Oct  9 08:06 default -> /etc/nginx/sites-available/default
+lrwxrwxrwx 1 root root 38 Oct  9 08:08 syndicateos -> /etc/nginx/sites-available/syndicateos
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$ sudo grep -R -n -B 10 -A 100 \
+  'server_name.*sos\.krishisetu9\.in' \
+  /etc/nginx/sites-enabled
+/etc/nginx/sites-enabled/syndicateos-1-server {
+/etc/nginx/sites-enabled/syndicateos:2:    server_name sos.krishisetu9.in;
+/etc/nginx/sites-enabled/syndicateos-3-
+/etc/nginx/sites-enabled/syndicateos-4-    root /opt/syndicateos/web;
+/etc/nginx/sites-enabled/syndicateos-5-    index index.html;
+/etc/nginx/sites-enabled/syndicateos-6-
+/etc/nginx/sites-enabled/syndicateos-7-    server_tokens off;
+/etc/nginx/sites-enabled/syndicateos-8-    client_max_body_size 256k;
+/etc/nginx/sites-enabled/syndicateos-9-
+/etc/nginx/sites-enabled/syndicateos-10-    add_header X-Content-Type-Options nosniff always;
+/etc/nginx/sites-enabled/syndicateos-11-    add_header Referrer-Policy strict-origin-when-cross-origin always;
+/etc/nginx/sites-enabled/syndicateos-12-
+/etc/nginx/sites-enabled/syndicateos-13-    proxy_http_version 1.1;
+/etc/nginx/sites-enabled/syndicateos-14-    proxy_set_header Host $host;
+/etc/nginx/sites-enabled/syndicateos-15-    proxy_set_header X-Real-IP $remote_addr;
+/etc/nginx/sites-enabled/syndicateos-16-    proxy_set_header X-Forwarded-For $remote_addr;
+/etc/nginx/sites-enabled/syndicateos-17-    proxy_set_header X-Forwarded-Proto $scheme;
+/etc/nginx/sites-enabled/syndicateos-18-    proxy_set_header Authorization $http_authorization;
+/etc/nginx/sites-enabled/syndicateos-19-    proxy_connect_timeout 5s;
+/etc/nginx/sites-enabled/syndicateos-20-    proxy_read_timeout 30s;
+/etc/nginx/sites-enabled/syndicateos-21-    proxy_send_timeout 30s;
+/etc/nginx/sites-enabled/syndicateos-22-
+/etc/nginx/sites-enabled/syndicateos-23-    location = /api/auth/login {
+/etc/nginx/sites-enabled/syndicateos-24-        limit_req zone=sos_login burst=10 nodelay;
+/etc/nginx/sites-enabled/syndicateos-25-        limit_req_status 429;
+/etc/nginx/sites-enabled/syndicateos-26-        proxy_pass http://127.0.0.1:8090;
+/etc/nginx/sites-enabled/syndicateos-27-    }
+/etc/nginx/sites-enabled/syndicateos-28-
+/etc/nginx/sites-enabled/syndicateos-29-    location ^~ /api/ {
+/etc/nginx/sites-enabled/syndicateos-30-        proxy_pass http://127.0.0.1:8090;
+/etc/nginx/sites-enabled/syndicateos-31-    }
+/etc/nginx/sites-enabled/syndicateos-32-
+/etc/nginx/sites-enabled/syndicateos-33-    location ^~ /assets/ {
+/etc/nginx/sites-enabled/syndicateos-34-        try_files $uri =404;
+/etc/nginx/sites-enabled/syndicateos-35-    }
+/etc/nginx/sites-enabled/syndicateos-36-
+/etc/nginx/sites-enabled/syndicateos-37-    location ~ /\.(?!well-known/) {
+/etc/nginx/sites-enabled/syndicateos-38-        deny all;
+/etc/nginx/sites-enabled/syndicateos-39-    }
+/etc/nginx/sites-enabled/syndicateos-40-
+/etc/nginx/sites-enabled/syndicateos-41-    location / {
+/etc/nginx/sites-enabled/syndicateos-42-        try_files $uri $uri/ /index.html;
+/etc/nginx/sites-enabled/syndicateos-43-    }
+/etc/nginx/sites-enabled/syndicateos-44-
+/etc/nginx/sites-enabled/syndicateos-45-    listen 443 ssl; # managed by Certbot
+/etc/nginx/sites-enabled/syndicateos-46-    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+/etc/nginx/sites-enabled/syndicateos-47-    ssl_certificate /etc/letsencrypt/live/sos.krishisetu9.in/fullchain.pem; # managed by Certbot
+/etc/nginx/sites-enabled/syndicateos-48-    ssl_certificate_key /etc/letsencrypt/live/sos.krishisetu9.in/privkey.pem; # managed by Certbot
+/etc/nginx/sites-enabled/syndicateos-49-    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+/etc/nginx/sites-enabled/syndicateos-50-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+/etc/nginx/sites-enabled/syndicateos-51-
+/etc/nginx/sites-enabled/syndicateos-52-}
+/etc/nginx/sites-enabled/syndicateos-53-server {
+/etc/nginx/sites-enabled/syndicateos-54-    if ($host = sos.krishisetu9.in) {
+/etc/nginx/sites-enabled/syndicateos-55-        return 301 https://$host$request_uri;
+/etc/nginx/sites-enabled/syndicateos-56-    } # managed by Certbot
+/etc/nginx/sites-enabled/syndicateos-57-
+/etc/nginx/sites-enabled/syndicateos-58-
+/etc/nginx/sites-enabled/syndicateos-59-    listen 80;
+/etc/nginx/sites-enabled/syndicateos-60-    listen [::]:80;
+/etc/nginx/sites-enabled/syndicateos:61:    server_name sos.krishisetu9.in;
+/etc/nginx/sites-enabled/syndicateos-62-    return 404; # managed by Certbot
+/etc/nginx/sites-enabled/syndicateos-63-
+/etc/nginx/sites-enabled/syndicateos-64-
+/etc/nginx/sites-enabled/syndicateos-65-}
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$
