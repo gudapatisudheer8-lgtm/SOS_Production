@@ -1,0 +1,22 @@
+---
+name: Personal marketing access
+description: Why marketing access uses individual invitations and separate credentials rather than the accountant entry.
+---
+
+Use a personal invitation for each marketing mobile and project, not a shared public signup link. Opening a marketing link must never restore or display the accountant dashboard.
+
+**Why:** The user selected personal invitations and reported that the previous marketing link opened the accountant dashboard.
+
+**How to apply:** Keep the marketing entry independent of normal firm login. Verify the invited mobile and require the initial credential change before inventory access.
+
+Marketing credentials must remain separate from accountant and partner credentials, even when the same person uses the same mobile in both contexts.
+
+**Why:** Marketing enrollment must not reset or weaken an existing financial user's login.
+
+**How to apply:** Keep authentication authority separate; marketing access permits scoped inventory and booking proposals, never financial dashboards or ledger posting. Re-invitations must preserve an activated marketing credential.
+
+Do not use the new-PIN length policy to reject a temporary or previously stored login credential.
+
+**Why:** The shorter temporary marketing credential was blocked when the first login screen reused permanent-PIN validation. A policy change must also not lock out existing credentials.
+
+**How to apply:** Validate the stored credential at sign-in; apply the current length policy only when setting a new credential.

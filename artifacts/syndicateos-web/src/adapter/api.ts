@@ -160,7 +160,7 @@ export function installOriginalFetchBridge() {
     // These are real Spring endpoints, not legacy prototype operations.
     // Request resolves relative URLs and prevents an older hot-loaded bridge
     // from intercepting this forwarding call again.
-    if (/^\/api\/(?:commands(?:\/|$)|erp(?:\/|$)|configuration(?:\/|$)|workspace(?:\?|$)|healthz(?:\?|$)|readyz(?:\?|$))/.test(url)) {
+    if (/^\/api\/(?:commands(?:\/|$)|erp(?:\/|$)|marketing(?:\/|$)|configuration(?:\/|$)|workspace(?:\?|$)|healthz(?:\?|$)|readyz(?:\?|$))/.test(url)) {
       return nativeFetch(new Request(input, { ...init, redirect: 'manual' }));
     }
     if (!url.startsWith('/api/')) return nativeFetch(input as any, init);

@@ -16,6 +16,7 @@ import { useConfig, sectorUiCode, masterNumber } from './adapter/config';
 import { MasterEditor } from './adapter/MasterEditor';
 import { loadAll, erpSave, erpReview, command, pickConfigured, describeAccess, type LoadedData } from './adapter/erp';
 import { ProjectPlanSaver } from './adapter/projectPlans';
+import { MarketingAccessPage } from './marketing/MarketingAccessPage';
 
 const EMPTY_LAYOUT: LayoutCalculation = { totalExtentValue: 0, unit: 'Acres', roadWidth: 30, openSpacePercent: 10, floorRatePerSqYard: 0 };
 const EMPTY_MATRIX: ApartmentPricingMatrix = { baseSqFtRate: 0, eastPremium: 0, northPremium: 0, cornerPremium: 0, floorRisePerFloor: 0, carParkingFee: 0, amenitiesFee: 0, floorRatePerSqFt: 0 };
@@ -24,7 +25,6 @@ const EMPTY_MATRIX: ApartmentPricingMatrix = { baseSqFtRate: 0, eastPremium: 0, 
 const BLOCKED_ACTIONS = [
   'Owner sign-in into accountant / partner consoles (owner has no ERP scope)',
   'Feature flags: WhatsApp, Tally export, voice notes, audit lock, dual ledger',
-  'Marketing agent plot portal',
   'Separate drawing disbursement (ledger posts on approval)',
 ];
 
@@ -87,6 +87,12 @@ function App() {
       .catch(() => { clearSession(); setCurrentUser(null); })
       .finally(() => setBooting(false));
   }, [reload]);
+
+  useEffect(() => {
+    const changed = () => { if (currentUser) void reload(currentUser.role); };
+    window.addEventListener('sos-marketing-changed', changed);
+    return () => window.removeEventListener('sos-marketing-changed', changed);
+  }, [currentUser, reload]);
 
   useEffect(() => {
     const onExpired = () => {
@@ -297,6 +303,14 @@ function App() {
     const id = data?.plotIds.get(plot.id); const meta = id ? metaOf(id) : undefined;
     if (!meta) return unsupported('plot is not a saved backend record.');
     const prev = data?.plots.find((x) => x.id === plot.id);
+    const proposal = plot.marketingRequest;
+    if (prev?.marketingRequest?.status === 'pending' && proposal?.id === prev.marketingRequest.id
+      && (proposal.status === 'accepted_blocked' || proposal.status === 'rejected')) {
+      return run(`Marketing request for plot ${plot.plotNumber} reviewed`, () => api(
+        `/marketing/proposals/${encodeURIComponent(proposal.id)}/review`,
+        { method: 'POST', body: { accept: proposal.status === 'accepted_blocked' } },
+      ));
+    }
     if (prev?.status === 'available' && plot.status !== 'available' && plot.buyerName) {
       return run(`Booking for plot ${plot.plotNumber} submitted`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'bookings', { ...plot, inventoryId: meta.id }));
     }
@@ -580,4 +594,12 @@ function App() {
   );
 }
 
-export default App;
+function AppEntry() {
+  const params = new URLSearchParams(window.location.search);
+  if (/\/marketing\/?$/.test(window.location.pathname) || params.get('portal') === 'marketing') {
+    return <MarketingAccessPage invitation={params.get('invite')} />;
+  }
+  return <App />;
+}
+
+export default AppEntry;

@@ -26,3 +26,9 @@ Finish workflow restarts before browser verification. A component harness mounte
 **Why:** A restart interrupted a responsive layout check and removed the temporary harness; that blank harness was not evidence of a persistent application failure.
 
 **How to apply:** Avoid edits and restarts during captures. Isolated component rendering can check presentation without customer writes, but does not verify authenticated saving or the complete dashboard.
+
+Preserve the browser's Host header when an isolated UI-test proxy forwards requests to Spring.
+
+**Why:** Rewriting Host to the upstream API port made same-origin browser POSTs appear cross-origin. Spring rejected both company verification and invitation creation, while GET requests still worked.
+
+**How to apply:** Distinguish a plain-text `Invalid CORS request` from application authorization errors before changing authentication or weakening allowed origins.

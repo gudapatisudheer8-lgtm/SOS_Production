@@ -40,7 +40,7 @@ public class SecurityConfiguration {
         }
         cors.setAllowedOrigins(allowed);
         cors.setAllowedMethods(java.util.List.of("GET", "POST", "OPTIONS"));
-        cors.setAllowedHeaders(java.util.List.of("Content-Type", "Authorization"));
+        cors.setAllowedHeaders(java.util.List.of("Content-Type", "Authorization", "X-Marketing-Session"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", cors);
         return http
@@ -52,6 +52,8 @@ public class SecurityConfiguration {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/healthz", "/api/readyz", "/api/auth/login", "/api/auth/company").permitAll()
+                .requestMatchers("/api/marketing/access/**").permitAll()
+                .requestMatchers("/api/marketing/**").authenticated()
                 .requestMatchers("/api/auth/**", "/api/workspace", "/api/commands/**", "/api/configuration/**", "/api/erp/**").authenticated()
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors
