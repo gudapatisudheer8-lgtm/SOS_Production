@@ -50,3 +50,4 @@ Thumbs.db
 .cache/
 .local/
 /releases/sos-development.tar.gz
+/generated-artifacts/
