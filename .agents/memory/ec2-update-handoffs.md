@@ -20,3 +20,9 @@ Account for Nginx's asynchronous worker transition when verifying HTTPS immediat
 **Why:** A fresh activation's first release request hit an old-root redirect cycle, while a later request served the correct release with valid file permissions. Reload timing was the likely cause, not a database or permissions failure.
 
 **How to apply:** Check the failing route and current response before changing configuration. Future activation checks should use bounded retries with exact release/readiness validation and retain fail-closed behavior for persistent errors.
+
+For frontend-only EC2 hotfixes, retain the original checksummed release and switch the SOS web root to a separate versioned frontend directory.
+
+**Why:** In-place replacement of frontend files invalidates the base installer's package checksums and can block later configuration or activation. A separate root also permits routing rollback without touching credentials, uploads, or the database.
+
+**How to apply:** Back up only the SOS routing snippet, validate syntax and exact frontend markers over HTTPS with bounded retries, and restore the prior routing on failure.

@@ -2038,27 +2038,27 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       )}
 
       {/* Modal: + Enroll Project Expense */}
-      <EnrollExpenseModal
+      {activeProject && <EnrollExpenseModal
         isOpen={isEnrollExpenseModalOpen}
         onClose={() => setIsEnrollExpenseModalOpen(false)}
         firm={firm}
-        project={activeProject || undefined}
+        project={activeProject}
         partners={activeProjectPartners}
         firmAccounts={firmAccounts}
         onEnrollExpense={(newExpense, bankAccountId) => onEnrollExpense(newExpense, bankAccountId)}
-      />
+      />}
 
       {/* Modal: + Individual Investment */}
-      <IndividualInvestmentModal
+      {activeProject && <IndividualInvestmentModal
         isOpen={isIndividualInvestmentModalOpen}
         onClose={() => setIsIndividualInvestmentModalOpen(false)}
         firm={firm}
-        project={activeProject || undefined}
+        project={activeProject}
         partners={activeProjectPartners}
         firmAccounts={firmAccounts}
         initiatorRole="accountant"
         onRecordInvestment={(data) => (onRecordIndividualInvestment ? onRecordIndividualInvestment(data) : false)}
-      />
+      />}
 
       {/* Modal: Voucher Slip View & Print */}
       {selectedVoucherForSlip && (

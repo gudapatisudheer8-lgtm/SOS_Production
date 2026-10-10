@@ -308,3 +308,17 @@ mtime_ms = 1791650941522
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/82a855c7-09c3-44bf-addc-8ba232b04122/e43e3abc-0337-4aac-bb31-ecc18fc69450"
 storage_version_token = "1791650969931230"
 content_type = "text/html"
+
+[[outputs]]
+id = "-avtrTJNDzdYNNN6TLJUk"
+uri = "file://generated-artifacts/ec2/sos-member-login-fix-20261010.tar.gz"
+type = "unspecified"
+title = "EC2 Member Login Fix — Frontend Only"
+description = "Fixes the fresh-firm accountant blank screen. Browser-tested accountant PIN reset, expense/investment forms, and assigned partner dashboard. No database migration, credential reset, or API replacement."
+logical_id = "65d6eb13-01a6-46bc-a7ff-0288a24c4bf2"
+content_hash = "sha256:278447be7e1f6372356164fd22045dffadd9fcffe99c132c6e7c308c2befff74"
+size = 224916
+mtime_ms = 1791653594035
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/65d6eb13-01a6-46bc-a7ff-0288a24c4bf2/1834d9c7-f481-4c0b-ab2c-3651d7d507c3"
+storage_version_token = "1791653950475169"
+content_type = "application/octet-stream"
