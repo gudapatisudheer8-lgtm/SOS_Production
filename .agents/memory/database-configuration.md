@@ -15,6 +15,12 @@ Published configuration changes require explicit firm assignment; do not silentl
 
 **How to apply:** Include the exact new release label and assignment step in deployment instructions. Preserve historical configuration and existing operational data.
 
+Backward-compatible optional project metadata can be added through catalog-defined optional fields without changing a firm's release assignment or editing published definitions.
+
+**Why:** Layout utility areas needed persistence on existing interfaces, whose published configuration is deliberately immutable.
+
+**How to apply:** Extensions must not override existing bindings or introduce required fields or change financial/security rules. Use the same effective configuration for displaying, validating and saving them; keep their limits in PostgreSQL configuration.
+
 Treat a migration as immutable once its EC2 archive has been shared, even if installation has not been confirmed.
 
 **Why:** The user may already have downloaded or installed that archive. Changing its migration checksum would make later upgrades unsafe.

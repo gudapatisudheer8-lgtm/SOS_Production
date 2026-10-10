@@ -49,12 +49,20 @@ public final class ProjectSetupDefinitions {
         for(JsonNode f:fields) {
             if(!f.path("key").asText().matches("[a-z][A-Za-z0-9]{0,63}")||!keys.add(f.path("key").asText())
                 ||f.path("label").asText().isBlank()||!f.path("required").isBoolean()
-                ||!Set.of("text","multiline","number","boolean","date","select").contains(f.path("kind").asText()))
+                ||!Set.of("text","multiline","number","boolean","date","select","rows").contains(f.path("kind").asText()))
                 throw ApiProblem.invalid("Setup fields must have valid unique bindings, labels, kinds and required flags.");
             if("select".equals(f.path("kind").asText())) {
                 Set<String> options=new HashSet<>();
                 if(!f.path("options").isArray()||f.path("options").isEmpty()||f.path("options").size()>100) throw ApiProblem.invalid("Configure dropdown options.");
                 for(JsonNode option:f.path("options")) if(!option.isTextual()||option.asText().isBlank()||!options.add(option.asText())) throw ApiProblem.invalid("Dropdown choices must be unique text.");
+            }
+            if("rows".equals(f.path("kind").asText())) {
+                if(!f.path("maxRows").isInt()||f.path("maxRows").asInt()<1||f.path("maxRows").asInt()>1000
+                    ||!f.path("fields").isArray()||f.path("fields").isEmpty())
+                    throw ApiProblem.invalid("Configure bounded row fields.");
+                for(JsonNode child:f.path("fields")) if("rows".equals(child.path("kind").asText()))
+                    throw ApiProblem.invalid("Nested setup rows are not supported.");
+                check(f.path("fields"),new HashSet<>());
             }
         }
     }

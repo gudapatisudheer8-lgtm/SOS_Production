@@ -42,6 +42,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 }) => {
   const [newAmenityName, setNewAmenityName] = useState('');
   const [newAmenityArea, setNewAmenityArea] = useState<number>(0);
+  const [amenityError, setAmenityError] = useState('');
   const [showAddAmenity, setShowAddAmenity] = useState(false);
   const [showLiveGridPreview, setShowLiveGridPreview] = useState(false);
 
@@ -114,20 +115,22 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
     });
   };
 
-  const handleAddAmenity = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAmenityName.trim()) return;
+  const handleAddAmenity = () => {
+    if (!newAmenityName.trim() || !Number.isFinite(newAmenityArea) || newAmenityArea <= 0) {
+      setAmenityError('Enter a space name and an area greater than zero.');
+      return;
+    }
 
     const newAmenity: LayoutAmenity = {
-      id: `layout-amenity-${Date.now()}`,
+      id: crypto.randomUUID(),
       name: newAmenityName.trim(),
-      allocatedAreaSqYards: Number(newAmenityArea) || 200,
-      category: 'park',
+      allocatedAreaSqYards: newAmenityArea,
     };
 
     onAmenitiesChange([...amenities, newAmenity]);
     setNewAmenityName('');
-    setNewAmenityArea(500);
+    setNewAmenityArea(0);
+    setAmenityError('');
     setShowAddAmenity(false);
   };
 
@@ -522,8 +525,16 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 
         {/* Add amenity modal/form */}
         {showAddAmenity && (
-          <form
-            onSubmit={handleAddAmenity}
+          <div
+            role="group"
+            aria-label="Add layout utility area"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAddAmenity();
+              }
+            }}
             className="bg-white p-3.5 rounded-xl border border-emerald-300 shadow-sm flex flex-wrap items-center gap-3"
           >
             <div className="flex-1 min-w-[200px]">
@@ -549,7 +560,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
                 step="1"
                 min="0"
                 value={newAmenityArea === 0 ? '' : newAmenityArea}
-                onChange={(e) => setNewAmenityArea(parseInt(e.target.value) || 0)}
+                onChange={(e) => setNewAmenityArea(e.target.value === '' ? 0 : Number(e.target.value))}
                 placeholder="0"
                 className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-black text-gray-900 outline-none"
               />
@@ -557,7 +568,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 
             <div className="flex items-center gap-2 pt-4">
               <button
-                type="submit"
+                type="button"
+                onClick={handleAddAmenity}
                 className="px-4 py-1.5 bg-emerald-600 text-white font-bold rounded-lg text-xs hover:bg-emerald-700"
               >
                 Add Space
@@ -570,7 +582,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
                 Cancel
               </button>
             </div>
-          </form>
+            {amenityError && <p role="alert" className="w-full text-xs font-semibold text-red-700">{amenityError}</p>}
+          </div>
         )}
 
         {/* Amenities List */}

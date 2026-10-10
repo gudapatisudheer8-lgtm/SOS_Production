@@ -78,7 +78,7 @@ public class ErpService {
         });
     }
     private JsonNode projectPolicy(UUID release) {
-        var rows=jdbc.queryForList("SELECT definition FROM sos.project_setup_definitions WHERE release_id=?",release);
+        var rows=jdbc.queryForList("SELECT definition FROM sos.project_setup_effective_definitions WHERE release_id=?",release);
         return rows.isEmpty()?json.createObjectNode():parse(rows.getFirst().get("definition"));
     }
     private Map<String,Object> settings(UUID project) {

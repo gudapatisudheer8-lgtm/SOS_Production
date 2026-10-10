@@ -189,7 +189,7 @@ export interface LayoutAmenity {
   id: string;
   name: string;
   allocatedAreaSqYards: number;
-  category: 'park' | 'utilities' | 'clubhouse' | 'roads';
+  category?: 'park' | 'utilities' | 'clubhouse' | 'roads';
 }
 
 export type PlotStatus = 'available' | 'blocked' | 'reserved' | 'sold';

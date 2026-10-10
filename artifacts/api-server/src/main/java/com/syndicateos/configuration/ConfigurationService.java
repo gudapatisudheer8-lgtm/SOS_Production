@@ -62,7 +62,7 @@ public class ConfigurationService {
         for (Map<String,Object> grant : jdbc.queryForList("SELECT * FROM sos.permission_grants WHERE release_id=? ORDER BY role_code,permission_key",id))
             grants.addObject().put("role",(String)grant.get("role_code")).put("permission",(String)grant.get("permission_key")).put("scope",(String)grant.get("scope"));
         root.set("resources",erp.read(id));
-        var setup=jdbc.queryForList("SELECT definition FROM sos.project_setup_definitions WHERE release_id=?",id);
+        var setup=jdbc.queryForList("SELECT definition FROM sos.project_setup_effective_definitions WHERE release_id=?",id);
         if(!setup.isEmpty()) {
             ObjectNode definition=(ObjectNode)parse(setup.getFirst().get("definition"));
             definition.put("versionId",id.toString());

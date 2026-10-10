@@ -76,7 +76,7 @@ public class ProjectSetupService {
         return row;
     }
     private JsonNode definition(UUID release) {
-        var rows=jdbc.queryForList("SELECT definition FROM sos.project_setup_definitions WHERE release_id=?",release);
+        var rows=jdbc.queryForList("SELECT definition FROM sos.project_setup_effective_definitions WHERE release_id=?",release);
         if(rows.isEmpty()) throw new ApiProblem(409,"SETUP_NOT_CONFIGURED","The owner must assign a published Project workspace release.");
         return config.parse(rows.getFirst().get("definition"));
     }
@@ -199,7 +199,7 @@ public class ProjectSetupService {
         for(JsonNode a:setup.path("accounts")) bootstrap(actor,id,"accounts",a,request,pos++);
         for(JsonNode d:setup.path("documents")) bootstrap(actor,id,"documents",d,request,pos++);
         for(JsonNode row:inventory) bootstrap(actor,id,def.path("inventory").path("kind").asText(),row,request,pos++);
-        ObjectNode erpSettings=json.createObjectNode();
+        ObjectNode erpSettings=settings.deepCopy();
         erpSettings.set("equitySplitMode",settings.path("equitySplitMode"));
         ObjectNode plan=erpSettings.putObject("projectPlan");plan.set("groups",setup.path("groups"));plan.set("values",values);
         jdbc.update("INSERT INTO sos.erp_project_settings(project_id,data) VALUES (?,?::jsonb) ON CONFLICT(project_id) DO UPDATE SET data=excluded.data,revision=sos.erp_project_settings.revision+1",
@@ -287,6 +287,13 @@ public class ProjectSetupService {
                         throw ApiProblem.invalid("Outside configured limits: "+field.path("label").asText());
                 }
                 case "boolean" -> {if(!v.isBoolean()) throw ApiProblem.invalid("Choose a valid boolean.");}
+                case "rows" -> {
+                    if(!v.isArray()||v.size()>field.path("maxRows").asInt(1000))
+                        throw ApiProblem.invalid("Invalid rows: "+field.path("label").asText());
+                    ArrayNode rows=data.arrayNode();
+                    for(JsonNode row:v) rows.add(fields(field.path("fields"),row,required));
+                    data.set(key,rows);
+                }
                 case "date" -> {try{LocalDate.parse(v.asText());}catch(Exception e){throw ApiProblem.invalid("Enter an ISO date.");}}
                 case "select" -> {
                     boolean found=false;for(JsonNode option:field.path("options")) if(option.asText().equals(v.asText())) found=true;

@@ -172,6 +172,7 @@ export async function loadAll(role: string): Promise<LoadedData> {
     }
     for (const a of erp.audit || []) out.audit.push({ id: String(a.id), timestamp: a.timestamp, actorName: a.actor, action: a.event, deviceId: '', notes: `${p.name}`, ledgerType: 'System Governance', verified: true });
     const s = erp.settings || {};
+    if (Array.isArray(s.layoutAmenities)) p.layoutAmenities = s.layoutAmenities;
     if (s.layoutCalculation) out.settings.layoutCalc = s.layoutCalculation;
     if (s.pricingMatrix) out.settings.pricingMatrix = s.pricingMatrix;
     if (s.equitySplitMode) out.settings.splitMode = s.equitySplitMode;
