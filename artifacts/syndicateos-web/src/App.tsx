@@ -178,6 +178,18 @@ function App() {
       command('firm.update', { firmId, name: f.name, status: f.status === 'active' ? 'SUSPENDED' : 'ACTIVE', revision: f.__revision, ...firmMetadata(f) }));
   };
 
+  const handleResetAccountantPin = (firmId: string) => run('Accountant temporary PIN issued', async () => {
+    const firm = firms.find((f) => f.id === firmId);
+    const registered = data?.workspace?.firms?.find((f: any) => String(f.id) === firmId);
+    const accountant = registered?.accountants?.find((a: any) =>
+      a.mobile === normalizeClientMobile(firm?.accountantPhone || ''));
+    if (!accountant?.identityId) throw new Error('The registered accountant could not be identified. Reload the owner console.');
+    const result: any = await command('credentials.reset', { identityId: accountant.identityId });
+    const notice = describeAccess(result.access);
+    if (!notice) throw new Error('The server did not return a temporary PIN.');
+    setStickyNotice(`${firm?.name} (${firm?.code}) accountant — ${notice}`);
+  });
+
   const handleUpdateFirmFlags = () => unsupported('feature flags are configured through sector releases, not per-firm toggles.');
 
   // ---------- Accountant: projects & partners ----------
@@ -426,6 +438,8 @@ function App() {
             onAddFirm={handleAddFirm}
             onUpdateFirm={handleUpdateFirm}
             onToggleFirmStatus={handleToggleFirmStatus}
+            onResetAccountantPin={handleResetAccountantPin}
+            issuedAccessNotice={stickyNotice}
             onUpdateFirmFlags={handleUpdateFirmFlags}
             onSwitchRole={() => unsupported('owners cannot enter firm consoles; sign in as the firm accountant.')}
           />

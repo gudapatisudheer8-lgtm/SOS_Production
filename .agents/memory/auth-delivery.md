@@ -8,3 +8,9 @@ Use database-backed opaque bearer sessions. Browser tokens are per-tab in sessio
 **Why:** Expo browser previews and the API can have different origins, and the same application must later support native clients. Cookie-only authentication would require a different delivery and CSRF model.
 
 **How to apply:** Keep tokens out of logs and ordinary native storage. Clear identity-scoped query caches when sessions end. If switching production web to HttpOnly cookies, explicitly revisit CSRF, cookie attributes, cross-origin behavior and native authentication rather than silently retaining bearer-only assumptions.
+
+Account provisioning and recovery must communicate the server-issued temporary PIN, never advertise a universal prototype PIN.
+
+**Why:** leftover prototype login instructions made a newly provisioned accountant unable to sign in despite successful firm creation.
+
+**How to apply:** display issuance results transiently in the owner flow, explain that reused identities keep their existing PIN, and offer an explicitly confirmed owner reset if the notice was missed. Warn that resetting a shared identity affects its sessions across firms; never persist plaintext PINs.

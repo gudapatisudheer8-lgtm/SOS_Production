@@ -44,6 +44,8 @@ interface SuperAdminViewProps {
   onAddFirm: (firm: TenantFirm) => void | boolean | Promise<boolean>;
   onUpdateFirm?: (firm: TenantFirm) => void | boolean | Promise<boolean>;
   onToggleFirmStatus?: (firmId: string) => void | boolean | Promise<boolean>;
+  onResetAccountantPin?: (firmId: string) => Promise<boolean>;
+  issuedAccessNotice?: string | null;
   onUpdateFirmFlags: (firmId: string, flags: Partial<FeatureFlags>) => void;
   onSelectFirm?: (firmId: string) => void;
   activeFirmId?: string;
@@ -55,12 +57,15 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   onAddFirm,
   onUpdateFirm,
   onToggleFirmStatus,
+  onResetAccountantPin,
+  issuedAccessNotice,
   onUpdateFirmFlags,
   onSelectFirm,
   activeFirmId,
   onSwitchRole,
 }) => {
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [resettingAccountantPin, setResettingAccountantPin] = useState(false);
   
   // Onboarding Form States
   const [newFirmName, setNewFirmName] = useState('');
@@ -1114,8 +1119,17 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                       Mobile Number (Unique Login ID): <strong className="text-amber-900 font-bold">{generatedCredentials.accountantPhone}</strong>
                     </div>
                     <div className="text-[11px] text-stone-600 bg-amber-50/70 p-2 rounded-lg border border-amber-200">
-                      How to log in: Open <strong>Firm Member Portal</strong> → Enter Firm Code <strong>{generatedCredentials.firmCode}</strong> → Mobile <strong>{generatedCredentials.accountantPhone}</strong> → Default PIN: <strong>9999</strong>
+                      How to log in: Open <strong>Firm Member Portal</strong> → Enter Firm Code <strong>{generatedCredentials.firmCode}</strong> → Mobile <strong>{generatedCredentials.accountantPhone}</strong> → Use the server-issued temporary six-digit PIN below. There is no default PIN.
                     </div>
+                    {issuedAccessNotice && (
+                      <div role="status" className="p-3 rounded-lg border border-amber-300 bg-amber-50 font-mono break-all">
+                        {issuedAccessNotice}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-stone-600">
+                      Save the temporary PIN securely before closing. Already registered accounts keep their existing PIN.
+                      If the PIN was missed, open Edit firm and select Reset accountant PIN.
+                    </p>
                   </div>
 
                   <div className="p-3 bg-white rounded-xl border border-gray-200 space-y-1 font-sans text-xs">
@@ -1454,6 +1468,30 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
               </div>
 
               <div><p className="text-[11px] text-stone-500 font-bold">Subscription plan: unavailable. The backend does not store a plan per firm yet.</p></div>
+
+              {onResetAccountantPin && (
+                <div className="p-3 rounded-xl border border-amber-300 bg-amber-50 space-y-2">
+                  <p className="text-xs font-bold">Accountant login access</p>
+                  <p className="text-xs text-stone-600">
+                    Issue a new temporary six-digit PIN for the registered accountant. This replaces their current PIN
+                    and signs them out across all firms where this account is used.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={resettingAccountantPin}
+                    onClick={async () => {
+                      if (!editingFirm || !window.confirm('Replace the registered accountant’s PIN and sign them out of all active sessions?')) return;
+                      setResettingAccountantPin(true);
+                      try { await onResetAccountantPin(editingFirm.id); }
+                      finally { setResettingAccountantPin(false); }
+                    }}
+                    className="px-4 py-2 rounded-lg border border-amber-400 font-bold text-xs disabled:opacity-50"
+                  >
+                    {resettingAccountantPin ? 'Issuing PIN…' : 'Reset accountant PIN'}
+                  </button>
+                  {issuedAccessNotice && <p role="status" className="font-mono text-xs break-all">{issuedAccessNotice}</p>}
+                </div>
+              )}
 
               {/* Modal Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-200">
