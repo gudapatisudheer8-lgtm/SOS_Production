@@ -32,3 +32,9 @@ Project-creation acceptance must include a rejected plan upload followed by retr
 **Why:** A valid-plan test passed while real rejected uploads left drafts behind; changing the local form identifier on every submit then collided with the database's unique project code. File-picker advertisements also exceeded the API's accepted formats.
 
 **How to apply:** Validate plan type and size before persisting a draft, retain the same draft across retries, and obtain explicit confirmation before continuing an existing unfinished setup. Never remove code uniqueness or silently delete drafts to resolve a conflict.
+
+API hotfixes must also preserve the original checksummed release: install the jar side by side and change its systemd command through a reversible override.
+
+**Why:** Replacing the base jar in place would invalidate future deployment checks just as replacing the original frontend would.
+
+**How to apply:** Preserve the base environment file, JVM limits, private uploads, disabled runtime migrations and loopback binding. Verify the active command and readiness; restore the prior override on failure.

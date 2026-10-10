@@ -48,7 +48,7 @@ public class ErpConfiguration {
                 for(JsonNode role:roles) {
                     String code=role.asText();
                     boolean partnerAllowed="submit".equals(permission)?Set.of("investments","expenses","drawings","bookings","reimbursements").contains(kind)
-                        :"review".equals(permission)&&Set.of("investments","expenses","bookings","reimbursements").contains(kind);
+                        :"review".equals(permission)&&Set.of("investments","expenses","drawings","bookings","reimbursements").contains(kind);
                     if(!found.add(code)||!"ACCOUNTANT".equals(code)&&!("PARTNER".equals(code)&&partnerAllowed))
                         errors.add("Invalid resource role capability.");
                 }

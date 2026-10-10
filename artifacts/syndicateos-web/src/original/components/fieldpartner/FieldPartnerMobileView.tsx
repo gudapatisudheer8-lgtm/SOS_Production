@@ -75,6 +75,7 @@ export interface DrawingRequest {
   destinationAccountDetails?: string;
   purpose: string;
   requestedAt: string;
+  requestedByName?: string;
   status: 'pending_approval' | 'approved' | 'cleared';
   reviewedBy?: string;
   reviewedAt?: string;
@@ -792,6 +793,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   }, [partnerExpenses, expenseFilter]);
 
   const pendingExpenseApprovalsCount = partnerExpenses.filter((e) => e.status === 'pending').length;
+  const pendingDrawingApprovalsCount = submittedDrawings.filter((d) => d.status === 'pending_approval').length;
+  const pendingDeskApprovalsCount = pendingExpenseApprovalsCount + pendingDrawingApprovalsCount;
 
   // Active Project Individual Investments (Cash & Bank)
   const activeProjectInvestments = useMemo(() => {
@@ -937,11 +940,6 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   const handleApproveDrawing = (drawId: string) => {
     if (!currentPartner || !onReviewDrawing) return;
     onReviewDrawing(drawId, 'approved');
-  };
-
-  const handleDisburseDrawing = (_drawId: string) => {
-    // Disbursement is posted by the backend when a drawing is approved; there is no separate payout command.
-    onBlockedAction?.('separate drawing disbursement (the ledger posts on approval).');
   };
 
   // Sign-in is handled only by the production auth gate (server-verified). No local credential path exists here.
@@ -1155,9 +1153,9 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
           >
             <FileText className="w-4 h-4 text-amber-400" />
             <span>{t('tabExpensesApprovals')}</span>
-            {pendingExpenseApprovalsCount > 0 && (
+            {pendingDeskApprovalsCount > 0 && (
               <span className="px-2 py-0.5 rounded-full bg-red-600 text-white font-black text-[10px] animate-pulse">
-                {pendingExpenseApprovalsCount}
+                {pendingDeskApprovalsCount}
               </span>
             )}
           </button>
@@ -1905,10 +1903,10 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                 {t('expensesBannerSubtitle')}
               </p>
             </div>
-            {pendingExpenseApprovalsCount > 0 && (
+            {pendingDeskApprovalsCount > 0 && (
               <span className="px-3 py-1.5 bg-red-600 text-white font-black rounded-xl text-xs flex items-center gap-1.5 self-start sm:self-auto">
                 <Clock className="w-3.5 h-3.5" />
-                <span>{pendingExpenseApprovalsCount} {t('filterPending')}</span>
+                <span>{pendingDeskApprovalsCount} {t('filterPending')}</span>
               </span>
             )}
           </div>
@@ -2442,7 +2440,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                           </span>
                         </div>
                         <div className="text-[10px] text-gray-500 flex items-center gap-1.5 flex-wrap mt-0.5">
-                          <span>By: <strong className="text-gray-800">{draw.partnerName}</strong></span>
+                          <span>For: <strong className="text-gray-800">{draw.partnerName}</strong></span>
+                          {draw.requestedByName && <span>• Requested by: <strong className="text-gray-800">{draw.requestedByName}</strong></span>}
                           <span>•</span>
                           <span>Mode: <strong className="text-gray-700">{draw.payoutMode}</strong></span>
                           <span>•</span>
@@ -2473,6 +2472,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                           ? `Processed by: ${draw.disbursedBy} at ${draw.disbursedAt}`
                           : draw.reviewedBy
                           ? `Approved by: ${draw.reviewedBy}`
+                          : draw.status === 'cleared'
+                          ? 'Approved and posted to the project ledger'
                           : 'Awaiting consensus authorization'}
                       </div>
 
@@ -2483,18 +2484,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                             onClick={() => handleApproveDrawing(draw.id)}
                             className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
                           >
-                            Approve
-                          </button>
-                        )}
-                        {draw.status === 'pending_approval' && activeProject?.reviewableRecordIds?.includes(draw.id) && (
-                          <button
-                            type="button"
-                            onClick={() => handleDisburseDrawing(draw.id)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors shadow-2xs flex items-center gap-1"
-                            title="Disburse funds and debit the project bank account immediately"
-                          >
-                            <DollarSign className="w-3 h-3" />
-                            <span>Process Payout &amp; Debit A/C</span>
+                            Approve Drawing
                           </button>
                         )}
                         {draw.status === 'cleared' && (

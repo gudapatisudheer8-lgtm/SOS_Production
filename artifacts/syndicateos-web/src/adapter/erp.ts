@@ -207,7 +207,9 @@ export async function loadAll(role: string): Promise<LoadedData> {
     for (const r of recs.filter((x) => x.kind === 'drawings')) {
       const d = r.data || {};
       out.drawings.push({ ...d, id: String(r.id), firmId: p.firmId, projectId: p.id, amount: num(d.amount),
-        sourceAccountId: d.accountId, requestedAt: r.createdAt,
+        partnerName: (erp.partners || []).find((m: any) => String(m.id) === String(d.partnerId))?.name || 'Project partner',
+        sourceAccountId: d.accountId, sourceAccountName: out.accounts.find((a) => a.id === String(d.accountId))?.accountName,
+        requestedByName: r.createdByName, requestedAt: r.createdAt,
         status: r.status === 'approved' ? 'cleared' : r.status === 'rejected' ? ('rejected' as any) : 'pending_approval' } as DrawingRequest);
     }
     for (const a of erp.audit || []) out.audit.push({ id: String(a.id), timestamp: a.timestamp, actorName: a.actor, action: a.event, deviceId: '', notes: `${p.name}`, ledgerType: 'System Governance', verified: true });

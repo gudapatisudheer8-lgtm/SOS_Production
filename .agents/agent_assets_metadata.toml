@@ -350,3 +350,17 @@ mtime_ms = 1791656040834
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/abcefba9-869f-44cb-8d1f-a4fc0624ca9f/cf269946-e88c-4f04-8674-7fc25f0e3062"
 storage_version_token = "1791656178432618"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "As1VwiCfKDAw4b5J49xBr"
+uri = "file://generated-artifacts/ec2/sos-drawing-review-fix-20261010.tar.gz"
+type = "unspecified"
+title = "EC2 Partner Drawing Approval Fix"
+description = "Verified independent-partner approval, requester self-review denial, one ledger debit and matching accountant/partner statements. Includes API and frontend updates plus a confirmed, firm-scoped configuration rollout. Preserves existing requests, balances, credentials and immutable base deployment."
+logical_id = "edd882ef-4ae3-48cd-919e-94ac59e03fe2"
+content_hash = "sha256:6b4b882c9759b9b7daf8931121942c84917fddf979a17da5a44aa4af0653b8f2"
+size = 26849507
+mtime_ms = 1791659198151
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/edd882ef-4ae3-48cd-919e-94ac59e03fe2/0b901310-4060-4e0e-ba52-5a479ee3f0d5"
+storage_version_token = "1791659222286057"
+content_type = "application/octet-stream"
