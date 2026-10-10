@@ -1256,7 +1256,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             <div>
               <h3 className="text-xl font-black text-gray-950">No Open Plotting Venture Selected</h3>
               <p className="text-xs text-gray-600 mt-2 leading-relaxed max-w-md mx-auto">
-                Open plotting layout calculations, statutory DTCP/CRDA/HMDA road deductions, and plot inventory sync with specific open plotting ventures. Please add or select an Open Plotting project from the dropdown above to launch the layout engine.
+                Select an Open Plotting project to view its saved layout details and plot inventory, or add a new project to get started.
               </p>
             </div>
             <div className="pt-2">

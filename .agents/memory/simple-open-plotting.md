@@ -24,3 +24,9 @@ The user requires plots, roads, utilities and other allocated spaces together to
 **Why:** Clients need to understand how much land is allocated and avoid allocating more land than the venture actually contains.
 
 **How to apply:** Treat declared venture area as the shared area limit across project entry and dashboards. Distinguish measured road area from estimates; road width alone does not establish its occupied area.
+
+The Open Plotting overview must be read-only and reflect the selected project's saved setup values, not an independent editable calculator or unrelated defaults.
+
+**Why:** The user found different values in this overview than those entered in the project form and explicitly requested cards or a correct non-editable view.
+
+**How to apply:** Show saved measurements and clearly labelled recorded inventory totals. Do not invent target selling rates, statutory deductions, net land or revenue estimates when those inputs are not recorded.

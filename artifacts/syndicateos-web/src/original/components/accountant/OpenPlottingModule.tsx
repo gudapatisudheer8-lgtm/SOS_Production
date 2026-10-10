@@ -1,7 +1,7 @@
 import { MasterOptions, masterNumber } from '../../../adapter/config';
 import React, { useState } from 'react';
 import { Plot, LayoutCalculation, ProjectExpense, PlotStatus, LedgerMode, Project, PlanUploadDocument, TenantFirm, FirmAccount, FirmAccountTransaction } from '../../types';
-import { formatINR, formatIndianCompact, calculateLayoutMetrics } from '../../utils/formatters';
+import { formatINR } from '../../utils/formatters';
 import {
   Compass,
   Grid3X3,
@@ -47,7 +47,6 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
   plots,
   onUpdatePlot,
   layoutCalc,
-  onUpdateLayoutCalc,
   ledgerMode = 'internal_syndicate',
   project,
   firm,
@@ -98,17 +97,22 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
       : '';
 
   // Floor Price Protection Modal state
-  const FLOOR_RATE_PER_SQYD = layoutCalc.floorRatePerSqYard || 0;
+  const FLOOR_RATE_PER_SQYD = project?.floorRatePerSqYard ?? layoutCalc.floorRatePerSqYard ?? 0;
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [pendingDiscountPlot, setPendingDiscountPlot] = useState<Plot | null>(null);
 
-  // Calculate layout metrics
-  const metrics = calculateLayoutMetrics(
-    layoutCalc.totalExtentValue,
-    layoutCalc.unit,
-    layoutCalc.roadWidth,
-    layoutCalc.openSpacePercent
-  );
+  // Read-only summary: saved selected-project values only
+  const isSaved = (v: unknown) => v !== undefined && v !== null && v !== '';
+  const NOT_SPECIFIED = 'Not specified';
+  const savedExtent = isSaved(project?.extentValue)
+    ? `${Number(project?.extentValue).toLocaleString('en-IN', { maximumFractionDigits: 6 })}${isSaved(project?.extentUnit) ? ` ${project?.extentUnit}` : ''}`
+    : NOT_SPECIFIED;
+  const savedRoadWidth = isSaved(project?.roadWidth) ? `${project?.roadWidth} ft` : NOT_SPECIFIED;
+  const savedOpenSpace = isSaved(project?.openSpacePercent) ? `${project?.openSpacePercent}%` : NOT_SPECIFIED;
+  const savedFloorRate = isSaved(project?.floorRatePerSqYard)
+    ? `₹${Number(project?.floorRatePerSqYard).toLocaleString('en-IN', { maximumFractionDigits: 6 })}/Sq.Yd`
+    : NOT_SPECIFIED;
+  const recordedPlotArea = plots.reduce((acc, p) => acc + (p.areaSqYards || 0), 0);
 
   // Plot summaries
   const totalPlots = plots.length;
@@ -154,18 +158,18 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. LAYOUT CALCULATOR & PROGRESSION STEP ENGINE */}
+      {/* 1. READ-ONLY PROJECT LAYOUT SUMMARY */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-200 space-y-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-gray-200 gap-3">
           <div>
             <div className="flex items-center gap-2">
               <Compass className="w-5 h-5 text-[#FFB800]" />
               <h3 className="text-lg font-black text-gray-950">
-                DTCP / CRDA / HMDA Venture Layout Engine
+                Project Layout Summary
               </h3>
             </div>
             <p className="text-xs text-gray-600 mt-0.5">
-              Input gross parcel extent and road specifications to auto-calculate statutory deductions and net sellable plot inventory.
+              Read-only values saved in project setup, alongside the plots recorded so far. Edit them from project setup.
             </p>
           </div>
 
@@ -190,152 +194,54 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
             <div className="flex items-center gap-2 bg-[#FFFDF0] px-3.5 py-1.5 rounded-full border border-amber-300 text-xs">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span className="text-gray-700 font-bold">Floor Rate Lock: </span>
-              <strong className="text-gray-950 font-black">{formatINR(FLOOR_RATE_PER_SQYD)}/Sq.Yd</strong>
+              <strong className="text-gray-950 font-black">{savedFloorRate}</strong>
             </div>
           </div>
         </div>
 
-        {/* Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-[#F4F4F6] p-4 rounded-2xl">
-          <div>
-            <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-              Total Venture Extent:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={layoutCalc.totalExtentValue}
-                onChange={(e) =>
-                  onUpdateLayoutCalc({
-                    ...layoutCalc,
-                    totalExtentValue: Number(e.target.value),
-                  })
-                }
-                className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs font-mono font-bold text-gray-950 focus:ring-2 focus:ring-amber-500"
-              />
-              <select
-                value={layoutCalc.unit}
-                onChange={(e) =>
-                  onUpdateLayoutCalc({
-                    ...layoutCalc,
-                    unit: e.target.value as any,
-                  })
-                }
-                className="bg-white border border-gray-300 rounded-xl p-2 text-xs font-bold text-gray-950"
-              >
-                <MasterOptions group="extent_units" />
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-              Approach Road Width:
-            </label>
-            <select
-              value={layoutCalc.roadWidth}
-              onChange={(e) =>
-                onUpdateLayoutCalc({
-                  ...layoutCalc,
-                  roadWidth: Number(e.target.value) as any,
-                })
-              }
-              className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950"
+        {/* Read-only saved project setup values */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="project-layout-summary">
+          {[
+            {
+              label: 'Venture Extent',
+              value: savedExtent,
+              note: 'Saved at project setup',
+            },
+            {
+              label: 'Approach Road Width',
+              value: savedRoadWidth,
+              note: 'Saved at project setup',
+            },
+            {
+              label: 'Planned Open Space',
+              value: savedOpenSpace,
+              note: 'Saved at project setup',
+            },
+            {
+              label: 'Protected Floor Rate',
+              value: savedFloorRate,
+              note: 'Saved at project setup',
+            },
+            {
+              label: 'Recorded Plots',
+              value: String(plots.length),
+              note: 'Plots entered in this project',
+            },
+            {
+              label: 'Recorded Plot Area',
+              value: `${recordedPlotArea.toLocaleString('en-IN', { maximumFractionDigits: 6 })} Sq.Yds`,
+              note: 'Sum of recorded plots; not the remaining venture land',
+            },
+          ].map((card, i) => (
+            <div
+              key={card.label}
+              className={`p-3.5 rounded-2xl border ${i >= 4 ? 'bg-[#FFFDF0] border-amber-300' : 'bg-[#F4F4F6] border-gray-200'}`}
             >
-              <MasterOptions group="road_widths" format={(o) => `${o.label} (${o.metadata.deductionPercent}% deduction)`} />
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-              Statutory Park / Open Space:
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="range"
-                min={5}
-                max={20}
-                value={layoutCalc.openSpacePercent}
-                onChange={(e) =>
-                  onUpdateLayoutCalc({
-                    ...layoutCalc,
-                    openSpacePercent: Number(e.target.value),
-                  })
-                }
-                className="w-full accent-amber-500"
-              />
-              <span className="font-mono text-xs font-black text-gray-950 w-12 text-right">
-                {layoutCalc.openSpacePercent}%
-              </span>
+              <span className="text-gray-500 text-[10px] font-bold uppercase tracking-wide block">{card.label}</span>
+              <strong className="text-base font-black text-gray-950 font-mono mt-1 block break-words">{card.value}</strong>
+              <span className="text-[10px] text-gray-500 block mt-0.5">{card.note}</span>
             </div>
-            <span className="text-[10px] text-gray-500 block mt-1">DTCP Mandate: Min 10%</span>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-              Average Target Selling Rate:
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs text-gray-500 font-bold">₹</span>
-              <input
-                type="number"
-                value={layoutCalc.expectedRatePerSqYard || 18000}
-                onChange={(e) =>
-                  onUpdateLayoutCalc({
-                    ...layoutCalc,
-                    expectedRatePerSqYard: Number(e.target.value),
-                  })
-                }
-                className="w-full bg-white border border-gray-300 rounded-xl p-2.5 pl-7 text-xs font-mono font-bold text-gray-950"
-              />
-            </div>
-            <span className="text-[10px] text-emerald-600 font-bold block mt-1">
-              Floor Rate: ₹17,000 Protected
-            </span>
-          </div>
-        </div>
-
-        {/* Calculated Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-[#F4F4F6] p-4 rounded-2xl">
-            <span className="text-gray-500 text-[11px] font-bold uppercase block">Gross Parcel Area</span>
-            <strong className="text-xl font-black text-gray-950 font-mono mt-0.5 block">
-              {metrics.grossSqYards.toLocaleString('en-IN')} <span className="text-xs font-normal">Sq.Yds</span>
-            </strong>
-            <span className="text-[10px] text-gray-500 block mt-0.5">
-              {metrics.equivalentGuntas} Guntas • {metrics.equivalentCents} Cents
-            </span>
-          </div>
-
-          <div className="bg-[#F4F4F6] p-4 rounded-2xl">
-            <span className="text-gray-500 text-[11px] font-bold uppercase block">Roads & Park Deductions</span>
-            <strong className="text-xl font-black text-red-600 font-mono mt-0.5 block">
-              -{metrics.totalDeductions.toLocaleString('en-IN')} <span className="text-xs font-normal">Sq.Yds</span>
-            </strong>
-            <span className="text-[10px] text-gray-500 block mt-0.5">
-              Roads: {metrics.roadLossPercent}% + Parks: {layoutCalc.openSpacePercent}%
-            </span>
-          </div>
-
-          <div className="bg-[#FFFDF0] p-4 rounded-2xl border border-amber-300">
-            <span className="text-amber-800 text-[11px] font-bold uppercase block">Net Sellable Plotted Area</span>
-            <strong className="text-xl font-black text-gray-950 font-mono mt-0.5 block">
-              {metrics.netSellableSqYards.toLocaleString('en-IN')} <span className="text-xs font-normal">Sq.Yds</span>
-            </strong>
-            <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">
-              {metrics.netSellablePercent}% Plottable Yield
-            </span>
-          </div>
-
-          <div className="bg-[#F4F4F6] p-4 rounded-2xl">
-            <span className="text-gray-500 text-[11px] font-bold uppercase block">Venture Gross Revenue</span>
-            <strong className="text-xl font-black text-emerald-700 font-mono mt-0.5 block">
-              {formatIndianCompact(metrics.netSellableSqYards * (layoutCalc.expectedRatePerSqYard || 18000))}
-            </strong>
-            <span className="text-[10px] text-gray-500 block mt-0.5">
-              ~{metrics.estimatedPlotsOf200SqYds} Standard Plots (200 Sq.Yds)
-            </span>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -505,7 +411,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
                 </h3>
                 <p className="text-[11px] text-gray-400">
                   LP Number: {project?.lpOrReraNumber || 'Approved Layout Permit'} • {plots.length} Demarcated Plots •{' '}
-                  {layoutCalc.totalExtentValue} {layoutCalc.unit}
+                  {savedExtent}
                 </p>
               </div>
             </div>
