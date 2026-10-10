@@ -32,7 +32,7 @@ Dashboard delivery requires verifying the firm's assigned release and rendered i
 
 Submitters cannot approve their own expenses, investments or drawings when their project has partners. This applies to accountants and partners, including bulk approval and payout controls.
 **Why:** the user explicitly requires independent approval, with an exception only when there are no project partners.
-**How to apply:** use server-owned creator/recipient identity and project membership, never the selected spender's display name; make UI eligibility agree with the server and store exception policy in database configuration.
+**How to apply:** self-approval means the server-owned request creator only. A named spender, investor or drawing recipient who did not create the request may approve it if authorized for that project. Never block them solely by partner attribution; make UI eligibility agree with server enforcement and retain the database-configured no-partners exception.
 
 Investment enrollment automatically enters the project's pending approval queue; submitters do not choose signatories or enter another partner's PIN.
 **Why:** the user wants a simple enrollment form and automatic visibility to the project's reviewers rather than manual consensus inputs.

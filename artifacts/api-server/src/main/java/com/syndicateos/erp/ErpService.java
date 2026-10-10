@@ -86,8 +86,7 @@ public class ErpService {
                 "reviewableRecordIds",records.stream().filter(r->"pending".equals(r.get("status"))
                     && !((List<?>)r.get("votes")).contains(actor.identityId().toString())
                     && resources.stream().anyMatch(res->res.get("kind").equals(r.get("kind"))&&Boolean.TRUE.equals(res.get("canReview"))
-                        && (Boolean.TRUE.equals(res.get("canReviewOwn")) || (!actor.identityId().equals(r.get("createdBy"))
-                            && !actor.identityId().toString().equals(((JsonNode)r.get("data")).path("partnerId").asText())))))
+                        && (Boolean.TRUE.equals(res.get("canReviewOwn")) || !actor.identityId().equals(r.get("createdBy")))))
                     .map(r->r.get("id").toString()).toList());
         });
     }
@@ -438,7 +437,7 @@ public class ErpService {
     private Map<String,Object> review(SessionAccount actor,UUID project,Map<String,Object> definition,Map<String,Object> row,JsonNode input) {
         if(!role(definition,"review_roles",actor.role()) || !"pending".equals(row.get("status"))) throw ApiProblem.denied();
         boolean noPartnerException=!hasProjectPartners(project)&&Boolean.TRUE.equals(definition.get("allow_self_approval_without_partners"));
-        if(Boolean.TRUE.equals(definition.get("financial")) && !noPartnerException && (actor.identityId().equals(row.get("created_by")) || actor.identityId().equals(row.get("partner_id"))))
+        if(Boolean.TRUE.equals(definition.get("financial")) && !noPartnerException && actor.identityId().equals(row.get("created_by")))
             throw ApiProblem.invalid("You cannot approve your own submission.");
         String decision=Values.text(input,"decision",16);
         if(!Set.of("approved","rejected").contains(decision)) throw ApiProblem.invalid("Choose approved or rejected.");

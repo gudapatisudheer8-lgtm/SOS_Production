@@ -163,15 +163,25 @@ class ExpenseEnrollmentIntegrationTest {
         jdbc.update("INSERT INTO sos.firm_memberships(firm_id,identity_id,role_code) VALUES(?,?,'PARTNER')",firm,payer);
         jdbc.update("INSERT INTO sos.project_memberships(project_id,firm_id,identity_id) VALUES(?,?,?)",project,firm,payer);
         input.put("paymentSource","individual"); input.put("partnerId",payer.toString()); input.remove("accountId");
+        List<UUID> attributedExpenses=new ArrayList<>();
         for(var mode:Map.of("Cash / Spot Voucher","Cash","UPI / Online","UPI").entrySet()) {
             input.put("paymentMode",mode.getKey());
             UUID personal=save(recorder,project,input);
+            attributedExpenses.add(personal);
             assertEquals(mode.getValue(),jdbc.queryForObject("SELECT data->>'paymentMode' FROM sos.erp_records WHERE id=?",String.class,personal));
             assertNull(jdbc.queryForObject("SELECT account_id FROM sos.erp_records WHERE id=?",UUID.class,personal));
             assertEquals(payer,jdbc.queryForObject("SELECT partner_id FROM sos.erp_records WHERE id=?",UUID.class,personal));
             assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,personal));
         }
         var partner=new SessionAccount(payer,"PARTNER","Expense test partner","+919777772009",false,firm,"EXP-UNIT");
+        // A named spender is not the submitter: creator alone determines self-approval.
+        for(UUID attributedExpense:attributedExpenses) {
+            assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(attributedExpense.toString()));
+            assertFalse(((List<?>)service.read(recorder,project).get("reviewableRecordIds")).contains(attributedExpense.toString()));
+            assertThrows(ApiProblem.class,()->review(recorder,project,attributedExpense,1));
+            review(partner,project,attributedExpense,1);
+            assertFalse(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(attributedExpense.toString()));
+        }
         UUID bankInvestment=saveKind(partner,project,"investments",new HashMap<>(Map.of(
             "partnerId",payer.toString(),"accountId",bank.toString(),"amount","10000.25",
             "date","2026-10-10","purpose","Partner capital","paymentMode","Bank Wire (RTGS / NEFT)")));
@@ -183,7 +193,9 @@ class ExpenseEnrollmentIntegrationTest {
         UUID cashInvestment=saveKind(recorder,project,"investments",new HashMap<>(Map.of(
             "partnerId",payer.toString(),"accountId",cashAccount.toString(),"amount","5000.50",
             "date","2026-10-10","purpose","Partner capital","paymentMode","Cash - Site Cash Vault Deposit")));
-        clear(actors.get(1),actors.get(2),project,cashInvestment);
+        assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(cashInvestment.toString()));
+        assertThrows(ApiProblem.class,()->review(recorder,project,cashInvestment,1));
+        clear(partner,actors.get(1),project,cashInvestment);
         assertMoney("5000.50",cashAccount);
         var paid=new HashMap<String,Object>(Map.of("partnerId",payer.toString(),"accountId",cashAccount.toString(),
             "paymentSource","project_bank","paymentMode","Cash","category","Labor Wages",
@@ -200,6 +212,7 @@ class ExpenseEnrollmentIntegrationTest {
             "partnerId",payer.toString(),"accountId",bank.toString(),"amount","1000.10","date","2026-10-10",
             "purpose","Partner cash drawing","payoutMode","Field Vault Cash","destinationAccountDetails","Cash handover")));
         assertEquals(cashAccount,jdbc.queryForObject("SELECT account_id FROM sos.erp_records WHERE id=?",UUID.class,cashDraw));
+        assertThrows(ApiProblem.class,()->review(recorder,project,cashDraw,1));
         clear(actors.get(1),actors.get(2),project,cashDraw);
         UUID plot=UUID.randomUUID();
         jdbc.update("INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,status,created_by,request_id) VALUES(?,?,?,'plots','{\"plotNumber\":\"1\",\"status\":\"available\",\"areaSqYards\":100,\"ratePerSqYard\":1000}'::jsonb,'{}','approved',?,?)",
