@@ -32,3 +32,9 @@ Preserve the browser's Host header when an isolated UI-test proxy forwards reque
 **Why:** Rewriting Host to the upstream API port made same-origin browser POSTs appear cross-origin. Spring rejected both company verification and invitation creation, while GET requests still worked.
 
 **How to apply:** Distinguish a plain-text `Invalid CORS request` from application authorization errors before changing authentication or weakening allowed origins.
+
+Authenticated browser checks through the real development Preview must distinguish login completion from dashboard hydration.
+
+**Why:** A valid client sign-in remained on “Authenticating…” beyond a short default assertion window; direct API login succeeded, and waiting for its response followed by configuration/workspace hydration verified the dashboard.
+
+**How to apply:** Await the actual login response and then the signed-in dashboard readiness separately. Do not diagnose slow Preview requests as invalid credentials or bypass real authentication with mocked sessions.

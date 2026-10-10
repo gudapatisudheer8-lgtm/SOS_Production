@@ -156,6 +156,8 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
     return (
       <div
         key={plot.id}
+        data-testid="venture-plot-card"
+        data-plot-number={plot.plotNumber}
         onClick={() => onSelectPlot(plot)}
         className={`group relative rounded-2xl border transition-all cursor-pointer shadow-2xs hover:shadow-md hover:-translate-y-0.5 active:scale-98 select-none ${
           isAvailable
@@ -265,6 +267,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
 
   return (
     <div
+      data-testid="venture-layout-grid"
       className={`space-y-5 transition-all ${
         isPresentationMode
           ? 'fixed inset-0 z-50 bg-slate-900 text-slate-100 p-4 sm:p-6 overflow-y-auto'
