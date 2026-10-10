@@ -3,7 +3,6 @@ import { Plot, Project, LayoutCalculation, PlanUploadDocument, TenantFirm, Marke
 import { formatINR, formatIndianCompact } from '../../utils/formatters';
 import {
   Compass,
-  TreePine,
   Maximize2,
   Minimize2,
   Search,
@@ -12,7 +11,6 @@ import {
   CheckCircle2,
   Clock,
   Ban,
-  Building,
   Sparkles,
   MapPin,
   Layers,
@@ -26,6 +24,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { MarketingPlotPortalModal } from '../marketing/MarketingPlotPortalModal';
+import { ProjectLayoutDetails, savedProjectText } from './ProjectLayoutDetails';
 
 const savedRoadWidthLabel = (width?: number | string) => {
   // Persisted project select values can be numeric strings, unlike plot widths.
@@ -321,7 +320,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>Sanctioned Blueprint</span>
+              <span>Uploaded Blueprint</span>
             </button>
 
             <button
@@ -639,17 +638,17 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
           <div className="flex items-center justify-between text-xs text-slate-300 pb-2 border-b border-slate-800">
             <span className="font-bold flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-amber-400" />
-              Sanctioned Master Layout Plan &amp; Clearances Blueprint
+              Uploaded Master Layout Plan &amp; Clearance Documents
             </span>
             <span className="text-[11px] text-amber-400 font-mono">
-              LP: {project?.lpOrReraNumber || firm.reraNumber || 'DTCP / HMDA Approved'}
+              LP / RERA: {savedProjectText(project?.lpOrReraNumber)}
             </span>
           </div>
 
           <div className="bg-slate-900 rounded-2xl overflow-hidden p-2 flex items-center justify-center min-h-[460px]">
             {(blueprintUrl) ? <img
               src={blueprintUrl}
-              alt="Sanctioned Master Plan Blueprint"
+              alt="Uploaded Master Plan Blueprint"
               className="max-h-[600px] w-auto object-contain rounded-xl shadow-lg border border-slate-800"
             /> : <p className="text-xs font-bold text-stone-400">No plan document uploaded yet.</p>}
           </div>
@@ -667,16 +666,16 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
             <div className="flex items-center justify-between text-xs text-slate-300 pb-2 border-b border-slate-800">
               <span className="font-bold flex items-center gap-1">
                 <FileText className="w-3.5 h-3.5 text-amber-400" />
-                Sanctioned Blueprint
+                Uploaded Blueprint
               </span>
               <span className="text-[10px] text-amber-400 font-mono">
-                {project?.lpOrReraNumber || 'Approved LP'}
+                LP / RERA: {savedProjectText(project?.lpOrReraNumber)}
               </span>
             </div>
             <div className="bg-slate-900 rounded-2xl p-2 flex items-center justify-center min-h-[380px]">
               {(blueprintUrl) ? <img
                 src={blueprintUrl}
-                alt="Sanctioned Layout Blueprint"
+                alt="Uploaded Layout Blueprint"
                 className="max-h-[500px] w-auto object-contain rounded-xl"
               /> : <p className="text-xs font-bold text-stone-400">No plan document uploaded yet.</p>}
             </div>
@@ -818,7 +817,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
               </div>
             </div>
 
-            {/* RIGHT SIDEBAR: COMPASS, STATUTORY PARKS & LAYOUT AMENITIES */}
+            {/* RIGHT SIDEBAR: DIRECTION GUIDE & SAVED PROJECT DETAILS */}
             <div className="lg:col-span-3 space-y-4">
               {/* COMPASS ROSE WIDGET */}
               <div
@@ -827,7 +826,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
                 }`}
               >
                 <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block">
-                  Orientation Compass
+                  Direction Guide (Illustrative)
                 </span>
 
                 <div className="w-28 h-28 mx-auto relative flex items-center justify-center rounded-full bg-white shadow-inner border-2 border-slate-200">
@@ -841,38 +840,11 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
                 </div>
 
                 <div className="text-[11px] text-gray-500 font-mono">
-                  All plots demarcated as per sanctioned DTCP / LP compass bearings.
+                  Sanctioned compass bearings: Unspecified. This guide does not represent a surveyed layout.
                 </div>
               </div>
 
-              {/* STATUTORY 10% PUBLIC PARK & GREEN OPEN SPACE */}
-              <div className="bg-emerald-50/70 p-4 rounded-3xl border border-emerald-300 space-y-2">
-                <div className="flex items-center gap-2 text-emerald-900 font-black text-xs">
-                  <TreePine className="w-4 h-4 text-emerald-700" />
-                  <span>Statutory Public Park Reserve</span>
-                </div>
-                <p className="text-[11px] text-emerald-950 font-semibold leading-relaxed">
-                  🌳 10% DTCP / HMDA Open Space Reservation. Landscaped central park with walking jogging track, children’s play area &amp; avenue plantation.
-                </p>
-                <div className="pt-2 border-t border-emerald-200/80 flex justify-between text-[11px] text-emerald-900 font-bold">
-                  <span>Reserved Area:</span>
-                  <span className="font-mono">1,850 Sq.Yards</span>
-                </div>
-              </div>
-
-              {/* UTILITIES & OVERHEAD WATER TANK (OHT) */}
-              <div className="bg-blue-50/70 p-4 rounded-3xl border border-blue-200 space-y-2">
-                <div className="flex items-center gap-2 text-blue-950 font-black text-xs">
-                  <Building className="w-4 h-4 text-blue-700" />
-                  <span>Layout Utilities &amp; Infrastructure</span>
-                </div>
-                <ul className="text-[11px] text-blue-900 space-y-1 list-disc list-inside">
-                  <li>50,000L Overhead Tank (OHT)</li>
-                  <li>Dedicated Electrical Transformer Yard</li>
-                  <li>Underground Drainage (UGD) Lines</li>
-                  <li>Compound Wall &amp; Solar Fencing</li>
-                </ul>
-              </div>
+              <ProjectLayoutDetails project={project} />
 
               {/* FAST STATS SUMMARY */}
               <div
