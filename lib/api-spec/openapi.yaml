@@ -272,6 +272,7 @@ components:
         canCreate: { type: boolean }
         canManage: { type: boolean }
         canReview: { type: boolean }
+        canReviewOwn: { type: boolean }
     FinancialStatementEntry:
       type: object
       required: [id, date, type, amount, status, accountId, accountName, affectsCash, description]
@@ -293,6 +294,7 @@ components:
       type: object
       required: [projectId, records, resources, balances, partners, audit, settings]
       properties:
+        reviewableRecordIds: { type: array, items: { type: string } }
         statement:
           type: array
           items: { $ref: "#/components/schemas/FinancialStatementEntry" }

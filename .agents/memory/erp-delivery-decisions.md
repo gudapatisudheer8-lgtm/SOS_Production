@@ -25,3 +25,7 @@ Check the testing runner's database target before using its database tools.
 Dashboard delivery requires verifying the firm's assigned release and rendered interface, not just API health.
 **Why:** additive configuration updates deliberately preserve existing firm assignments for compatibility; a healthy deployment can still display the old dashboard. Incorrect release names in rollout instructions caused unnecessary user effort.
 **How to apply:** use actual published release labels rather than planning terminology, keep activation owner-controlled, and distinguish successful installation from verified dashboard activation.
+
+Submitters cannot approve their own expenses, investments or drawings when their project has partners. This applies to accountants and partners, including bulk approval and payout controls.
+**Why:** the user explicitly requires independent approval, with an exception only when there are no project partners.
+**How to apply:** use server-owned creator/recipient identity and project membership, never the selected spender's display name; make UI eligibility agree with the server and store exception policy in database configuration.

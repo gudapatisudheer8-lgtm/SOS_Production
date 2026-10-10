@@ -15,6 +15,7 @@ import type { ProjectErpProjectSetup } from './projectErpProjectSetup';
 import type { ProjectErpSettings } from './projectErpSettings';
 
 export interface ProjectErp {
+  reviewableRecordIds?: string[];
   statement?: FinancialStatementEntry[];
   projectSetup?: ProjectErpProjectSetup;
   projectId: string;

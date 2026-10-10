@@ -56,6 +56,30 @@ class ExpenseEnrollmentIntegrationTest {
         var snapshot=service.read(actor,project);
         assertEquals(project,snapshot.get("projectId"));
         assertTrue(((List<?>)snapshot.get("statement")).isEmpty());
+        UUID bank=UUID.randomUUID();
+        jdbc.update("""
+            INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,amount,status,created_by,request_id)
+            VALUES(?,?,?,'accounts','{"accountName":"Exception test bank","status":"active","openingBalance":50000}'::jsonb,'{}',0,'approved',?,?)
+            """,bank,project,firm,actorId,UUID.randomUUID());
+        jdbc.update("INSERT INTO sos.erp_postings(id,record_id,project_id,account_id,ledger_code,debit,credit) VALUES(?,?,?,?,'project-account',50000,0)",
+            UUID.randomUUID(),bank,project,bank);
+        jdbc.update("INSERT INTO sos.erp_postings(id,record_id,project_id,ledger_code,debit,credit) VALUES(?,?,?,'opening-equity',0,50000)",
+            UUID.randomUUID(),bank,project);
+        var expenseData=new HashMap<String,Object>(Map.of("amount",40000,"category","Labor Wages","date","2026-10-10",
+            "note","No-partner exception test","paymentSource","project_bank","paymentMode","RTGS / NEFT","accountId",bank.toString()));
+        UUID own=save(actor,project,expenseData);
+        assertTrue(((List<?>)service.read(actor,project).get("reviewableRecordIds")).contains(own.toString()));
+        review(actor,project,own,1);
+        assertEquals(0,balance(bank).compareTo(new BigDecimal("10000")));
+        UUID partner=UUID.randomUUID();
+        jdbc.update("INSERT INTO sos.identities(id,mobile,display_name,credential_hash) VALUES(?,'+919666669001','Approval partner','not-a-login-hash')",partner);
+        jdbc.update("INSERT INTO sos.firm_memberships(firm_id,identity_id,role_code) VALUES(?,?,'PARTNER')",firm,partner);
+        jdbc.update("INSERT INTO sos.project_memberships(project_id,firm_id,identity_id) VALUES(?,?,?)",project,firm,partner);
+        expenseData.put("amount",1);
+        UUID blocked=save(actor,project,expenseData);
+        assertFalse(((List<?>)service.read(actor,project).get("reviewableRecordIds")).contains(blocked.toString()));
+        assertThrows(ApiProblem.class,()->review(actor,project,blocked,1));
+        assertEquals(0,balance(bank).compareTo(new BigDecimal("10000")));
     }
     private void review(SessionAccount actor,UUID project,UUID record,int revision) {
         service.execute(actor,"erp.review",node(Map.of("projectId",project.toString(),"recordId",record.toString(),
@@ -92,6 +116,10 @@ class ExpenseEnrollmentIntegrationTest {
         jdbc.update("INSERT INTO sos.firm_sector_assignments(firm_id,sector_id,release_id) VALUES(?,?,?)",firm,release.get("sector_id"),release.get("id"));
         jdbc.update("INSERT INTO sos.projects(id,firm_id,sector_id,name,created_by,setup_state,setup_release_id) VALUES(?,?,?,'Expense test project',?,'READY',?)",
             project,firm,release.get("sector_id"),recorder.identityId(),release.get("id"));
+        UUID independentPartner=UUID.randomUUID();
+        jdbc.update("INSERT INTO sos.identities(id,mobile,display_name,credential_hash) VALUES(?,'+919666669002','Independent partner fixture','not-a-login-hash')",independentPartner);
+        jdbc.update("INSERT INTO sos.firm_memberships(firm_id,identity_id,role_code) VALUES(?,?,'PARTNER')",firm,independentPartner);
+        jdbc.update("INSERT INTO sos.project_memberships(project_id,firm_id,identity_id) VALUES(?,?,?)",project,firm,independentPartner);
         jdbc.update("INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,amount,status,created_by,request_id) VALUES(?,?,?,'accounts','{\"accountName\":\"Test bank\",\"status\":\"active\",\"openingBalance\":0}'::jsonb,'{}',0,'approved',?,?)",
             bank,project,firm,recorder.identityId(),UUID.randomUUID());
         jdbc.update("INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,amount,status,created_by,request_id) VALUES(?,?,?,'transactions','{}','{}',100000,'approved',?,?)",
@@ -148,6 +176,8 @@ class ExpenseEnrollmentIntegrationTest {
             "partnerId",payer.toString(),"accountId",bank.toString(),"amount","10000.25",
             "date","2026-10-10","purpose","Partner capital","paymentMode","Bank Wire (RTGS / NEFT)")));
         assertMoney("60000",bank);
+        assertFalse(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(bankInvestment.toString()));
+        assertThrows(ApiProblem.class,()->review(partner,project,bankInvestment,1));
         clear(recorder,actors.get(1),project,bankInvestment);
         assertMoney("70000.25",bank);
         UUID cashInvestment=saveKind(recorder,project,"investments",new HashMap<>(Map.of(
@@ -163,6 +193,8 @@ class ExpenseEnrollmentIntegrationTest {
         UUID bankDraw=saveKind(partner,project,"drawings",new HashMap<>(Map.of(
             "partnerId",payer.toString(),"accountId",bank.toString(),"amount","2000.05","date","2026-10-10",
             "purpose","Partner drawing","payoutMode","Bank Transfer","destinationAccountDetails","Partner bank")));
+        assertFalse(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(bankDraw.toString()));
+        assertThrows(ApiProblem.class,()->review(partner,project,bankDraw,1));
         clear(recorder,actors.get(1),project,bankDraw);
         UUID cashDraw=saveKind(recorder,project,"drawings",new HashMap<>(Map.of(
             "partnerId",payer.toString(),"accountId",bank.toString(),"amount","1000.10","date","2026-10-10",

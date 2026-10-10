@@ -289,7 +289,7 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
   if (edit) return <Dialog title={`Edit ${nice(res)}`} onClose={() => setEdit(false)}><RecordForm erp={erp} res={res} rec={rec} ctx={ctx} onDone={onClose} /></Dialog>;
   const pending = rec.status === 'pending';
   const own = rec.createdBy === ctx.account.identityId || (ctx.account.role === 'PARTNER' && str(rec.data.partnerId) === ctx.account.identityId);
-  const canRev = res.canReview && pending && !own;
+  const canRev = res.canReview && pending && (!own || res.canReviewOwn);
   return (
     <Dialog title={`${res.title}: ${label(rec)}`} onClose={onClose}>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}><Badge text={rec.status} tone={tone(rec.status)} />{rec.data.status ? <Badge text={str(rec.data.status)} tone={tone(str(rec.data.status))} /> : null}</View>
@@ -302,7 +302,7 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
       {attKeys.map((k) => <AttachmentView key={k} projectId={erp.projectId} id={str(rec.data[k])} label={k === 'voiceAttachmentId' ? 'Voice memo' : k === 'receiptAttachmentId' ? 'Photo voucher / bill' : 'Document'} />)}
       <Text style={{ color: c.mutedForeground, fontSize: 12, marginVertical: 6 }}>Created {rec.createdAt.slice(0, 16).replace('T', ' ')}{creator ? ` by ${creator}` : ''} · revision {rec.revision} · {rec.votes.length} vote{rec.votes.length === 1 ? '' : 's'}{rec.votes.length ? `: ${rec.votes.map((v) => erp.partners.find((p) => p.id === v)?.name ?? 'reviewer').join(', ')}` : ''}</Text>
       {msg ? <Banner tone="error" title="Action refused" text={msg} /> : null}
-      {res.canReview && pending && own ? <Banner tone="warn" title="Your own record" text="You cannot review a record you created or that is booked to you. Another reviewer must approve it." /> : null}
+      {res.canReview && pending && own && !res.canReviewOwn ? <Banner tone="warn" title="Your own record" text="You cannot review a record you created or that is booked to you. Another reviewer must approve it." /> : null}
       {canRev ? (
         <View style={{ marginTop: 8 }}>
           <Field label="Review note (optional, shown on rejection)" value={reason} onChangeText={setReason} />

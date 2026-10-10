@@ -14,4 +14,5 @@ export interface ErpResource {
   canCreate: boolean;
   canManage: boolean;
   canReview: boolean;
+  canReviewOwn?: boolean;
 }

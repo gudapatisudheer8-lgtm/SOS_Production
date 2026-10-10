@@ -46,11 +46,13 @@ public class ErpService {
             var scope=access.project(actor,project,"erp.read",false);
             UUID release=(UUID)scope.get("release_id");
             boolean writable=Boolean.TRUE.equals(scope.get("assignment_enabled")) && "ACTIVE".equals(scope.get("status"));
+            boolean projectHasPartners=hasProjectPartners(project);
             List<Map<String,Object>> resources=new ArrayList<>();
             for(var r:jdbc.queryForList("SELECT * FROM sos.erp_resources WHERE release_id=? ORDER BY kind",release))
                 resources.add(Map.of("kind",r.get("kind"),"title",r.get("title"),"fields",parse(r.get("fields")),
                     "canCreate",writable&&role(r,"submit_roles",actor.role()),"canManage",writable&&role(r,"manage_roles",actor.role()),
-                    "canReview",writable&&role(r,"review_roles",actor.role())));
+                    "canReview",writable&&role(r,"review_roles",actor.role()),
+                    "canReviewOwn",!projectHasPartners&&Boolean.TRUE.equals(r.get("allow_self_approval_without_partners"))));
             List<Map<String,Object>> records=new ArrayList<>();
             for(var r:jdbc.queryForList("SELECT e.*,i.display_name AS creator_name FROM sos.erp_records e JOIN sos.identities i ON i.id=e.created_by WHERE e.project_id=? AND e.status<>'deleted' ORDER BY e.created_at DESC",project)) {
                 ObjectNode recordData=(ObjectNode)parse(r.get("data"));
@@ -82,10 +84,10 @@ public class ErpService {
                 "partners",partners,"audit",audit,"settings",settings,"projectSetup",projectPolicy(release),
                 "statement",new FinancialStatementService(jdbc,json).read(project),
                 "reviewableRecordIds",records.stream().filter(r->"pending".equals(r.get("status"))
-                    && !actor.identityId().equals(r.get("createdBy"))
-                    && !actor.identityId().toString().equals(((JsonNode)r.get("data")).path("partnerId").asText())
                     && !((List<?>)r.get("votes")).contains(actor.identityId().toString())
-                    && resources.stream().anyMatch(res->res.get("kind").equals(r.get("kind"))&&Boolean.TRUE.equals(res.get("canReview"))))
+                    && resources.stream().anyMatch(res->res.get("kind").equals(r.get("kind"))&&Boolean.TRUE.equals(res.get("canReview"))
+                        && (Boolean.TRUE.equals(res.get("canReviewOwn")) || (!actor.identityId().equals(r.get("createdBy"))
+                            && !actor.identityId().toString().equals(((JsonNode)r.get("data")).path("partnerId").asText())))))
                     .map(r->r.get("id").toString()).toList());
         });
     }
@@ -423,9 +425,20 @@ public class ErpService {
         if(!data.hasNonNull(key)||data.path(key).asText().isBlank()) return null;
         return Values.id(data,key);
     }
+    private boolean hasProjectPartners(UUID project) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            SELECT EXISTS(
+              SELECT 1 FROM sos.project_memberships pm
+              JOIN sos.projects p ON p.id=pm.project_id
+              JOIN sos.firm_memberships fm ON fm.firm_id=p.firm_id AND fm.identity_id=pm.identity_id
+              WHERE pm.project_id=? AND pm.enabled AND fm.enabled AND fm.role_code='PARTNER'
+            )
+            """,Boolean.class,project));
+    }
     private Map<String,Object> review(SessionAccount actor,UUID project,Map<String,Object> definition,Map<String,Object> row,JsonNode input) {
         if(!role(definition,"review_roles",actor.role()) || !"pending".equals(row.get("status"))) throw ApiProblem.denied();
-        if(Boolean.TRUE.equals(definition.get("financial")) && (actor.identityId().equals(row.get("created_by")) || actor.identityId().equals(row.get("partner_id"))))
+        boolean noPartnerException=!hasProjectPartners(project)&&Boolean.TRUE.equals(definition.get("allow_self_approval_without_partners"));
+        if(Boolean.TRUE.equals(definition.get("financial")) && !noPartnerException && (actor.identityId().equals(row.get("created_by")) || actor.identityId().equals(row.get("partner_id"))))
             throw ApiProblem.invalid("You cannot approve your own submission.");
         String decision=Values.text(input,"decision",16);
         if(!Set.of("approved","rejected").contains(decision)) throw ApiProblem.invalid("Choose approved or rejected.");
@@ -438,6 +451,7 @@ public class ErpService {
         int needed=(Integer)definition.get("approval_count");
         BigDecimal threshold=(BigDecimal)definition.get("approval_threshold");
         if(threshold!=null && ((BigDecimal)row.get("amount")).compareTo(threshold)<=0) needed=1;
+        if(noPartnerException) needed=(Integer)definition.get("no_partner_approval_count");
         int approvals=jdbc.queryForObject("SELECT count(*) FROM sos.erp_approvals WHERE record_id=? AND decision='approved'",Integer.class,id);
         String state="rejected".equals(decision)?"rejected":approvals>=needed?"approved":"pending";
         if("approved".equals(state)) applyPosting(project,row);

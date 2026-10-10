@@ -41,6 +41,7 @@ export const GetProjectErpParams = zod.object({
 })
 
 export const GetProjectErpResponse = zod.object({
+  "reviewableRecordIds": zod.array(zod.string()).optional(),
   "statement": zod.array(zod.object({
   "id": zod.string(),
   "date": zod.string(),
@@ -87,7 +88,8 @@ export const GetProjectErpResponse = zod.object({
 })),
   "canCreate": zod.boolean(),
   "canManage": zod.boolean(),
-  "canReview": zod.boolean()
+  "canReview": zod.boolean(),
+  "canReviewOwn": zod.boolean().optional()
 })),
   "balances": zod.array(zod.object({
   "accountId": zod.string(),

@@ -1466,8 +1466,9 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
           return true;
         });
 
+        const reviewableExpenses = pendingExpenses.filter(exp => activeProject?.reviewableRecordIds?.includes(exp.id));
         const handleApproveAll = () => {
-          pendingExpenses.forEach((exp) => {
+          reviewableExpenses.forEach((exp) => {
             onApproveExpense(exp.id, `${firm.accountantName || 'Accountant'} (Accountant)`);
           });
         };
@@ -1508,7 +1509,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                   <span>+ Enroll Project Expenses</span>
                 </button>
 
-                {pendingExpenses.length > 0 && (
+                {reviewableExpenses.length > 0 && (
                   <button
                     type="button"
                     onClick={handleApproveAll}
@@ -1516,7 +1517,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                     title="Approve all currently pending site vouchers with one click"
                   >
                     <CheckSquare className="w-4 h-4" />
-                    <span>Approve All ({pendingExpenses.length})</span>
+                    <span>Approve All ({reviewableExpenses.length})</span>
                   </button>
                 )}
               </div>
@@ -1892,7 +1893,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                               {/* Actions */}
                               <td className="py-3 px-3 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  {isPending ? (
+                                  {isPending && activeProject?.reviewableRecordIds?.includes(exp.id) ? (
                                     <>
                                       <button
                                         type="button"

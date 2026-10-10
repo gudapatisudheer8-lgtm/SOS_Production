@@ -1791,7 +1791,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                       {/* Action Buttons */}
                       <div className="flex items-center gap-2 self-end sm:self-center">
                         {/* If Pending: Quick Ratify / Reject Buttons */}
-                        {!isApproved && inv.status !== 'rejected' && (
+                        {!isApproved && inv.status !== 'rejected' && activeProject?.reviewableRecordIds?.includes(inv.id) && (
                           <>
                             <button
                               type="button"
@@ -2325,7 +2325,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                       </strong>
 
                       {/* Ability for partner to approve if pending and permission provided */}
-                      {exp.status === 'pending' && onApproveExpense && (
+                      {exp.status === 'pending' && onApproveExpense && activeProject?.reviewableRecordIds?.includes(exp.id) && (
                         <button
                           type="button"
                           onClick={() => onApproveExpense(exp.id, `${currentPartner.name} (Partner)`)}
@@ -2413,7 +2413,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {draw.status === 'pending_approval' && (
+                        {draw.status === 'pending_approval' && activeProject?.reviewableRecordIds?.includes(draw.id) && (
                           <button
                             type="button"
                             onClick={() => handleApproveDrawing(draw.id)}
@@ -2422,7 +2422,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                             Approve
                           </button>
                         )}
-                        {draw.status !== 'cleared' && (
+                        {draw.status === 'pending_approval' && activeProject?.reviewableRecordIds?.includes(draw.id) && (
                           <button
                             type="button"
                             onClick={() => handleDisburseDrawing(draw.id)}

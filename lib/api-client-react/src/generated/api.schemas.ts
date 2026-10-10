@@ -57,6 +57,7 @@ export interface ErpResource {
   canCreate: boolean;
   canManage: boolean;
   canReview: boolean;
+  canReviewOwn?: boolean;
 }
 
 export type FinancialStatementEntryType = typeof FinancialStatementEntryType[keyof typeof FinancialStatementEntryType];
@@ -110,6 +111,7 @@ export type ProjectErpAuditItem = {
 export type ProjectErpSettings = {[key: string]: unknown};
 
 export interface ProjectErp {
+  reviewableRecordIds?: string[];
   statement?: FinancialStatementEntry[];
   projectSetup?: ProjectErpProjectSetup;
   projectId: string;
