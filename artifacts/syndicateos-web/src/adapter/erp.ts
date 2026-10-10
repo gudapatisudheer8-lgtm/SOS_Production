@@ -144,7 +144,11 @@ export async function loadAll(role: string): Promise<LoadedData> {
             createdDate: r.createdAt, recentTransactions: txs } as FirmAccount);
           break;
         }
-        case 'expenses': out.fieldExpenses.push({ ...d, ...base, id, amount: num(d.amount), status: status(r.status), approvedByPartners: r.votes || [] } as FieldExpenseLog); break;
+        case 'expenses': out.fieldExpenses.push({ ...d, ...base, id,
+          enrolledBy: r.createdByName, partnerName: (erp.partners || []).find((m: any) => String(m.id) === String(d.partnerId))?.name || r.createdByName,
+          bankAccountId: d.accountId,
+          bankAccountName: recs.find((a: any) => a.kind === 'accounts' && String(a.id) === String(d.accountId))?.data?.accountName,
+          amount: num(d.amount), status: status(r.status), approvedByPartners: r.votes || [] } as FieldExpenseLog); break;
         case 'investments': out.investments.push({ ...d, ...base, id, amount: num(d.amount), status: status(r.status) } as IndividualInvestmentRecord); break;
         case 'settlements': out.settlements.push({ ...d, firmId: p.firmId, id } as LiquorDailySettlement); break;
         case 'stock-draws': out.stockDraws.push({ ...d, firmId: p.firmId, id } as PartnerStockDraw); break;
@@ -183,7 +187,7 @@ export async function loadAll(role: string): Promise<LoadedData> {
 // UI-computed or identity keys the original components attach; never business input.
 const UI_KEYS = new Set(['id', 'firmId', 'projectId', 'status', 'recentTransactions', 'currentBalance', 'balanceAfter',
   'createdDate', 'requestedAt', 'submittedAt', 'avatarColor', 'enrolledBy', 'approvedBy', 'approvedAt', 'partnerName',
-  'accountName', 'sourceAccountName', 'bankAccountName', 'projectName', 'deviceId', 'addedDate', 'addedBy']);
+  'accountName', 'sourceAccountName', 'bankAccountName', 'projectName', 'deviceId', 'addedDate', 'addedBy', 'isDefaultCash']);
 
 // Keep only configured fields. Financially significant non-empty values with no configured
 // field are rejected (never silently dropped).

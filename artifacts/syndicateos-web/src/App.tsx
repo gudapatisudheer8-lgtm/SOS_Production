@@ -17,6 +17,7 @@ import { MasterEditor } from './adapter/MasterEditor';
 import { loadAll, erpSave, erpReview, command, pickConfigured, describeAccess, type LoadedData } from './adapter/erp';
 import { ProjectPlanSaver } from './adapter/projectPlans';
 import { MarketingAccessPage } from './marketing/MarketingAccessPage';
+import { expenseInput } from './adapter/expenseInput';
 
 const EMPTY_LAYOUT: LayoutCalculation = { totalExtentValue: 0, unit: 'Acres', roadWidth: 30, openSpacePercent: 10, floorRatePerSqYard: 0 };
 const EMPTY_MATRIX: ApartmentPricingMatrix = { baseSqFtRate: 0, eastPremium: 0, northPremium: 0, cornerPremium: 0, floorRisePerFloor: 0, carParkingFee: 0, amenitiesFee: 0, floorRatePerSqFt: 0 };
@@ -358,7 +359,7 @@ function App() {
   // ---------- Expenses ----------
   const handleSubmitFieldExpense = (e: FieldExpenseLog, bankAccountId?: string) => {
     const pid = e.projectId || activeProjectId;
-    return run('Expense submitted for approval', () => erpSave(erpOf(pid), pid, 'expenses', { ...e, accountId: bankAccountId || e.bankAccountId }));
+    return run('Expense submitted for approval', () => erpSave(erpOf(pid), pid, 'expenses', expenseInput(e, bankAccountId)));
   };
   const review = (id: string, decision: 'approved' | 'rejected', label: string, reason?: string) => {
     const meta = metaOf(id);

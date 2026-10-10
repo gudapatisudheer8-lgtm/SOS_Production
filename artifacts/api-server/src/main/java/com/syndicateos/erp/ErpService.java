@@ -48,8 +48,9 @@ public class ErpService {
                     "canCreate",writable&&role(r,"submit_roles",actor.role()),"canManage",writable&&role(r,"manage_roles",actor.role()),
                     "canReview",writable&&role(r,"review_roles",actor.role())));
             List<Map<String,Object>> records=new ArrayList<>();
-            for(var r:jdbc.queryForList("SELECT * FROM sos.erp_records WHERE project_id=? AND status<>'deleted' ORDER BY created_at DESC",project)) {
+            for(var r:jdbc.queryForList("SELECT e.*,i.display_name AS creator_name FROM sos.erp_records e JOIN sos.identities i ON i.id=e.created_by WHERE e.project_id=? AND e.status<>'deleted' ORDER BY e.created_at DESC",project)) {
                 ObjectNode recordData=(ObjectNode)parse(r.get("data"));
+                if("accounts".equals(r.get("kind"))) recordData.put("isDefaultCash",cash.isDefault((UUID)r.get("id")));
                 if("PARTNER".equals(actor.role())&&"accounts".equals(r.get("kind"))&&recordData.hasNonNull("accountNumber")) {
                     String number=recordData.path("accountNumber").asText();
                     recordData.put("accountNumber","••••"+number.substring(Math.max(0,number.length()-4)));
@@ -58,7 +59,7 @@ public class ErpService {
                     "SELECT count(*) FROM sos.erp_inventory_reservations WHERE inventory_id=? AND state='active'",Integer.class,r.get("id"))>0)
                     recordData.put("status","plots".equals(r.get("kind"))?"reserved":"booked");
                 records.add(Map.of("id",r.get("id"),"kind",r.get("kind"),"status",r.get("status"),"revision",r.get("revision"),
-                    "createdBy",r.get("created_by"),"createdAt",r.get("created_at").toString(),"data",recordData,
+                    "createdBy",r.get("created_by"),"createdByName",r.get("creator_name"),"createdAt",r.get("created_at").toString(),"data",recordData,
                     "votes",jdbc.queryForList("SELECT actor_id::text FROM sos.erp_approvals WHERE record_id=? AND decision='approved'",String.class,r.get("id"))));
             }
             var balances=jdbc.queryForList("""
@@ -177,7 +178,25 @@ public class ErpService {
         if(!role(def,"submit_roles",actor.role())) throw ApiProblem.denied();
         boolean hasAccount=false;
         for(JsonNode field:parse(def.get("fields"))) if("accountId".equals(field.path("key").asText())) hasAccount=true;
-        ObjectNode data=validate(def,hasAccount?cash.route(actor,project,kind,input.path("data")):input.path("data"));
+        if(!input.path("data").isObject()) throw ApiProblem.invalid("Supply a record object.");
+        ObjectNode submission=(ObjectNode)input.path("data").deepCopy();
+        if("expenses".equals(kind)) {
+            var modes=jdbc.queryForList("""
+                SELECT metadata->>'canonicalValue' AS canonical_value FROM sos.business_masters
+                WHERE group_code='expense_payment_modes' AND value_code=? AND enabled
+                """,submission.path("paymentMode").asText());
+            if(!modes.isEmpty()&&modes.getFirst().get("canonical_value") instanceof String canonical&&!canonical.isBlank())
+                submission.put("paymentMode",canonical);
+        }
+        if(hasAccount) submission=cash.route(actor,project,kind,submission);
+        // The original spender selector includes the authenticated accountant for
+        // project-paid expenses. Resolve it here; never fabricate a partner or
+        // attribute a bank expense to an accountant's partner-capital ledger.
+        if("expenses".equals(kind)&&"ACCOUNTANT".equals(actor.role())
+            &&"project_bank".equals(submission.path("paymentSource").asText())
+            &&(!submission.hasNonNull("partnerId")||submission.path("partnerId").asText().isBlank()))
+            submission.put("partnerId",actor.identityId().toString());
+        ObjectNode data=validate(def,submission);
         UUID id=input.hasNonNull("recordId")?Values.id(input,"recordId"):UUID.randomUUID();
         Map<String,Object> previous=null;
         if(input.hasNonNull("recordId")) {
@@ -191,6 +210,11 @@ public class ErpService {
         if("accounts".equals(kind) && previous!=null && cash.isDefault(id))
             throw ApiProblem.invalid("The default project cash account cannot be edited. Record a cash transaction instead.");
         UUID partner=optionalId(data,"partnerId"),account=optionalId(data,"accountId"),inventory=optionalId(data,"inventoryId");
+        if("expenses".equals(kind)&&"ACCOUNTANT".equals(actor.role())
+            &&"project_bank".equals(data.path("paymentSource").asText())&&actor.identityId().equals(partner)) {
+            partner=null;
+            data.remove("partnerId");
+        }
         for(String field:List.of("attachmentId","receiptAttachmentId","voiceAttachmentId")) {
             UUID attachment=optionalId(data,field);
             if(attachment!=null && jdbc.queryForObject("SELECT count(*) FROM sos.erp_attachments WHERE id=? AND project_id=?",Integer.class,attachment,project)==0)

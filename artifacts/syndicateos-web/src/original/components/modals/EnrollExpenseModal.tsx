@@ -1,5 +1,5 @@
-import { MasterOptions } from '../../../adapter/config';
-import React, { useState } from 'react';
+import { MasterOptions, masterItems, masterItem } from '../../../adapter/config';
+import React, { useState, useEffect } from 'react';
 import {
   TenantFirm,
   Project,
@@ -46,20 +46,32 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
   const projectAccounts = (firmAccounts || []).filter(
     (a) =>
       a.firmId === firm.id &&
-      (!a.linkedProjectId || a.linkedProjectId === 'all' || a.linkedProjectId === project.id)
+      a.linkedProjectId === project.id && a.status === 'active'
   );
 
   const [partnerId, setPartnerId] = useState<string>(partners[0]?.id || 'accountant');
   const [paymentSource, setPaymentSource] = useState<'project_bank' | 'individual'>('project_bank');
-  const [bankAccountId, setBankAccountId] = useState<string>(projectAccounts[0]?.id || '');
+  const cashModes: string[] = masterItem('project_account_defaults', 'standard')?.metadata?.cashPaymentModes || [];
+  const defaultMode = masterItems('expense_payment_modes')[0]?.key || '';
+  const compatibleAccounts = (mode: string) => projectAccounts.filter((a) => Boolean((a as any).isDefaultCash) === cashModes.includes(mode));
+  const [bankAccountId, setBankAccountId] = useState<string>(() => compatibleAccounts(defaultMode)[0]?.id || '');
   const [amount, setAmount] = useState<number | ''>('');
-  const [category, setCategory] = useState<ExpenseCategory>('Labor Wages');
+  const [category, setCategory] = useState<ExpenseCategory>(() => (masterItems('expense_categories')[0]?.key || '') as ExpenseCategory);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState<string>('');
   const [vendorName, setVendorName] = useState<string>('');
   const [taxInvoiceNo, setTaxInvoiceNo] = useState<string>('');
-  const [paymentMode, setPaymentMode] = useState<string>('Cash / Spot Voucher');
-  const [initialStatus, setInitialStatus] = useState<'pending' | 'approved'>('approved');
+  const [paymentMode, setPaymentMode] = useState<string>(() => masterItems('expense_payment_modes')[0]?.key || '');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    setPartnerId(partners[0]?.id || 'accountant');
+    setPaymentSource('project_bank'); setPaymentMode(defaultMode);
+    setBankAccountId(compatibleAccounts(defaultMode)[0]?.id || '');
+    setAmount(''); setCategory((masterItems('expense_categories')[0]?.key || '') as ExpenseCategory);
+    setDate(new Date().toISOString().split('T')[0]); setNote(''); setVendorName(''); setTaxInvoiceNo('');
+    setSaving(false);
+  }, [isOpen, project.id]);
 
   if (!isOpen) return null;
 
@@ -67,14 +79,27 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
   const enrolledName =
     selectedPartner ? selectedPartner.name : `${firm.accountantName || 'Accountant'} (Accountant)`;
 
-  const chosenAccount = projectAccounts.find((a) => a.id === bankAccountId) || projectAccounts[0];
+  const eligibleAccounts = compatibleAccounts(paymentMode);
+  const chosenAccount = eligibleAccounts.find((a) => a.id === bankAccountId);
   const numAmount = typeof amount === 'number' ? amount : 0;
-  const isHighValue = numAmount > 10000;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!numAmount || numAmount <= 0) {
       alert('Please enter a valid expense amount greater than ₹0.');
+      return;
+    }
+    if (paymentSource === 'project_bank' && !chosenAccount) {
+      alert('Choose an active account belonging to this project.');
+      return;
+    }
+    if (paymentSource === 'individual' && !selectedPartner) {
+      alert('Choose the project partner who paid from their own funds.');
+      return;
+    }
+    if (!note.trim()) {
+      alert('Enter the expense narration or work details.');
       return;
     }
 
@@ -87,12 +112,8 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
       amount: numAmount,
       category,
       date,
-      note: note.trim() || `Project expense for ${category}`,
-      status: initialStatus,
-      reconciledDate: initialStatus === 'approved' ? date : undefined,
-      reconciledBy: initialStatus === 'approved' ? `${firm.accountantName || 'Accountant'} (Accountant)` : undefined,
-      requiresManagingPartnerSignoff: isHighValue && initialStatus === 'pending',
-      approvedByPartners: initialStatus === 'approved' ? [firm.managingPartnerName || 'Managing Partner'] : undefined,
+      note: note.trim(),
+      status: 'pending',
       taxInvoiceNo: taxInvoiceNo.trim() || undefined,
       vendorName: vendorName.trim() || undefined,
       paymentMode,
@@ -103,7 +124,11 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
       enrolledBy: enrolledName,
     };
 
-    void Promise.resolve(onEnrollExpense(newExpense, paymentSource === 'project_bank' ? (chosenAccount?.id || undefined) : undefined)).then((ok) => { if (ok !== false) onClose(); });
+    setSaving(true);
+    try {
+      const ok = await onEnrollExpense(newExpense, paymentSource === 'project_bank' ? chosenAccount?.id : undefined);
+      if (ok !== false) onClose();
+    } finally { setSaving(false); }
   };
 
   return (
@@ -153,11 +178,11 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
                   }`}
                 >
                   <Landmark className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Project Bank A/C</span>
+                  <span>Project Bank / Cash</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaymentSource('individual')}
+                  onClick={() => { setPaymentSource('individual'); if (partnerId === 'accountant') setPartnerId(partners[0]?.id || ''); }}
                   className={`py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
                     paymentSource === 'individual'
                       ? 'bg-[#111827] text-white border-gray-900 shadow-sm'
@@ -170,12 +195,27 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
               </div>
             </div>
 
+            <div className="mb-3">
+              <label className="block text-[11px] font-black text-gray-700 uppercase mb-1">
+                Disbursement Mode
+              </label>
+              <select
+                value={paymentMode}
+                onChange={(e) => { const mode = e.target.value; setPaymentMode(mode); setBankAccountId(compatibleAccounts(mode)[0]?.id || ''); }}
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
+              >
+                <MasterOptions group="expense_payment_modes" />
+              </select>
+              {paymentSource === 'project_bank' && cashModes.includes(paymentMode) && (
+                <p className="text-[10px] text-amber-900 mt-1">Cash payments use this project's Cash ledger. Choose a bank disbursement mode to pay from a bank account.</p>
+              )}
+            </div>
             {paymentSource === 'project_bank' ? (
               <div>
                 <label className="block text-[11px] font-black text-amber-950 uppercase mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Landmark className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Select Project Bank Account to Debit *</span>
+                    <span>Select Project Account to Debit *</span>
                   </span>
                   {chosenAccount && (
                     <span className="font-mono text-[10px] text-amber-900 font-bold">
@@ -184,22 +224,20 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
                   )}
                 </label>
                 <select
-                  value={bankAccountId || chosenAccount?.id}
+                  value={chosenAccount?.id || ''}
                   onChange={(e) => setBankAccountId(e.target.value)}
                   className="w-full px-3 py-2.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-gray-950 focus:ring-2 focus:ring-amber-500 outline-none cursor-pointer"
                 >
-                  {projectAccounts.length === 0 && (
-                    <option value="">Cash Treasury / Site Imprest (General Treasury)</option>
-                  )}
-                  {projectAccounts.map((acc) => (
+                  <option value="" disabled>Choose a project account</option>
+                  {eligibleAccounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.bankName} - {acc.accountName} (A/C: ...{acc.accountNumber.slice(-4)}) — Bal: {formatINR(acc.currentBalance)}
+                      {(acc as any).isDefaultCash ? acc.accountName : `${acc.bankName} - ${acc.accountName} (A/C: ...${acc.accountNumber.slice(-4)})`} — Bal: {formatINR(acc.currentBalance)}
                     </option>
                   ))}
                 </select>
                 {chosenAccount && numAmount > 0 && (
                   <div className="mt-2 flex items-center justify-between text-[11px] font-mono font-semibold text-amber-950 bg-white/80 p-2 rounded-lg border border-amber-200">
-                    <span>Projected Treasury Bal After Debit:</span>
+                    <span>Balance if approved and paid:</span>
                     <span className={chosenAccount.currentBalance - numAmount < 0 ? 'text-rose-700 font-black' : 'text-emerald-700 font-black'}>
                       {formatINR(chosenAccount.currentBalance - numAmount)} (-{formatINR(numAmount)})
                     </span>
@@ -250,9 +288,9 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
                     {p.name} ({p.roleDescription || 'Partner'})
                   </option>
                 ))}
-                <option value="accountant">
+                {paymentSource === 'project_bank' && <option value="accountant">
                   {firm.accountantName || 'Accountant'} (Accountant Central Office)
-                </option>
+                </option>}
               </select>
             </div>
           </div>
@@ -328,33 +366,16 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
             </div>
           </div>
 
-          {/* 4. Payment Mode & Initial Status */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-[11px] font-black text-gray-700 uppercase mb-1">
-                Disbursement Mode
-              </label>
-              <select
-                value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
-              >
-                <MasterOptions group="expense_payment_modes" />
-              </select>
-            </div>
-
+          {/* 4. Server-controlled approval workflow */}
+          <div>
             <div>
               <label className="block text-[11px] font-black text-gray-700 uppercase mb-1">
                 Approval Workflow
               </label>
-              <select
-                value={initialStatus}
-                onChange={(e) => setInitialStatus(e.target.value as any)}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
-              >
-                <option value="approved">✓ Direct Fast-Approve &amp; Settle (Immediate Debit)</option>
-                <option value="pending">⏳ Send to Verification Queue (Pending)</option>
-              </select>
+              <div className="px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950">
+                Pending independent verification
+              </div>
+              <p className="text-[10px] text-gray-600 mt-1">Ledger debits occur only after the required independent approvals.</p>
             </div>
           </div>
 
@@ -374,11 +395,11 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
           </div>
 
           {/* High-value compliance notice */}
-          {isHighValue && initialStatus === 'pending' && (
+          {(
             <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3 flex items-start gap-2 text-amber-900 text-[11px]">
               <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
               <span>
-                <strong>High-Value Outlay (&gt; ₹10,000):</strong> This expense requires Managing Partner consensus signoff or multi-partner approval before reconciling into the partner capital ledger.
+                <strong>Independent verification:</strong> The project's configured approval rules apply. Saving does not debit an account or claim that a partner has approved.
               </span>
             </div>
           )}
@@ -394,10 +415,11 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
             </button>
             <button
               type="submit"
+              disabled={saving}
               className="px-5 py-2.5 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95 flex items-center gap-1.5"
             >
               <Receipt className="w-4 h-4 text-gray-950" />
-              <span>Enroll Project Expenses</span>
+              <span>{saving ? 'Saving expense…' : 'Enroll Project Expenses'}</span>
             </button>
           </div>
         </form>
