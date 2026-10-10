@@ -280,3 +280,31 @@ mtime_ms = 1791627207294
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/6000d692-8802-44c3-9875-43fe9ca9bf78/4788b692-d9dd-4fd9-94e1-3b1e04951176"
 storage_version_token = "1791627219796564"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "tcY-Q8PUZS26ELWFDXyrs"
+uri = "file://generated-artifacts/ec2/sos-fresh-ec2-20261010.tar.gz"
+type = "unspecified"
+title = "SyndicateOS — Fresh EC2 Release"
+description = "Verified React production build, Spring Boot JAR, migrations V1–V19, fresh database SQL, and phased installation scripts. Target: lowercase sos on your RDS instance. AWS has not been modified."
+logical_id = "19cafbc7-bb9d-4889-9c94-8098b7a8fb9b"
+content_hash = "sha256:ef525c284707e07ee82feb3ee9ebd1941eb71823915a7735bd1c31a91c328e20"
+size = 26962452
+mtime_ms = 1791650900632
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/19cafbc7-bb9d-4889-9c94-8098b7a8fb9b/2e0c06b3-bace-4e22-880b-03e7362167d0"
+storage_version_token = "1791650968705202"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "tv_FcY76ouTCwy0MJaBI0"
+uri = "file://generated-artifacts/ec2/SyndicateOS-Fresh-EC2-Guide.html"
+type = "html"
+title = "Fresh EC2 Installation Guide"
+description = "Step-by-step upload, checksum, safe cleanup, SQL permissions, owner setup, HTTPS configuration, and acceptance checks."
+logical_id = "82a855c7-09c3-44bf-addc-8ba232b04122"
+content_hash = "sha256:aeb5b210d6c3d508d6d05a1a96267ef4154dd8b1bf2c267f283fd7a69c9ea0c8"
+size = 20021
+mtime_ms = 1791650941522
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/82a855c7-09c3-44bf-addc-8ba232b04122/e43e3abc-0337-4aac-bb31-ecc18fc69450"
+storage_version_token = "1791650969931230"
+content_type = "text/html"

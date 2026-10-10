@@ -24,15 +24,15 @@ SyndicateOS is a multi-tenant business syndicate and ERP platform for multi-part
 
 ### Required product stack
 
-- React Native mobile frontend (Expo).
+- React web frontend and React Native mobile frontend (Expo); the owner portal is web-only.
 - Java Spring Boot backend.
 - PostgreSQL database.
 - The first version built in Google AI Studio is at https://github.com/gudapatisudheer8-lgtm/SOS. Its source has been reviewed: reuse its business workflows and domain models as reference, while retaining the required React Native, Java Spring Boot, and PostgreSQL product stack.
 - The Expo frontend implements a company-code-first client entry followed by mobile/PIN login with server-resolved accountant/partner membership, and a separate web-only `/owner` portal. It includes first-login reset, owner firm/sector onboarding, configuration editing/preview/publication, accountant projects and partner provisioning, and read-only partner interfaces. Demo persistence and financial balances have been removed. It uses generated API clients and reports unavailable setup explicitly.
 - The Java 21 / Spring Boot API implements hashed credentials, persisted opaque sessions, attempt limits, required credential changes, owner bootstrap, tenant-scoped onboarding commands and normalized configuration resolution. Default workspace settings keep database writes and automatic migrations disabled.
-- The relational migrations and API provisioning/isolation journey passed disposable localhost PostgreSQL tests. On 2026-10-09, the user executed guarded setup from EC2 against AWS SOS and verified both migrations, owner bootstrap with mandatory reset, initial published releases and runtime-role grants. The non-root systemd API service and HTTPS gateway returned HTTP 200 readiness; unauthenticated workspace access returned 401. Certificate renewal simulation, its timer and exported font asset routing were confirmed. The company-code/owner-portal update is prepared in the workspace and must be transferred to EC2; do not repeat initial setup or drop/reset the database.
+- Historical installation: on 2026-10-09 the user verified guarded setup, owner bootstrap, runtime grants, HTTPS readiness, certificate renewal and font routing on AWS database `SOS`. This installation is superseded by the fresh-database request below; do not assume its users or migration history still exist.
 - The updated owner → firm → accountant reset → project → partner reset journey and independent portal-session restoration passed a browser test against disposable localhost PostgreSQL. API isolation tests also verified shared identities across firms, company-code denial, suspension, credential rotation and role precedence. This verifies the implementation, not an update of the AWS installation.
-- See `docs/sos-ec2-release.md` for the application-only EC2 upgrade. Complete protected browser acceptance on AWS before claiming production readiness; native and financial modules are separate milestones.
+- Current fresh EC2 handoff: see `docs/sos-fresh-ec2-installation.md`. Complete protected browser acceptance on AWS before claiming the new installation is live; native binary distribution is separate from the web release.
 
 ### Initial workspace tooling
 
@@ -64,9 +64,9 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - Each sector has distinct accountant and partner interfaces, selected from assigned sectors and the user's firm/project permissions.
 - Accountants add projects and partners. Adding a partner automatically provisions that partner's login.
 - Partners log in with their mobile number and a default PIN, with a mandatory PIN/password change on first login.
-- The user created AWS EC2 and PostgreSQL database SOS on the shared KrishiSetu RDS instance. SOS is now initialized; EC2 SQL authentication, runtime grants and API readiness have been verified. The workspace cannot reach RDS. Scope future changes to SOS only and do not alter sibling databases or shared AWS network settings without explicit approval.
-- PostgreSQL remains on RDS; no PostgreSQL server installation is needed on EC2. A command-line PostgreSQL client is optional because pgAdmin can run SQL checks.
-- The AWS web hostname is sos.krishisetu9.in; HTTPS deployment and readiness were verified. See the release guide for the prepared portal update and outstanding AWS browser acceptance.
+- On 2026-10-10, after accepting Preview, the user said the database was deleted/recreated and approved preparing a fresh EC2 installation. The confirmed new database is lowercase `sos` on `krishisetu-db.cpmomccww28x.ap-south-1.rds.amazonaws.com`, EC2 `3.111.185.116`, domain `sos.krishisetu9.in`. AWS initialization/deployment has not been performed or verified by the agent. Never use the old uppercase `SOS` target or older update packages for this handoff.
+- Scope fresh setup to `sos` only; do not alter sibling databases, shared AWS network settings, unrelated EC2 applications, HTTPS certificates, or private uploads. Archive the old SOS installation rather than broadly deleting server files.
+- PostgreSQL remains on RDS; no PostgreSQL server installation is needed on EC2. The current guarded installer uses a PostgreSQL client and new dedicated migration/runtime roles. Owner credentials are entered privately during bootstrap; do not carry over the Preview database or test records.
 
 ## Product
 

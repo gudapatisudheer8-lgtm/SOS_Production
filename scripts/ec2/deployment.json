@@ -1,0 +1,11 @@
+{
+  "release": "sos-fresh-ec2-20261010",
+  "domain": "sos.krishisetu9.in",
+  "ec2_host": "3.111.185.116",
+  "database_host": "krishisetu-db.cpmomccww28x.ap-south-1.rds.amazonaws.com",
+  "database_port": "5432",
+  "database_name": "sos",
+  "migration_role": "sos_deploy",
+  "runtime_role": "sos_runtime",
+  "schema_version": "19"
+}

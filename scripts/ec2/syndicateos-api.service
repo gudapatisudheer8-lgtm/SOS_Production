@@ -1,0 +1,26 @@
+[Unit]
+Description=SyndicateOS Spring Boot API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=syndicateos
+Group=syndicateos
+WorkingDirectory=/opt/syndicateos/current
+EnvironmentFile=/etc/syndicateos/runtime.env
+ExecStart=/usr/bin/java -Xms64m -Xmx256m -jar /opt/syndicateos/current/sos-api.jar --server.address=127.0.0.1 --server.port=8080 --server.tomcat.threads.max=24 --server.tomcat.threads.min-spare=2 --sos.upload-directory=/var/lib/syndicateos/uploads --sos.setup-approved=false --sos.preview-fixture=false --spring.flyway.enabled=false
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+StateDirectory=syndicateos
+ReadWritePaths=/var/lib/syndicateos/uploads
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

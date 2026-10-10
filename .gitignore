@@ -7,6 +7,8 @@ out-tsc
 *.tsbuildinfo
 **/target/
 *.class
+**/__pycache__/
+*.py[cod]
 .expo
 .expo-shared
 
