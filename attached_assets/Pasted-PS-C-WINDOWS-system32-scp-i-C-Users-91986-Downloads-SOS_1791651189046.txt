@@ -1,0 +1,87 @@
+PS C:\WINDOWS\system32> scp -i "C:\Users\91986\Downloads\SOS.pem" "C:\Users\91986\Downloads\sos-fresh-ec2-20261010.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
+sos-fresh-ec2-20261010.tar.gz                                                         100%   26MB   2.1MB/s   00:12
+PS C:\WINDOWS\system32> ssh -i C:\Users\91986\Downloads\SOS.pem ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1014-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat Oct 10 16:52:18 UTC 2026
+
+  System load:  1.11              Temperature:           -273.1 C
+  Usage of /:   56.4% of 6.61GB   Processes:             126
+  Memory usage: 42%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+ * Ubuntu Pro delivers the most comprehensive open source security and
+   compliance features.
+
+   https://ubuntu.com/aws/pro
+
+Expanded Security Maintenance for Applications is not enabled.
+
+42 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Fri Oct  9 19:34:25 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$ (
+  set -e
+  cd /home/ubuntu
+
+  printf '%s  %s\n' \
+    'ef525c284707e07ee82feb3ee9ebd1941eb71823915a7735bd1c31a91c328e20' \
+    'sos-fresh-ec2-20261010.tar.gz' |
+    sha256sum -c -
+
+  if [ -e sos-fresh-ec2-20261010 ]; then
+    echo "Extraction folder already exists. Stop; do not overwrite it."
+    exit 1
+  fi
+
+  tar -xzf sos-fresh-ec2-20261010.tar.gz
+  cd sos-fresh-ec2-20261010
+  sha256sum -c FILES.sha256
+  sudo python3 deploy.py inspect
+)
+sos-fresh-ec2-20261010.tar.gz: OK
+README.md: OK
+certs/aws-rds-global-bundle.pem: OK
+deploy.py: OK
+deployment.json: OK
+migrations/V10__web_business_masters.sql: OK
+migrations/V11__reconcile_extent_unit_masters.sql: OK
+migrations/V12__subscription_plan_masters.sql: OK
+migrations/V13__project_cash_accounts.sql: OK
+migrations/V14__project_bank_institutions.sql: OK
+migrations/V15__project_layout_utility_areas.sql: OK
+migrations/V16__personal_marketing_access.sql: OK
+migrations/V17__expense_payment_mode_bindings.sql: OK
+migrations/V18__financial_payment_bindings.sql: OK
+migrations/V19__no_partner_self_approval_policy.sql: OK
+migrations/V1__onboarding_and_configuration.sql: OK
+migrations/V2__initial_sector_configuration.sql: OK
+migrations/V3__project_erp_core.sql: OK
+migrations/V4__original_dashboard_configuration.sql: OK
+migrations/V5__private_project_attachments.sql: OK
+migrations/V6__complete_project_setup.sql: OK
+migrations/V7__reconcile_booking_reservations.sql: OK
+migrations/V8__simple_open_plotting_forms.sql: OK
+migrations/V9__business_masters_and_profile_metadata.sql: OK
+sos-api.jar: OK
+sql/01_prepare_database.sql: OK
+sql/02_runtime_permissions.sql: OK
+syndicateos-api.service: OK
+syndicateos-fresh.nginx.conf: OK
+web/assets/index-BC4hSBy1.css: OK
+web/assets/index-DX4TOy79.js: OK
+web/favicon.svg: OK
+web/index.html: OK
+web/release.json: OK
+web/robots.txt: OK
+Missing psql. Install the prerequisites in README.md first.
+ubuntu@ip-172-31-13-52:~$
