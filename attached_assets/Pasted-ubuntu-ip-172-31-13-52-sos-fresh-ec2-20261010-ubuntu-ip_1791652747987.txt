@@ -1,0 +1,104 @@
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$ echo "=== HTTPS release response ==="
+curl --silent --show-error --max-time 10 \
+  --noproxy '*' \
+  --resolve sos.krishisetu9.in:443:127.0.0.1 \
+  -w '\nHTTP status: %{http_code}\n' \
+  https://sos.krishisetu9.in/release.json
+
+echo "=== Nginx errors ==="
+sudo tail -n 60 /var/log/nginx/error.log
+
+echo "=== Deployment path permissions ==="
+sudo namei -l /opt/syndicateos/current/web/release.json
+
+echo "=== Web entry files ==="
+sudo ls -l \
+  /opt/syndicateos/current/web/index.html \
+  /opt/syndicateos/current/web/release.json
+=== HTTPS release response ===
+{
+  "release": "sos-fresh-ec2-20261010",
+  "schema_version": "19",
+  "frontend_base": "/"
+}
+
+HTTP status: 200
+=== Nginx errors ===
+2026/10/09 19:00:10 [error] 10724#10724: *731 access forbidden by rule, client: 91.148.245.81, server: sos.krishisetu9.in, request: "GET /.env.production HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/09 19:00:10 [error] 10724#10724: *731 access forbidden by rule, client: 91.148.245.81, server: sos.krishisetu9.in, request: "GET /.vscode/sftp.json HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/09 19:00:10 [error] 10725#10725: *730 access forbidden by rule, client: 91.148.245.81, server: sos.krishisetu9.in, request: "GET /.npmrc HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/09 19:00:10 [error] 10725#10725: *733 access forbidden by rule, client: 91.148.245.81, server: sos.krishisetu9.in, request: "GET /.bash_history HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/09 19:00:10 [error] 10725#10725: *730 access forbidden by rule, client: 91.148.245.81, server: sos.krishisetu9.in, request: "GET /.svn/wc.db HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/09 19:49:00 [error] 11451#11451: *772 access forbidden by rule, client: 165.227.230.38, server: sos.krishisetu9.in, request: "GET /.git/config HTTP/1.1", host: "3.111.185.116"
+2026/10/09 22:18:42 [error] 11451#11451: *844 access forbidden by rule, client: 195.63.30.190, server: sos.krishisetu9.in, request: "GET /.env HTTP/1.1", host: "3.111.185.116"
+2026/10/09 22:51:36 [error] 11451#11451: *853 access forbidden by rule, client: 185.218.86.24, server: sos.krishisetu9.in, request: "GET /.git/config HTTP/1.1", host: "3.111.185.116"
+2026/10/09 22:51:38 [error] 11451#11451: *854 access forbidden by rule, client: 185.218.86.24, server: sos.krishisetu9.in, request: "GET /.svn/wc.db HTTP/1.1", host: "3.111.185.116"
+2026/10/09 23:06:22 [error] 11451#11451: *856 access forbidden by rule, client: 216.81.248.28, server: sos.krishisetu9.in, request: "GET /.vite/manifest.json HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:26:05 [error] 11451#11451: *999 access forbidden by rule, client: 93.152.221.20, server: sos.krishisetu9.in, request: "GET /.env HTTP/1.1", host: "sos.krishisetu9.in", referrer: "http://sos.krishisetu9.in/.env"
+2026/10/10 04:26:06 [error] 11451#11451: *1004 access forbidden by rule, client: 93.152.221.20, server: sos.krishisetu9.in, request: "GET /.git/config HTTP/1.1", host: "sos.krishisetu9.in", referrer: "http://sos.krishisetu9.in/.git/config"
+2026/10/10 04:29:17 [error] 11449#11449: *1025 access forbidden by rule, client: 93.152.221.20, server: sos.krishisetu9.in, request: "GET /.env.bak HTTP/1.1", host: "sos.krishisetu9.in", referrer: "http://sos.krishisetu9.in/.env.bak"
+2026/10/10 04:29:17 [error] 11449#11449: *1026 access forbidden by rule, client: 93.152.221.20, server: sos.krishisetu9.in, request: "GET /.gitconfig HTTP/1.1", host: "sos.krishisetu9.in", referrer: "http://sos.krishisetu9.in/.gitconfig"
+2026/10/10 04:29:49 [error] 11449#11449: *1048 access forbidden by rule, client: 93.152.221.20, server: sos.krishisetu9.in, request: "GET /.env-config.js HTTP/1.1", host: "sos.krishisetu9.in", referrer: "http://sos.krishisetu9.in/.env-config.js"
+2026/10/10 04:29:49 [error] 11449#11449: *1054 access forbidden by rule, client: 93.152.221.20, server: sos.krishisetu9.in, request: "GET /.aws/credentials HTTP/1.1", host: "sos.krishisetu9.in", referrer: "http://sos.krishisetu9.in/.aws/credentials"
+2026/10/10 04:29:49 [error] 11449#11449: *1048 access forbidden by rule, client: 93.152.221.20, server: sos.krishisetu9.in, request: "GET /.env.js HTTP/1.1", host: "sos.krishisetu9.in", referrer: "http://sos.krishisetu9.in/.env.js"
+2026/10/10 04:39:58 [error] 11449#11449: *1102 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.oci/private_key.pem HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1104 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.oci/oci_api_key.pem HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11451#11451: *1109 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env.production.local HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1102 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.oci/config HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11451#11451: *1103 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.oci/config.old HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1104 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.oci/config.bak HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1105 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.oci/oci_api_key.pem.bak HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11451#11451: *1109 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.oci/api_key.pem HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11451#11451: *1108 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1106 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env.local HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1107 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env.production HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11451#11451: *1110 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env.development HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1102 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env.staging HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1104 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env.bak HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11451#11451: *1109 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env.old HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11451#11451: *1103 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /app/.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:39:58 [error] 11449#11449: *1105 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.env.backup HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:02 [error] 11451#11451: *1103 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /backend/.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:02 [error] 11449#11449: *1105 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /server/.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:02 [error] 11451#11451: *1109 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.git/config HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:02 [error] 11449#11449: *1112 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /config/.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:02 [error] 11451#11451: *1110 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.config/hub HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:02 [error] 11449#11449: *1104 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.git-credentials HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:02 [error] 11449#11449: *1102 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.config/gh/hosts.yml HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:02 [error] 11449#11449: *1107 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.netrc HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:03 [error] 11451#11451: *1108 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.modal.toml HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:03 [error] 11449#11449: *1106 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.npmrc HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:03 [error] 11451#11451: *1103 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.kube/config HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:03 [error] 11451#11451: *1110 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /open-webui/.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:03 [error] 11449#11449: *1104 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /webui/.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:03 [error] 11449#11449: *1107 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /dify/.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:06 [error] 11451#11451: *1103 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.aws/credentials HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:40:06 [error] 11449#11449: *1117 access forbidden by rule, client: 161.118.201.71, server: sos.krishisetu9.in, request: "GET /.aws/config HTTP/1.1", host: "3.111.185.116"
+2026/10/10 04:45:13 [error] 11449#11449: *1118 access forbidden by rule, client: 217.181.88.127, server: sos.krishisetu9.in, request: "GET /.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 07:03:03 [error] 33390#33390: *25 access forbidden by rule, client: 103.147.170.164, server: sos.krishisetu9.in, request: "GET /.git/config HTTP/1.1", host: "3.111.185.116"
+2026/10/10 07:03:03 [error] 33390#33390: *26 access forbidden by rule, client: 156.246.243.146, server: sos.krishisetu9.in, request: "GET /.env HTTP/1.1", host: "3.111.185.116"
+2026/10/10 07:03:05 [error] 33390#33390: *30 access forbidden by rule, client: 187.52.201.254, server: sos.krishisetu9.in, request: "GET /.git/config HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/10 07:03:06 [error] 33390#33390: *37 access forbidden by rule, client: 168.113.117.214, server: sos.krishisetu9.in, request: "GET /.git/config HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/10 07:03:06 [error] 33390#33390: *36 access forbidden by rule, client: 212.52.30.116, server: sos.krishisetu9.in, request: "GET /.env HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/10 07:03:06 [error] 33390#33390: *35 access forbidden by rule, client: 45.192.34.14, server: sos.krishisetu9.in, request: "GET /.env HTTP/1.1", host: "sos.krishisetu9.in"
+2026/10/10 17:12:24 [error] 709#709: *1 rewrite or internal redirection cycle while internally redirecting to "/index.html", client: 66.132.195.103, server: sos.krishisetu9.in, request: "GET / HTTP/1.1", host: "3.111.185.116"
+2026/10/10 17:12:42 [error] 709#709: *10 rewrite or internal redirection cycle while internally redirecting to "/index.html", client: 66.132.195.103, server: sos.krishisetu9.in, request: "GET /ads.txt HTTP/1.1", host: "3.111.185.116"
+2026/10/10 17:15:52 [error] 709#709: *11 rewrite or internal redirection cycle while internally redirecting to "/index.html", client: 127.0.0.1, server: sos.krishisetu9.in, request: "GET /release.json HTTP/1.1", host: "sos.krishisetu9.in"
+=== Deployment path permissions ===
+f: /opt/syndicateos/current/web/release.json
+drwxr-xr-x root root /
+drwxr-xr-x root root opt
+drwxr-xr-x root root syndicateos
+lrwxrwxrwx root root current -> /opt/syndicateos/releases/sos-fresh-ec2-20261010
+drwxr-xr-x root root   /
+drwxr-xr-x root root   opt
+drwxr-xr-x root root   syndicateos
+drwxr-xr-x root root   releases
+drwxr-xr-x root root   sos-fresh-ec2-20261010
+drwxr-xr-x root root web
+-rw-r--r-- root root release.json
+=== Web entry files ===
+-rw-r--r-- 1 root root 1480 Oct 10 16:45 /opt/syndicateos/current/web/index.html
+-rw-r--r-- 1 root root   92 Oct 10 16:45 /opt/syndicateos/current/web/release.json
+ubuntu@ip-172-31-13-52:~/sos-fresh-ec2-20261010$

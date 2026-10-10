@@ -14,3 +14,9 @@ Treat package installation, database migration, firm configuration activation, a
 **Why:** The user repeatedly reported unchanged accountant forms after successful deployment logs. Independent review found both configuration-dependent rendering and genuine reference-layout gaps; attributing the complaint solely to deployment or caching would miss unfinished UI work.
 
 **How to apply:** Before another release handoff, verify the signed-in accountant and partner flows against the supplied original source and screenshots. Distinguish proven local behavior from unverified production activation. Do not send another archive merely to repeat a successful installation.
+
+Account for Nginx's asynchronous worker transition when verifying HTTPS immediately after a reload. A successful reload command does not guarantee the first request uses the new configuration.
+
+**Why:** A fresh activation's first release request hit an old-root redirect cycle, while a later request served the correct release with valid file permissions. Reload timing was the likely cause, not a database or permissions failure.
+
+**How to apply:** Check the failing route and current response before changing configuration. Future activation checks should use bounded retries with exact release/readiness validation and retain fail-closed behavior for persistent errors.
