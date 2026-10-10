@@ -18,3 +18,9 @@ The user expects the automatic Cash account to be visible in Add Project's banki
 **Why:** The user explicitly requested this so cash transactions contribute to the complete ledger of the respective project.
 
 **How to apply:** Show the planned Cash account clearly as created on save, without fabricating a saved account ID. Provision it automatically without invented bank details or opening money. Route project cash receipts/payments to that project's cash account; distinguish partner-personal spending from project cash and preserve existing approvals and posting history.
+
+The user requires plots, roads, utilities and other allocated spaces together to stay within the declared venture area, with synchronized automatic calculations and visible free/unallocated area.
+
+**Why:** Clients need to understand how much land is allocated and avoid allocating more land than the venture actually contains.
+
+**How to apply:** Treat declared venture area as the shared area limit across project entry and dashboards. Distinguish measured road area from estimates; road width alone does not establish its occupied area.
