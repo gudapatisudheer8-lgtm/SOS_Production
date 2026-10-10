@@ -81,6 +81,10 @@ export interface ProjectPartnerShare {
 }
 
 export interface Project {
+  financialStatement?: import('./components/accountant/ProjectStatementModule').UnifiedProjectTransaction[];
+  financialForms?: Record<string, any[]>;
+  canRecordDrawings?: boolean;
+  reviewableRecordIds?: string[];
   id: string;
   firmId: string;
   name: string;
@@ -212,6 +216,7 @@ export interface MarketingBookingRequest {
 }
 
 export interface Plot {
+  bookingAccountId?: string;
   id: number;
   firmId?: string;
   projectId?: string;

@@ -1,4 +1,4 @@
-import { MasterOptions } from '../../../adapter/config';
+import { MasterOptions, masterItems } from '../../../adapter/config';
 import React, { useState, useEffect } from 'react';
 import {
   TenantFirm,
@@ -93,36 +93,38 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
   const projectBankAccounts = (firmAccounts || []).filter(
     (a) =>
       a.firmId === firm.id &&
-      (!a.linkedProjectId || a.linkedProjectId === 'all' || a.linkedProjectId === project.id) &&
+      a.linkedProjectId === project.id && a.status === 'active' &&
       a.accountType !== 'field_petty_cash'
   );
 
-  const existingCashAccount = (firmAccounts || []).find((a) => a.accountType === 'field_petty_cash');
+  const existingCashAccount = (firmAccounts || []).find((a) => a.firmId === firm.id && a.linkedProjectId === project.id && (a as any).isDefaultCash && a.status === 'active');
+  const CASH_ACCOUNTS = existingCashAccount ? [{ id: existingCashAccount.id, name: existingCashAccount.accountName, category: 'Project Cash', baseBal: existingCashAccount.currentBalance }] : [];
   const cashVaultBalance = existingCashAccount?.currentBalance ?? 0;
 
-  const defaultPartnerId = preSelectedPartnerId || partners[0]?.id || 'partner-custom';
-  const defaultAccountId = 'cash_main_vault';
+  const defaultPartnerId = preSelectedPartnerId || partners[0]?.id || '';
+  const defaultAccountId = existingCashAccount?.id || projectBankAccounts[0]?.id || '';
 
   const [partnerId, setPartnerId] = useState<string>(defaultPartnerId);
   const [customPartnerName, setCustomPartnerName] = useState<string>('');
   const [amount, setAmount] = useState<number | ''>('');
+  const [submitting, setSubmitting] = useState(false);
   const [accountId, setAccountId] = useState<string>(defaultAccountId);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [purpose, setPurpose] = useState<string>('Land Purchase & Procurement (Farmer / Landowner Advance)');
+  const [purpose, setPurpose] = useState<string>(masterItems('investment_purposes')[0]?.key || '');
   const [customPurpose, setCustomPurpose] = useState<string>('');
-  const [paymentMode, setPaymentMode] = useState<string>('💵 Cash - Direct Currency Handover to Promoter / MD');
+  const [paymentMode, setPaymentMode] = useState<string>(masterItems(existingCashAccount ? 'cash_investment_modes' : 'bank_investment_modes')[0]?.key || '');
   const [referenceNo, setReferenceNo] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   
   // Cash Specific details
   const [cashWitness, setCashWitness] = useState<string>(
-    firm.managingPartnerName ? `${firm.managingPartnerName} (Managing Partner)` : 'Site Operations Lead'
+    firm.managingPartnerName ? `${firm.managingPartnerName} (Managing Partner)` : ''
   );
   const [cashDenominations, setCashDenominations] = useState<string>('₹500 Notes Bundles');
 
   // Approval Process & Syndicate Consensus
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'pending'>(
-    initiatorRole === 'field_partner' ? 'pending' : 'approved'
+    'pending'
   );
   const [approverSignatory, setApproverSignatory] = useState<string>(
     firm.managingPartnerName ? `${firm.managingPartnerName} (Managing Partner)` : ''
@@ -130,7 +132,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
   const [coSignatory, setCoSignatory] = useState<string>(
     partners.length > 1 ? partners[1].name : ''
   );
-  const [authPin, setAuthPin] = useState<string>('7890');
+  const [authPin, setAuthPin] = useState<string>('');
 
   useEffect(() => {
     if (preSelectedPartnerId) {
@@ -166,27 +168,22 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
 
   const handleAccountChange = (val: string) => {
     setAccountId(val);
-    if (val.startsWith('cash_') || val === existingCashAccount?.id) {
-      setPaymentMode('💵 Cash - Direct Currency Handover to Promoter / MD');
-      if (!referenceNo || referenceNo.startsWith('UTR-') || referenceNo.startsWith('RTGS-')) {
-        setReferenceNo(`CASH-VCH-${Date.now().toString().slice(-6)}`);
-      }
-    } else {
-      setPaymentMode('🏦 Bank Wire (RTGS / NEFT)');
-      if (!referenceNo || referenceNo.startsWith('CASH-')) {
-        setReferenceNo(`UTR-${Date.now().toString().slice(-7)}`);
-      }
-    }
+    setPaymentMode(masterItems(val === existingCashAccount?.id ? 'cash_investment_modes' : 'bank_investment_modes')[0]?.key || '');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     if (!numAmount || numAmount <= 0) {
       alert('Please enter a valid investment amount greater than ₹0.');
       return;
     }
     if (isCustomPartner && !customPartnerName.trim()) {
       alert('Please enter the investor/partner name.');
+      return;
+    }
+    if (!selectedPartner || !(existingCashAccount?.id === accountId || projectBankAccounts.some((a) => a.id === accountId))) {
+      alert('Select a registered partner and an active account for this project.');
       return;
     }
 
@@ -200,7 +197,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
       date,
       purpose: finalPurpose,
       paymentMode,
-      referenceNo: referenceNo.trim() || (isCashAccount ? `CASH-REC-${Date.now().toString().slice(-6)}` : `UTR-${Date.now().toString().slice(-7)}`),
+      referenceNo: referenceNo.trim(),
       notes: notes.trim() || `Individual capital investment by ${finalPartnerName} for ${finalPurpose}${isCashAccount ? ` [Cash Handover witnessed by: ${cashWitness}]` : ''}`,
       status: approvalStatus,
       approvedBy: approvalStatus === 'approved' ? approverSignatory : undefined,
@@ -210,7 +207,8 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
       cashVaultLocation: isCashAccount ? chosenAccountName : undefined,
     };
 
-    void Promise.resolve(onRecordInvestment(payload)).then((ok) => { if (ok !== false) onClose(); });
+    setSubmitting(true);
+    void Promise.resolve(onRecordInvestment(payload)).then((ok) => { if (ok !== false) onClose(); }).finally(() => setSubmitting(false));
   };
 
   return (
@@ -323,8 +321,8 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
                 </span>
                 <input
                   type="number"
-                  min="1"
-                  step="1"
+                  min="0.01"
+                  step="0.01"
                   required
                   placeholder="e.g. 2500000"
                   value={amount}
@@ -531,12 +529,10 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
                 </label>
                 <select
                   value={approvalStatus}
+                  disabled
                   onChange={(e) => setApprovalStatus(e.target.value as 'approved' | 'pending')}
                   className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-bold text-gray-950 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                 >
-                  <option value="approved">
-                    ✓ Direct Verified &amp; Approved (Immediate Ledger Credit)
-                  </option>
                   <option value="pending">
                     ⏳ Submit for Managing Partner &amp; Consortium Signoff
                   </option>
@@ -646,6 +642,7 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
               </button>
               <button
                 type="submit"
+                disabled={submitting}
                 className="px-5 py-2.5 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95 flex items-center gap-1.5"
               >
                 <Coins className="w-4 h-4 text-gray-950" />

@@ -29,9 +29,33 @@ class ExpenseEnrollmentIntegrationTest {
     @Autowired ObjectMapper json;
     private JsonNode node(Map<String,Object> data) { return json.valueToTree(data); }
     private UUID save(SessionAccount actor,UUID project,Map<String,Object> data) {
-        var response=service.execute(actor,"erp.save",node(Map.of("projectId",project.toString(),"kind","expenses",
+        return saveKind(actor,project,"expenses",data);
+    }
+    private UUID saveKind(SessionAccount actor,UUID project,String kind,Map<String,Object> data) {
+        var response=service.execute(actor,"erp.save",node(Map.of("projectId",project.toString(),"kind",kind,
             "requestId",UUID.randomUUID().toString(),"data",data)));
         return UUID.fromString(((Map<?,?>)response.get("entity")).get("id").toString());
+    }
+    @Test
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void projectSnapshotReadsOutsideTheTestTransaction() {
+        UUID actorId=UUID.randomUUID(),firm=UUID.randomUUID(),project=UUID.randomUUID();
+        String code="RO-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
+        jdbc.update("INSERT INTO sos.identities(id,mobile,display_name,credential_hash) VALUES (?,?,?,?)",
+            actorId,"+91"+Math.abs(System.nanoTime()%10000000000L),"Read-only test","not-a-login-hash");
+        jdbc.update("INSERT INTO sos.firms(id,client_code,name,created_by) VALUES (?,?,?,?)",firm,code,"Read-only fixture",actorId);
+        jdbc.update("INSERT INTO sos.firm_memberships(firm_id,identity_id,role_code) VALUES (?,?,'ACCOUNTANT')",firm,actorId);
+        var release=jdbc.queryForList("""
+            SELECT r.id,r.sector_id FROM sos.sector_releases r JOIN sos.erp_resources e ON e.release_id=r.id
+            WHERE r.state='PUBLISHED' AND e.kind='expenses' ORDER BY r.version DESC LIMIT 1
+            """).getFirst();
+        jdbc.update("INSERT INTO sos.firm_sector_assignments(firm_id,sector_id,release_id) VALUES (?,?,?)",firm,release.get("sector_id"),release.get("id"));
+        jdbc.update("INSERT INTO sos.projects(id,firm_id,sector_id,name,created_by,setup_state,setup_release_id) VALUES (?,?,?,?,?,'READY',?)",
+            project,firm,release.get("sector_id"),"Read-only project",actorId,release.get("id"));
+        var actor=new SessionAccount(actorId,"ACCOUNTANT","Read-only test","+919666662001",false,firm,code);
+        var snapshot=service.read(actor,project);
+        assertEquals(project,snapshot.get("projectId"));
+        assertTrue(((List<?>)snapshot.get("statement")).isEmpty());
     }
     private void review(SessionAccount actor,UUID project,UUID record,int revision) {
         service.execute(actor,"erp.review",node(Map.of("projectId",project.toString(),"recordId",record.toString(),
@@ -39,6 +63,15 @@ class ExpenseEnrollmentIntegrationTest {
     }
     private BigDecimal balance(UUID account) {
         return jdbc.queryForObject("SELECT coalesce(sum(debit-credit),0) FROM sos.erp_postings WHERE account_id=?",BigDecimal.class,account);
+    }
+    private void assertMoney(String expected,UUID account) {
+        assertEquals(0,new BigDecimal(expected).compareTo(balance(account)));
+    }
+    private void clear(SessionAccount first,SessionAccount second,UUID project,UUID id) {
+        review(first,project,id,1);
+        if("pending".equals(jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,id)))
+            review(second,project,id,2);
+        assertEquals("approved",jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,id));
     }
     @Test void accountantExpenseIsPendingAndOnlyIndependentFundedApprovalDebits() {
         UUID firm=UUID.randomUUID(),project=UUID.randomUUID(),bank=UUID.randomUUID(),funding=UUID.randomUUID();
@@ -110,5 +143,51 @@ class ExpenseEnrollmentIntegrationTest {
             assertEquals(payer,jdbc.queryForObject("SELECT partner_id FROM sos.erp_records WHERE id=?",UUID.class,personal));
             assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,personal));
         }
+        var partner=new SessionAccount(payer,"PARTNER","Expense test partner","+919777772009",false,firm,"EXP-UNIT");
+        UUID bankInvestment=saveKind(partner,project,"investments",new HashMap<>(Map.of(
+            "partnerId",payer.toString(),"accountId",bank.toString(),"amount","10000.25",
+            "date","2026-10-10","purpose","Partner capital","paymentMode","Bank Wire (RTGS / NEFT)")));
+        assertMoney("60000",bank);
+        clear(recorder,actors.get(1),project,bankInvestment);
+        assertMoney("70000.25",bank);
+        UUID cashInvestment=saveKind(recorder,project,"investments",new HashMap<>(Map.of(
+            "partnerId",payer.toString(),"accountId",cashAccount.toString(),"amount","5000.50",
+            "date","2026-10-10","purpose","Partner capital","paymentMode","Cash - Site Cash Vault Deposit")));
+        clear(actors.get(1),actors.get(2),project,cashInvestment);
+        assertMoney("5000.50",cashAccount);
+        var paid=new HashMap<String,Object>(Map.of("partnerId",payer.toString(),"accountId",cashAccount.toString(),
+            "paymentSource","project_bank","paymentMode","Cash","category","Labor Wages",
+            "amount","300.25","date","2026-10-10","note","Partner spent project cash"));
+        UUID paidExpense=save(partner,project,paid);
+        clear(recorder,actors.get(1),project,paidExpense);
+        UUID bankDraw=saveKind(partner,project,"drawings",new HashMap<>(Map.of(
+            "partnerId",payer.toString(),"accountId",bank.toString(),"amount","2000.05","date","2026-10-10",
+            "purpose","Partner drawing","payoutMode","Bank Transfer","destinationAccountDetails","Partner bank")));
+        clear(recorder,actors.get(1),project,bankDraw);
+        UUID cashDraw=saveKind(recorder,project,"drawings",new HashMap<>(Map.of(
+            "partnerId",payer.toString(),"accountId",bank.toString(),"amount","1000.10","date","2026-10-10",
+            "purpose","Partner cash drawing","payoutMode","Field Vault Cash","destinationAccountDetails","Cash handover")));
+        assertEquals(cashAccount,jdbc.queryForObject("SELECT account_id FROM sos.erp_records WHERE id=?",UUID.class,cashDraw));
+        clear(actors.get(1),actors.get(2),project,cashDraw);
+        UUID plot=UUID.randomUUID();
+        jdbc.update("INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,status,created_by,request_id) VALUES(?,?,?,'plots','{\"plotNumber\":\"1\",\"status\":\"available\",\"areaSqYards\":100,\"ratePerSqYard\":1000}'::jsonb,'{}','approved',?,?)",
+            plot,project,firm,recorder.identityId(),UUID.randomUUID());
+        var booking=new HashMap<String,Object>(Map.of("inventoryId",plot.toString(),"accountId",bank.toString(),
+            "buyerName","Test purchaser","buyerPhone","+919777773001","advanceReceived","2000.99",
+            "paymentMode","RTGS / NEFT","date","2026-10-10","ratePerSqYard",1000));
+        UUID receipt=saveKind(recorder,project,"bookings",booking);
+        clear(actors.get(1),actors.get(2),project,receipt);
+        assertMoney("70001.19",bank);
+        assertMoney("3700.15",cashAccount);
+        assertEquals(0,jdbc.queryForObject("SELECT coalesce(sum(debit-credit),0) FROM sos.erp_postings WHERE project_id=?",BigDecimal.class,project).signum());
+        var accountantView=service.read(recorder,project);
+        var partnerView=service.read(partner,project);
+        assertEquals(accountantView.get("balances"),partnerView.get("balances"));
+        assertEquals(accountantView.get("statement"),partnerView.get("statement"));
+        var totals=((List<Map<String,Object>>)partnerView.get("partners")).getFirst();
+        assertEquals("15000.75",totals.get("invested")); assertEquals("3000.15",totals.get("drawings"));
+        assertEquals("0",new BigDecimal(totals.get("expenses").toString()).stripTrailingZeros().toPlainString());
+        var statement=(List<Map<String,Object>>)partnerView.get("statement");
+        assertEquals(statement.size(),statement.stream().map(e->e.get("id")).distinct().count());
     }
 }

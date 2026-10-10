@@ -188,8 +188,8 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
     );
     const individualInvsTotal = approvedInvs.reduce((sum, i) => sum + i.amount, 0);
 
-    const totalActualInvested = Math.max(baseInitial, individualInvsTotal, baseInitial + ledgerInflows);
-    const totalDrawings = (partner.drawings || 0) + ledgerOutflows;
+    const totalActualInvested = partner.actualInvested || 0;
+    const totalDrawings = partner.drawings || 0;
     const capitalDifference = totalActualInvested - partner.initialCapital;
 
     return {
@@ -233,7 +233,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
       .filter((d) => d.partnerId === partner.id)
       .reduce((sum, d) => sum + d.retailValuation, 0);
     const { totalActualInvested, totalDrawings } = getPartnerLedgerStats(partner);
-    return totalActualInvested + (partner.shareOfFieldExpenses || 0) - totalDrawings - partnerDrawsValuation;
+    return totalActualInvested + (partner.shareOfFieldExpenses || 0) - totalDrawings;
   };
 
   // 1. Total Sellable Area in Yards (Based on layout & demarcated plot entries)

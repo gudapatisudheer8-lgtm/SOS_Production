@@ -12,6 +12,7 @@ import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.TransactionDefinition;
 
 /** Database-defined forms with trusted financial handlers. Client balances/statuses are never authoritative. */
 @Service
@@ -38,7 +39,10 @@ public class ErpService {
         return rows.getFirst();
     }
     public Map<String,Object> read(SessionAccount actor,UUID project) {
-        return tx.execute(status -> {
+        var snapshot=new TransactionTemplate(Objects.requireNonNull(tx.getTransactionManager()));
+        snapshot.setReadOnly(true);
+        snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        return snapshot.execute(status -> {
             var scope=access.project(actor,project,"erp.read",false);
             UUID release=(UUID)scope.get("release_id");
             boolean writable=Boolean.TRUE.equals(scope.get("assignment_enabled")) && "ACTIVE".equals(scope.get("status"));
@@ -75,7 +79,14 @@ public class ErpService {
                 WHERE a.project_id=? ORDER BY a.created_at DESC LIMIT 500
                 """,project);
             return Map.of("projectId",project,"resources",resources,"records",records,"balances",balances,
-                "partners",partners,"audit",audit,"settings",settings,"projectSetup",projectPolicy(release));
+                "partners",partners,"audit",audit,"settings",settings,"projectSetup",projectPolicy(release),
+                "statement",new FinancialStatementService(jdbc,json).read(project),
+                "reviewableRecordIds",records.stream().filter(r->"pending".equals(r.get("status"))
+                    && !actor.identityId().equals(r.get("createdBy"))
+                    && !actor.identityId().toString().equals(((JsonNode)r.get("data")).path("partnerId").asText())
+                    && !((List<?>)r.get("votes")).contains(actor.identityId().toString())
+                    && resources.stream().anyMatch(res->res.get("kind").equals(r.get("kind"))&&Boolean.TRUE.equals(res.get("canReview"))))
+                    .map(r->r.get("id").toString()).toList());
         });
     }
     private JsonNode projectPolicy(UUID release) {
@@ -99,7 +110,11 @@ public class ErpService {
             """,project)) {
             UUID id=(UUID)p.get("id");
             BigDecimal invested=sum(project,id,"investments"),drawings=sum(project,id,"drawings").add(sum(project,id,"stock-draws"));
-            BigDecimal expenses=sum(project,id,"expenses");
+            BigDecimal expenses=jdbc.queryForObject("""
+                SELECT coalesce(sum(amount),0) FROM sos.erp_records
+                WHERE project_id=? AND partner_id=? AND kind='expenses' AND status='approved'
+                  AND data->>'paymentSource'='individual'
+                """,BigDecimal.class,project,id);
             BigDecimal equity=BigDecimal.ZERO;
             String split=Objects.toString(settings.get("equitySplitMode"),"fixed").replace("\"","");
             if("proportional".equals(split)) { if(total.signum()>0) equity=invested.multiply(new BigDecimal("100")).divide(total,4,RoundingMode.HALF_UP); }
@@ -180,15 +195,19 @@ public class ErpService {
         for(JsonNode field:parse(def.get("fields"))) if("accountId".equals(field.path("key").asText())) hasAccount=true;
         if(!input.path("data").isObject()) throw ApiProblem.invalid("Supply a record object.");
         ObjectNode submission=(ObjectNode)input.path("data").deepCopy();
-        if("expenses".equals(kind)) {
+        boolean selectedAccountRouting=false;
+        if(Set.of("expenses","investments","bookings").contains(kind)) {
             var modes=jdbc.queryForList("""
-                SELECT metadata->>'canonicalValue' AS canonical_value FROM sos.business_masters
-                WHERE group_code='expense_payment_modes' AND value_code=? AND enabled
+                SELECT metadata->>'canonicalValue' AS canonical_value,metadata->>'accountRouting' AS account_routing FROM sos.business_masters
+                WHERE group_code IN ('expense_payment_modes','cash_investment_modes','bank_investment_modes','booking_payment_modes')
+                  AND value_code=? AND enabled AND metadata->>'canonicalValue' IS NOT NULL
                 """,submission.path("paymentMode").asText());
-            if(!modes.isEmpty()&&modes.getFirst().get("canonical_value") instanceof String canonical&&!canonical.isBlank())
+            if(!modes.isEmpty()&&modes.getFirst().get("canonical_value") instanceof String canonical&&!canonical.isBlank()) {
                 submission.put("paymentMode",canonical);
+                selectedAccountRouting="selected".equals(modes.getFirst().get("account_routing"));
+            }
         }
-        if(hasAccount) submission=cash.route(actor,project,kind,submission);
+        if(hasAccount&&!selectedAccountRouting) submission=cash.route(actor,project,kind,submission);
         // The original spender selector includes the authenticated accountant for
         // project-paid expenses. Resolve it here; never fabricate a partner or
         // attribute a bank expense to an accountant's partner-capital ledger.
@@ -440,8 +459,10 @@ public class ErpService {
             ObjectNode updated=(ObjectNode)parse(item.get("data"));
             if(!"available".equals(updated.path("status").asText("available"))) throw ApiProblem.conflict();
             updated.put("status","plots".equals(item.get("kind"))?"reserved":"booked");
-            for(String key:List.of("buyerName","buyerPhone","advanceReceived","paymentMode","paymentRefNumber"))
+            for(String key:List.of("buyerName","buyerPhone","buyerRegistrationId","ratePerSqYard","advanceReceived","paymentMode","paymentRefNumber","paymentMilestone"))
                 if(data.has(key)) updated.set(key,data.path(key));
+            updated.put("bookingAccountId",Objects.toString(row.get("account_id"),""));
+            if(data.has("date")) updated.set("bookedAt",data.path("date"));
             jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",updated.toString(),inventory);
             amount=decimal(data.path("advanceReceived"),false);
         }

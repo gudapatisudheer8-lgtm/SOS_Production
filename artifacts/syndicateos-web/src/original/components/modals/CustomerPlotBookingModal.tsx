@@ -52,15 +52,15 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
 }) => {
   // Available bank & cash accounts of this firm
   const availableAccounts = firmAccounts.filter(
-    (a) => a.firmId === firm.id || a.linkedProjectId === project?.id
+    (a) => a.firmId === firm.id && a.linkedProjectId === project?.id && a.status === 'active'
   );
 
   const [buyerName, setBuyerName] = useState(plot.buyerName || plot.marketingRequest?.buyerName || '');
   const [buyerPhone, setBuyerPhone] = useState(plot.buyerPhone || plot.marketingRequest?.buyerPhone || '');
   const [buyerAadhaar, setBuyerAadhaar] = useState(plot.buyerAadhaar || '');
   const [ratePerSqYard, setRatePerSqYard] = useState(plot.ratePerSqYard || plot.marketingRequest?.proposedRatePerSqYard || floorRate);
-  const [advanceReceived, setAdvanceReceived] = useState(plot.advanceReceived || plot.marketingRequest?.proposedAdvanceAmount || 100000);
-  const [paymentMode, setPaymentMode] = useState<Plot['paymentMode']>(plot.paymentMode || 'UPI');
+  const [advanceReceived, setAdvanceReceived] = useState(plot.advanceReceived || plot.marketingRequest?.proposedAdvanceAmount || 0);
+  const [paymentMode, setPaymentMode] = useState<Plot['paymentMode']>(plot.paymentMode);
   const [paymentRefNumber, setPaymentRefNumber] = useState(plot.paymentRefNumber || '');
   const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
     if (availableAccounts.length === 0) return '';
@@ -187,6 +187,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
       advanceReceived: Number(advanceReceived) || 0,
       paymentMode,
       paymentRefNumber: paymentRefNumber.trim(),
+      bookingAccountId: selectedAccountId,
       bookedAt: plot.bookedAt || new Date().toISOString().split('T')[0],
       paymentMilestone,
       notes: notes.trim(),
@@ -281,14 +282,14 @@ Thank you for booking with ${firm.name}.
                 </h3>
                 <span
                   className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                    plot.status === 'available'
+                    !showReceiptView && plot.status === 'available'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : plot.status === 'reserved'
+                      : showReceiptView || plot.status === 'reserved'
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                       : 'bg-red-500/20 text-red-300 border border-red-500/30'
                   }`}
                 >
-                  {plot.status}
+                  {showReceiptView ? 'Booking submitted' : plot.status}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -647,8 +648,8 @@ Thank you for booking with ${firm.name}.
                     </label>
                     <input
                       type="number"
-                      min="5000"
-                      step="250"
+                      min={floorRate}
+                      step="0.01"
                       value={ratePerSqYard}
                       onChange={(e) => setRatePerSqYard(Number(e.target.value) || 0)}
                       className={`w-full px-3 py-2 rounded-xl text-xs font-mono font-bold outline-none border ${
@@ -670,7 +671,7 @@ Thank you for booking with ${firm.name}.
                     <input
                       type="number"
                       min="0"
-                      step="10000"
+                      step="0.01"
                       value={advanceReceived}
                       onChange={(e) => setAdvanceReceived(Number(e.target.value) || 0)}
                       className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-mono font-black text-emerald-800 outline-none"
@@ -719,11 +720,12 @@ Thank you for booking with ${firm.name}.
                       Payment Mode
                     </label>
                     <select
-                      value={paymentMode}
+                    value={paymentMode || ''}
                       onChange={(e) => handlePaymentModeChange(e.target.value as any)}
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none"
                     >
-                      <MasterOptions group="booking_payment_modes" />
+                    <option value="">Select payment mode</option>
+                    <MasterOptions group="booking_payment_modes" />
                     </select>
                   </div>
 

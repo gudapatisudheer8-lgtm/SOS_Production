@@ -32,8 +32,7 @@ public class ErpAccess {
               AND m.identity_id=? AND m.role_code=? AND m.enabled)
             AND (?='ACCOUNTANT' OR EXISTS(SELECT 1 FROM sos.project_memberships pm
               WHERE pm.project_id=p.id AND pm.identity_id=? AND pm.enabled))
-            FOR UPDATE OF p
-            """,project,actor.firmId(),actor.identityId(),actor.role(),actor.role(),actor.identityId());
+            """+(write?" FOR UPDATE OF p":""),project,actor.firmId(),actor.identityId(),actor.role(),actor.role(),actor.identityId());
         if (rows.isEmpty()) throw ApiProblem.denied();
         var row=rows.getFirst();
         if (!config.permitted((UUID)row.get("release_id"),actor.role(),permission)

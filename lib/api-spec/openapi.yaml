@@ -272,10 +272,30 @@ components:
         canCreate: { type: boolean }
         canManage: { type: boolean }
         canReview: { type: boolean }
+    FinancialStatementEntry:
+      type: object
+      required: [id, date, type, amount, status, accountId, accountName, affectsCash, description]
+      properties:
+        id: { type: string }
+        date: { type: string }
+        type: { type: string, enum: [credit, debit] }
+        amount: { type: string }
+        status: { type: string }
+        accountId: { type: string }
+        accountName: { type: string }
+        description: { type: string }
+        category: { type: string }
+        categoryLabel: { type: string }
+        partnerName: { type: string }
+        paymentMode: { type: string }
+        affectsCash: { type: boolean }
     ProjectErp:
       type: object
       required: [projectId, records, resources, balances, partners, audit, settings]
       properties:
+        statement:
+          type: array
+          items: { $ref: "#/components/schemas/FinancialStatementEntry" }
         projectSetup: { type: object, additionalProperties: true }
         projectId: { type: string }
         records: { type: array, items: { $ref: "#/components/schemas/ErpRecord" } }

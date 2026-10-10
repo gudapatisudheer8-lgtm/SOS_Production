@@ -41,6 +41,21 @@ export const GetProjectErpParams = zod.object({
 })
 
 export const GetProjectErpResponse = zod.object({
+  "statement": zod.array(zod.object({
+  "id": zod.string(),
+  "date": zod.string(),
+  "type": zod.enum(['credit', 'debit']),
+  "amount": zod.string(),
+  "status": zod.string(),
+  "accountId": zod.string(),
+  "accountName": zod.string(),
+  "description": zod.string(),
+  "category": zod.string().optional(),
+  "categoryLabel": zod.string().optional(),
+  "partnerName": zod.string().optional(),
+  "paymentMode": zod.string().optional(),
+  "affectsCash": zod.boolean()
+})).optional(),
   "projectSetup": zod.record(zod.string(), zod.unknown()).optional(),
   "projectId": zod.string(),
   "records": zod.array(zod.object({
@@ -305,6 +320,12 @@ export const GetWorkspaceResponse = zod.object({
  * credentials.reset, sector.create, configuration.save, configuration.validate,
  * configuration.publish. ACCOUNTANT: project.create, project.update, partner.add.
  * All identities, roles, tenancy and permissions are derived on the server.
+ * project.setup-create atomically validates and saves the entire project setup,
+ * creates project-linked operational records and finalizes it. A failed create
+ * leaves no draft. Use project.setup-save and project.setup-finalize for resumable drafts.
+ * master.save is owner-only and requires revision when updating an existing choice.
+ * partner.update and partner.status are accountant-only, require project membership
+ * revision and affect only that project, never another firm's identity name.
  */
 export const ExecuteCommandParams = zod.object({
   "action": zod.coerce.string()

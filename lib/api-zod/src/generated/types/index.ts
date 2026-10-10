@@ -32,6 +32,8 @@ export * from './erpFieldVisibleWhen';
 export * from './erpRecord';
 export * from './erpRecordData';
 export * from './erpResource';
+export * from './financialStatementEntry';
+export * from './financialStatementEntryType';
 export * from './firm';
 export * from './firmAccountantsItem';
 export * from './firmMetadata';

@@ -466,8 +466,8 @@ function Layout({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
 function Statement({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const c = useColors();
   const [note, setNote] = useState<string | null>(null);
-  const tx = erp.records.filter((r) => r.kind === 'transactions' && r.status === 'approved');
-  const exportCsv = () => setNote(downloadText('project-statement.csv', csvOf([['Date', 'Account', 'Description', 'Amount'], ...tx.map((r) => [str(r.data.date), recLabel(erp.records, r.data.accountId), str(r.data.description || r.data.narration), str(r.data.amount)])]), 'text/csv'));
+  const tx = erp.statement || [];
+  const exportCsv = () => setNote(downloadText('project-statement.csv', csvOf([['Date', 'Account', 'Type', 'Description', 'Amount', 'Status', 'Posted account movement'], ...tx.map((r) => [r.date, r.accountName, r.type, r.description, r.amount, r.status, r.affectsCash ? 'yes' : 'no'])]), 'text/csv'));
   const print = () => { if (Platform.OS === 'web' && typeof window !== 'undefined') window.print(); else setNote('Printing is available on web only in this build.'); };
   void ctx;
   return (
@@ -480,8 +480,8 @@ function Statement({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
         {erp.balances.length === 0 ? <Text style={{ color: c.mutedForeground }}>No accounts.</Text> : erp.balances.map((b) => <View key={b.accountId} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}><Text style={{ color: c.foreground }}>{recLabel(erp.records, b.accountId)}</Text><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold' }}>{money(b.balance)}</Text></View>)}
       </Card>
       <Card>
-        <Label>APPROVED TRANSACTIONS</Label>
-        {tx.length === 0 ? <Text style={{ color: c.mutedForeground }}>No approved transactions yet.</Text> : tx.map((r) => <View key={r.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, gap: 8 }}><Text style={{ color: c.foreground, flex: 1 }} numberOfLines={1}>{str(r.data.date)} · {recLabel(erp.records, r.data.accountId)}</Text><Text style={{ color: c.foreground }}>{money(r.data.amount)}</Text></View>)}
+        <Label>PROJECT FINANCIAL ENTRIES</Label>
+        {tx.length === 0 ? <Text style={{ color: c.mutedForeground }}>No financial entries yet.</Text> : tx.map((r) => <View key={r.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, gap: 8 }}><Text style={{ color: c.foreground, flex: 1 }}>{r.date} · {r.accountName} · {r.description} · {r.status}</Text><Text style={{ color: c.foreground }}>{r.type === 'credit' ? '+' : '−'}{money(r.amount)}</Text></View>)}
       </Card>
     </View>
   );

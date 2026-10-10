@@ -15,6 +15,7 @@ import { api, getToken, clearSession, toAppUser, newRequestId, normalizeClientMo
 import { useConfig, sectorUiCode, masterNumber } from './adapter/config';
 import { MasterEditor } from './adapter/MasterEditor';
 import { loadAll, erpSave, erpReview, command, pickConfigured, describeAccess, type LoadedData } from './adapter/erp';
+import { investmentInput, drawingInput, bookingInput } from './adapter/financialInput';
 import { ProjectPlanSaver } from './adapter/projectPlans';
 import { MarketingAccessPage } from './marketing/MarketingAccessPage';
 import { expenseInput } from './adapter/expenseInput';
@@ -61,7 +62,9 @@ function App() {
 
   const reload = useCallback(async (role: string) => {
     try {
+      const session = getToken();
       const d = await loadAll(role);
+      if (!session || getToken() !== session) return false;
       setData(d);
       setLoadError(null);
       setSelectedFirmId((prev) => prev || d.firms[0]?.id || '');
@@ -73,6 +76,24 @@ function App() {
       return false;
     }
   }, [showToast]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let refreshing = false;
+    const refresh = async () => {
+      if (document.hidden || refreshing) return;
+      refreshing = true;
+      try { await reload(currentUser.role); } finally { refreshing = false; }
+    };
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [currentUser, reload]);
 
   useEffect(() => {
     const onNotice = (e: Event) => setStickyNotice(String((e as CustomEvent).detail));
@@ -313,7 +334,7 @@ function App() {
       ));
     }
     if (prev?.status === 'available' && plot.status !== 'available' && plot.buyerName) {
-      return run(`Booking for plot ${plot.plotNumber} submitted`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'bookings', { ...plot, inventoryId: meta.id }));
+      return run(`Booking for plot ${plot.plotNumber} submitted`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'bookings', bookingInput(plot, meta.id)));
     }
     return run(`Plot ${plot.plotNumber} saved`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'plots', plot, meta));
   };
@@ -362,6 +383,10 @@ function App() {
     return run('Expense submitted for approval', () => erpSave(erpOf(pid), pid, 'expenses', expenseInput(e, bankAccountId)));
   };
   const review = (id: string, decision: 'approved' | 'rejected', label: string, reason?: string) => {
+    if (decision === 'rejected' && !reason?.trim()) {
+      reason = window.prompt('Enter the reason for rejecting this entry:')?.trim();
+      if (!reason) return Promise.resolve(false);
+    }
     const meta = metaOf(id);
     if (!meta) return unsupported('record is not a saved backend record.');
     return run(label, () => erpReview(meta, decision, reason));
@@ -373,7 +398,7 @@ function App() {
   const handleRecordIndividualInvestment = (d: IndividualInvestmentData) => run('Investment submitted', () => {
     const meta = metaOf(d.accountId);
     const pid = meta?.projectId || activeProjectId;
-    return erpSave(erpOf(pid), pid, 'investments', d as any);
+    return erpSave(erpOf(pid), pid, 'investments', investmentInput(d));
   });
   const handleApproveIndividualInvestment = (id: string) => review(id, 'approved', 'Investment approval recorded');
   const handleRejectIndividualInvestment = (id: string, reason?: string) => review(id, 'rejected', 'Investment rejected', reason);
@@ -381,7 +406,7 @@ function App() {
   // ---------- Drawings ----------
   const handleSubmitDrawing = (d: DrawingRequest) => {
     const pid = d.projectId || activeProjectId;
-    return run('Drawing request submitted', () => erpSave(erpOf(pid), pid, 'drawings', { ...d, accountId: d.sourceAccountId }));
+    return run('Drawing request submitted', () => erpSave(erpOf(pid), pid, 'drawings', drawingInput(d)));
   };
   const handleReviewDrawing = (id: string, decision: 'approved' | 'rejected') => review(id, decision, decision === 'approved' ? 'Drawing approval recorded' : 'Drawing rejected');
 
@@ -471,6 +496,8 @@ function App() {
 
         {data && currentRole === 'accountant' && (currentFirm ? (
           <AccountantDashboard
+            onSubmitDrawing={handleSubmitDrawing}
+            onReviewFinancial={async (id, decision) => review(id, decision, 'Financial review saved')}
             firm={currentFirm}
             projects={projects.filter((p) => p.firmId === currentFirm.id)}
             selectedProjectId={activeProjectId}
@@ -524,6 +551,7 @@ function App() {
 
         {data && currentRole === 'field_partner' && (currentFirm ? (
           <FieldPartnerMobileView
+            onReviewFinancial={async (id, decision) => review(id, decision, 'Financial review saved')}
             firm={currentFirm}
             firms={firms}
             currentUser={currentUser}

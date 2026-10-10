@@ -54,7 +54,7 @@ public class ProjectCashAccountService {
         for(JsonNode field:p.path("cashModeFields")) for(JsonNode mode:p.path("cashPaymentModes"))
             if(mode.asText().equals(data.path(field.asText()).asText())) {
                 cash=true;
-                data.put(field.asText(),p.path("cashCanonicalMode").asText());
+                data.put(field.asText(),p.path("cashCanonicalModesByField").path(field.asText()).asText(p.path("cashCanonicalMode").asText()));
             }
         if(cash) {
             if(data.hasNonNull("accountId") && !data.path("accountId").asText().isBlank()) {

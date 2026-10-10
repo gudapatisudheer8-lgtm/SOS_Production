@@ -113,6 +113,8 @@ interface AccountantDashboardProps {
   onApproveIndividualInvestment?: (investmentId: string, approverName: string) => void;
   onRejectIndividualInvestment?: (investmentId: string, reason?: string) => void;
   onSignOut?: () => void;
+  onSubmitDrawing?: (data: any) => void | boolean | Promise<boolean>;
+  onReviewFinancial?: (id: string, decision: 'approved' | 'rejected') => Promise<boolean>;
 }
 
 export type TopBarTab =
@@ -166,6 +168,8 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   onApproveIndividualInvestment,
   onRejectIndividualInvestment,
   onSignOut,
+  onSubmitDrawing,
+  onReviewFinancial,
 }) => {
   // Modal states
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
@@ -251,7 +255,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
           const totalInvsRecorded = partnerApprovedInvs.reduce((sum, i) => sum + i.amount, 0);
 
           const actualInv =
-            totalInvsRecorded > 0
+            activeProject.financialStatement ? (ps.actualInvested ?? 0) : totalInvsRecorded > 0
               ? totalInvsRecorded
               : ps.actualInvested !== undefined
               ? ps.actualInvested
@@ -1966,6 +1970,8 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
           </div>
         ) : (
           <ProjectStatementModule
+            onRecordDrawing={onSubmitDrawing}
+            onReviewFinancial={onReviewFinancial}
             project={activeProject}
             firm={firm}
             accounts={firmAccounts}

@@ -1,4 +1,5 @@
 import { MasterOptions } from '../../../adapter/config';
+import { ProjectDrawingForm } from '../modals/ProjectDrawingForm';
 import React, { useState, useMemo } from 'react';
 import {
   Project,
@@ -40,6 +41,8 @@ import {
 import { formatINR } from '../../utils/formatters';
 
 export interface UnifiedProjectTransaction {
+  affectsCash?: boolean;
+  accountId?: string;
   id: string;
   source: 'bank_account' | 'field_expense' | 'plot_booking' | 'apartment_booking';
   date: string;
@@ -60,6 +63,8 @@ export interface UnifiedProjectTransaction {
 }
 
 interface ProjectStatementModuleProps {
+  onReviewFinancial?: (id: string, decision: 'approved' | 'rejected') => Promise<boolean>;
+  onRecordDrawing?: (data: any) => void | boolean | Promise<boolean>;
   project?: Project | null;
   firm: TenantFirm;
   accounts: FirmAccount[];
@@ -74,6 +79,8 @@ interface ProjectStatementModuleProps {
 }
 
 export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
+  onRecordDrawing,
+  onReviewFinancial,
   project,
   firm,
   accounts,
@@ -108,6 +115,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
 
   // Aggregate all transactions into a unified, normalized transaction list
   const allProjectTransactions: UnifiedProjectTransaction[] = useMemo(() => {
+    if (project?.financialStatement) return project.financialStatement;
+    if (!project) return [];
     const list: UnifiedProjectTransaction[] = [];
 
     // 1. Bank Account Transactions from project accounts
@@ -381,11 +390,11 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
 
   // Aggregate Metrics for Statement
   const totalInflows = filteredTransactions
-    .filter((t) => t.type === 'credit' && t.status === 'approved')
+    .filter((t) => t.type === 'credit' && t.status === 'approved' && t.affectsCash !== false)
     .reduce((sum, t) => sum + t.amount, 0);
 
   const totalOutflows = filteredTransactions
-    .filter((t) => t.type === 'debit' && t.status === 'approved')
+    .filter((t) => t.type === 'debit' && t.status === 'approved' && t.affectsCash !== false)
     .reduce((sum, t) => sum + t.amount, 0);
 
   const netCashFlow = totalInflows - totalOutflows;
@@ -466,6 +475,17 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
 
   return (
     <div className="space-y-6">
+      {project?.canRecordDrawings && onRecordDrawing && <ProjectDrawingForm key={project.id} project={project} accounts={accounts} partners={partners} onSave={onRecordDrawing} />}
+      {onReviewFinancial && project?.financialStatement?.some((t) => t.status === 'pending') && <details className="rounded-xl border border-amber-200 bg-white p-4">
+        <summary className="font-bold cursor-pointer">Pending financial entries — review &amp; approval</summary>
+        {project.financialStatement.filter((t) => t.status === 'pending').map((t) => <div key={t.id} className="flex flex-wrap gap-3 items-center justify-between border-t py-3">
+          <span>{t.categoryLabel} · {t.enrolledBy} · {formatINR(t.amount)} · {t.accountName}</span>
+          {project.reviewableRecordIds?.includes(t.id) ? <div className="flex gap-3">
+            <button className="text-emerald-700 font-bold" onClick={() => void onReviewFinancial(t.id, 'approved')}>Approve</button>
+            <button className="text-red-700 font-bold" onClick={() => void onReviewFinancial(t.id, 'rejected')}>Reject</button>
+          </div> : <span className="text-xs text-gray-500">Awaiting eligible independent reviewer</span>}
+        </div>)}
+      </details>}
       {/* ======================================================== */}
       {/* 1. PROJECT STATEMENT HEADER & ACTION BUTTONS             */}
       {/* ======================================================== */}

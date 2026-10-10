@@ -1,4 +1,4 @@
-import { MasterOptions } from '../../../adapter/config';
+import { MasterOptions, masterItems } from '../../../adapter/config';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   SyndicatePartner,
@@ -113,6 +113,7 @@ export interface FieldPartnerMobileViewProps {
   onAddStockDraw?: (draw: PartnerStockDraw) => void | boolean | Promise<boolean>;
   onApproveExpense?: (expenseId: string, signoff?: string) => void;
   onRejectExpense?: (expenseId: string) => void;
+  onReviewFinancial?: (id: string, decision: 'approved' | 'rejected') => Promise<boolean>;
   ledgerMode?: LedgerMode;
   onUpdatePartner?: (partner: SyndicatePartner) => void | boolean | Promise<boolean>;
   individualInvestments?: IndividualInvestmentRecord[];
@@ -414,6 +415,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   onAddStockDraw,
   onApproveExpense,
   onRejectExpense,
+  onReviewFinancial,
   ledgerMode = 'internal_syndicate',
   onUpdatePartner,
   individualInvestments = [],
@@ -549,7 +551,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   const [expensePaymentSource, setExpensePaymentSource] = useState<'project_bank' | 'individual'>('project_bank');
   const [expenseBankAccountId, setExpenseBankAccountId] = useState<string>('');
   const [expenseCategory, setExpenseCategory] = useState<FieldExpenseLog['category']>('Labor Wages');
-  const [expensePaymentMode, setExpensePaymentMode] = useState<FieldExpenseLog['paymentMode']>('Field Cash Imprest');
+  const [expensePaymentMode, setExpensePaymentMode] = useState<FieldExpenseLog['paymentMode']>(masterItems('expense_payment_modes')[0]?.key || '');
   const [expenseVendor, setExpenseVendor] = useState<string>('');
   const [expenseNote, setExpenseNote] = useState<string>('');
   const [simulatedReceiptImage, setSimulatedReceiptImage] = useState<string | null>(null);
@@ -712,7 +714,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     const individualInvsTotal = approvedIndividualInvs.reduce((sum, inv) => sum + inv.amount, 0);
 
     const baseActual = currentPartner.actualInvested !== undefined ? currentPartner.actualInvested : 0;
-    const actualInvested = Math.max(baseActual, individualInvsTotal, baseActual + ledgerCapitalInflows);
+    const actualInvested = baseActual;
 
     // 3. Investment pending amount to clear estimated investment:
     const diff = actualInvested - est;
@@ -720,23 +722,23 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     const pendingAmt = Math.abs(diff);
 
     // 4. How much drawings taken:
-    const partnerDraws = currentPartner.drawings + ledgerCapitalOutflows;
+    const partnerDraws = currentPartner.drawings;
     const stockValuation = (partnerStockDraws || [])
       .filter((d) => d.partnerId === currentPartner.id)
       .reduce((sum, d) => sum + d.retailValuation, 0);
-    const combinedDraws = partnerDraws + stockValuation;
+    const combinedDraws = partnerDraws;
 
     // 5. Equity Share %:
-    const eqPct = currentPartner.fixedEquityPercent || 30;
+    const eqPct = currentPartner.fixedEquityPercent || 0;
 
     // 6. Expected Profit based on share:
     const totalRevenue = activePlots.reduce((acc, p) => acc + p.areaSqYards * p.ratePerSqYard, 0);
-    const totalCost = activeProject?.totalEstimatedOutlay || 48000000;
+    const totalCost = activeProject?.totalEstimatedOutlay || 0;
     const ventureSurplus = Math.max(0, totalRevenue - totalCost);
-    const profitShare = Math.round((eqPct / 100) * (ventureSurplus > 0 ? ventureSurplus : 35000000));
+    const profitShare = Math.round((eqPct / 100) * ventureSurplus);
 
     // 7. Expected Allotted Sellable Area as per share:
-    const totalSellableYds = activePlots.reduce((acc, p) => acc + (p.areaSqYards || 0), 0) || 5000;
+    const totalSellableYds = activePlots.reduce((acc, p) => acc + (p.areaSqYards || 0), 0);
     const allottedYds = Math.round((eqPct / 100) * totalSellableYds);
 
     // 8. Net Share Balance:
@@ -890,7 +892,10 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
       return;
     }
 
-    const chosenSourceAcc = firmAccounts.find((a) => a.id === drawSourceAccountId) || firmAccounts[0];
+    const eligible = firmAccounts.filter((a) => a.firmId === activeFirm.id && a.linkedProjectId === activeProject?.id && a.status === 'active'
+      && !!(a as any).isDefaultCash === (drawPayoutMode === 'Field Vault Cash'));
+    const chosenSourceAcc = eligible.find((a) => a.id === drawSourceAccountId) || eligible[0];
+    if (!chosenSourceAcc) { alert('No active project account supports this payment method.'); return; }
     const newRequest: DrawingRequest = {
       id: `draw-${Date.now()}`,
       firmId: activeFirm.id,
@@ -2019,7 +2024,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                       onChange={(e) => setExpensePaymentMode(e.target.value as any)}
                       className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none"
                     >
-                      <MasterOptions group="field_payment_sources" />
+                      <MasterOptions group="expense_payment_modes" />
                     </select>
                   </div>
                 </div>
@@ -2154,8 +2159,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                     <input
                       type="number"
                       required
-                      min="1000"
-                      step="5000"
+                      min="0.01"
+                      step="0.01"
                       placeholder="e.g. 200000"
                       value={drawAmount}
                       onChange={(e) => setDrawAmount(e.target.value)}
@@ -2171,10 +2176,16 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                     </label>
                     <select
                       value={drawPayoutMode}
-                      onChange={(e) => setDrawPayoutMode(e.target.value as any)}
+                      onChange={(e) => { setDrawPayoutMode(e.target.value as any); setDrawSourceAccountId(''); }}
                       className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none"
                     >
                       <MasterOptions group="drawing_payment_modes" />
+                    </select>
+                    <label className="block text-[10px] font-black text-gray-700 uppercase mt-3">Project account</label>
+                    <select className="w-full rounded-xl border p-2.5 text-xs" value={drawSourceAccountId} onChange={(e) => setDrawSourceAccountId(e.target.value)}>
+                      <option value="">Use first compatible project account</option>
+                      {firmAccounts.filter((a) => a.firmId === activeFirm.id && a.linkedProjectId === activeProject?.id && a.status === 'active'
+                        && !!(a as any).isDefaultCash === (drawPayoutMode === 'Field Vault Cash')).map((a) => <option key={a.id} value={a.id}>{a.accountName} — {formatINR(a.currentBalance)}</option>)}
                     </select>
                   </div>
 
@@ -2515,6 +2526,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
           {/* Full ProjectStatementModule as in Accountant Dashboard */}
           {activeProject ? (
             <ProjectStatementModule
+              onReviewFinancial={onReviewFinancial}
               project={activeProject}
               firm={activeFirm}
               accounts={firmAccounts}

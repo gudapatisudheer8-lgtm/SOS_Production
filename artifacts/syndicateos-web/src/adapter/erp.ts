@@ -109,6 +109,10 @@ export async function loadAll(role: string): Promise<LoadedData> {
     const base = { firmId: p.firmId, projectId: p.id };
     const balance = new Map<string, number>((erp.balances || []).map((b: any) => [String(b.accountId), Number(b.balance)]));
     const recs: any[] = erp.records || [];
+    p.financialStatement = (erp.statement || []).map((entry: any) => ({ ...entry, amount: num(entry.amount) }));
+    p.financialForms = Object.fromEntries((erp.resources || []).map((r: any) => [r.kind, r.fields]));
+    p.canRecordDrawings = !!(erp.resources || []).find((r: any) => r.kind === 'drawings')?.canCreate;
+    p.reviewableRecordIds = erp.reviewableRecordIds || [];
     // Workspace membership is identity/access data, not the project's capital
     // allocation. Read each project's approved profile instead of displaying
     // the membership projection's initial zero commitments.
@@ -132,12 +136,18 @@ export async function loadAll(role: string): Promise<LoadedData> {
         case 'plots': { const n = plotSeq++; out.plotIds.set(n, id); out.plots.push({ ...d, ...base, id: n, status: d.status || 'available' }); break; }
         case 'units': out.units.push({ ...d, ...base, id, status: d.status || 'available' }); break;
         case 'accounts': {
-          const txs: FirmAccountTransaction[] = recs.filter((t) => t.kind === 'transactions' && String(t.data?.accountId) === id)
-            .map((t) => ({ ...t.data, id: String(t.id), accountId: id, amount: num(t.data?.amount), balanceAfter: 0, status: t.status === 'approved' ? 'approved' : 'pending' }));
+          let running = 0;
+          const txs: FirmAccountTransaction[] = (erp.statement || [])
+            .filter((t: any) => t.affectsCash && String(t.accountId) === id)
+            .map((t: any) => {
+              const amount = num(t.amount);
+              running += t.type === 'credit' ? amount : -amount;
+              return { ...t, accountId: id, amount, balanceAfter: running, status: 'approved' };
+            });
           out.accounts.push({ ...d, firmId: p.firmId, id, linkedProjectId: p.id, openingBalance: num(d.openingBalance),
             bankName: String(d.bankName ?? ''), accountNumber: String(d.accountNumber ?? ''),
             ifscCode: String(d.ifscCode ?? ''), branchName: String(d.branchName ?? ''), city: String(d.city ?? ''),
-            currentBalance: balance.has(id) ? (balance.get(id) as number) : num(d.openingBalance), isPrimary: !!d.isPrimary,
+            currentBalance: balance.has(id) ? (balance.get(id) as number) : 0, isPrimary: !!d.isPrimary,
             status: r.status === 'approved' ? 'active' : 'frozen',
             authorizedSignatories: Array.isArray(d.authorizedSignatories) ? d.authorizedSignatories
               : d.authorizedSignatories ? [String(d.authorizedSignatories)] : [],
@@ -149,7 +159,14 @@ export async function loadAll(role: string): Promise<LoadedData> {
           bankAccountId: d.accountId,
           bankAccountName: recs.find((a: any) => a.kind === 'accounts' && String(a.id) === String(d.accountId))?.data?.accountName,
           amount: num(d.amount), status: status(r.status), approvedByPartners: r.votes || [] } as FieldExpenseLog); break;
-        case 'investments': out.investments.push({ ...d, ...base, id, amount: num(d.amount), status: status(r.status) } as IndividualInvestmentRecord); break;
+        case 'investments': {
+          const account = recs.find((a: any) => a.kind === 'accounts' && String(a.id) === String(d.accountId))?.data;
+          out.investments.push({ ...d, ...base, id, amount: num(d.amount), status: status(r.status),
+            partnerName: (erp.partners || []).find((m: any) => String(m.id) === String(d.partnerId))?.name || '',
+            accountName: account?.accountName || '', accountType: account?.isDefaultCash ? 'cash' : 'bank',
+            enrolledBy: r.createdByName } as IndividualInvestmentRecord);
+          break;
+        }
         case 'settlements': out.settlements.push({ ...d, firmId: p.firmId, id } as LiquorDailySettlement); break;
         case 'stock-draws': out.stockDraws.push({ ...d, firmId: p.firmId, id } as PartnerStockDraw); break;
         case 'budgets': out.projectExpenses.push({ ...d, ...base, id, estimatedBudget: num(d.estimatedBudget), actualSpent: num(d.actualSpent) } as ProjectExpense); break;

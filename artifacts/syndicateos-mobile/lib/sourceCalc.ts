@@ -1,7 +1,7 @@
 // Ported from source utils/formatters.ts. Tally output escapes every interpolated value.
 export function formatINR(amount: number): string {
   if (!Number.isFinite(amount)) return 'Rs 0';
-  return 'Rs ' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(amount);
+  return 'Rs ' + new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 }
 export function formatIndianCompact(amount: number): string {
   if (!amount) return 'Rs 0';

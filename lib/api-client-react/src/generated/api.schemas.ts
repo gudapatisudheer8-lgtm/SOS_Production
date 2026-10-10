@@ -59,6 +59,30 @@ export interface ErpResource {
   canReview: boolean;
 }
 
+export type FinancialStatementEntryType = typeof FinancialStatementEntryType[keyof typeof FinancialStatementEntryType];
+
+
+export const FinancialStatementEntryType = {
+  credit: 'credit',
+  debit: 'debit',
+} as const;
+
+export interface FinancialStatementEntry {
+  id: string;
+  date: string;
+  type: FinancialStatementEntryType;
+  amount: string;
+  status: string;
+  accountId: string;
+  accountName: string;
+  description: string;
+  category?: string;
+  categoryLabel?: string;
+  partnerName?: string;
+  paymentMode?: string;
+  affectsCash: boolean;
+}
+
 export type ProjectErpProjectSetup = { [key: string]: unknown };
 
 export type ProjectErpBalancesItem = {
@@ -86,6 +110,7 @@ export type ProjectErpAuditItem = {
 export type ProjectErpSettings = {[key: string]: unknown};
 
 export interface ProjectErp {
+  statement?: FinancialStatementEntry[];
   projectSetup?: ProjectErpProjectSetup;
   projectId: string;
   records: ErpRecord[];
