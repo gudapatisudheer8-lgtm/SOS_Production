@@ -1,0 +1,29 @@
+kind = "video"
+videoAspectRatio = "16:9"
+previewPath = "/syndicateos-promo-film/"
+title = "SyndicateOS — 60-Second Product Film"
+description = "A one-minute promotional animation introducing the SyndicateOS accountant and partner dashboards, project accounts, approvals, plots and project statements with Indian-English narration."
+version = "1.0.0"
+id = "artifacts/syndicateos-promo-film"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/syndicateos-promo-film/" ]
+localPort = 19581
+
+[services.development]
+run = "pnpm --filter @workspace/syndicateos-promo-film run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/syndicateos-promo-film", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/syndicateos-promo-film/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19581"
+BASE_PATH = "/syndicateos-promo-film/"
