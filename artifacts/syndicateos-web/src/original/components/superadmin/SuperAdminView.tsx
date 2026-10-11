@@ -292,6 +292,13 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   const handleSaveEditFirm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingFirm || !editFirmName.trim()) return;
+    const nextCode = editFirmCode.trim().toUpperCase();
+    if (!/^[A-Z0-9-]{3,32}$/.test(nextCode)) {
+      window.alert('Firm code must contain 3–32 letters, numbers or hyphens.');
+      return;
+    }
+    if (nextCode !== editingFirm.code
+      && !window.confirm(`Change the firm sign-in code from ${editingFirm.code} to ${nextCode}? Accountants and partners must use ${nextCode} for future sign-ins. Existing projects and balances will stay unchanged.`)) return;
 
     const mrr = 0; // plan pricing is not persisted by the backend
     const finalPropName = editProprietorName.trim() || editManagingPartnerName.trim() || editingFirm.managingPartnerName;
@@ -300,7 +307,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     const updated: TenantFirm = {
       ...editingFirm,
       name: editFirmName.trim(),
-      code: editFirmCode.trim().toUpperCase() || editingFirm.code,
+      code: nextCode,
       tradeName: editTradeName.trim(),
       businessType: editBusinessType,
       proprietorName: finalPropName,
@@ -1302,7 +1309,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-bold mb-1">Firm Code (Tenant ID) *</label>
+                  <label className="block text-gray-700 font-bold mb-1">Firm Code (Sign-in Code) *</label>
                   <input
                     type="text"
                     required
@@ -1310,6 +1317,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                     onChange={(e) => setEditFirmCode(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#FFB800] outline-none font-mono font-black uppercase text-xs"
                   />
+                  <p className="mt-1.5 text-[11px] text-gray-500">Used by accountants and partners to sign in. Changing this code does not change your projects or balances.</p>
                 </div>
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Business Entity Type</label>

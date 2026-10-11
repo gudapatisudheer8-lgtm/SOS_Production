@@ -364,3 +364,17 @@ mtime_ms = 1791659198151
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/edd882ef-4ae3-48cd-919e-94ac59e03fe2/0b901310-4060-4e0e-ba52-5a479ee3f0d5"
 storage_version_token = "1791659222286057"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "k-eucKSk6uV6-hzaK7u66"
+uri = "file://generated-artifacts/ec2/sos-firm-profile-fix-20261011.tar.gz"
+type = "unspecified"
+title = "EC2 update — firm code and profile menus"
+description = "Verified API and frontend update. No database initialization, migration or financial-data changes. Includes checksum verification and reversible installers."
+logical_id = "c071032d-7e3a-49c6-9d6e-f2a2e4ea4044"
+content_hash = "sha256:48c0ca62ade0aca634941572fbffd2419e58ec80369d121673ed1373ccc6bf23"
+size = 26848300
+mtime_ms = 1791690058610
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/c071032d-7e3a-49c6-9d6e-f2a2e4ea4044/3647f7bd-1572-42ea-9e54-7d8899be30ba"
+storage_version_token = "1791690309107685"
+content_type = "application/octet-stream"

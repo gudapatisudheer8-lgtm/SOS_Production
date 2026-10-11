@@ -53,3 +53,15 @@ Data must automatically integrate between the relevant tabs and authorized dashb
 **Why:** The user corrected the label-only interpretation and explicitly required integration when supplying the partner, banking, booking and expense screenshots.
 
 **How to apply:** Keep one authoritative project-scoped record and reuse its IDs in downstream workflows/views. Saving a bank account must populate that project's receipt/debit choices without re-entry; automatic synchronization never implies bypassing financial approval or permissions.
+
+Accountant and partner account actions belong in the clickable user profile menu, rather than repeated Sign out buttons in dashboard headers.
+
+**Why:** The user requested a more professional, less crowded header with PIN change and logout under the user profile.
+
+**How to apply:** Retain active firm/project selectors and identity information; use the existing six-digit client PIN policy and authenticated credential-change flow.
+
+Owners may change an existing firm's sign-in code without creating a new firm or resetting its projects and ledgers. The new code replaces the old code for future sign-ins.
+
+**Why:** The user expected an owner edit to change the existing firm's code to SHA, and reported a silent save that left the old code unchanged.
+
+**How to apply:** Explain the sign-in impact, retain stable firm/project IDs and assignments, reject duplicate codes, and do not introduce old-code aliases without an explicit decision.

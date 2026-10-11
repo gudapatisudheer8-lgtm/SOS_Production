@@ -153,10 +153,10 @@ const translations = {
     investmentRecordsHistory: 'Investment Records History',
     filterAllInvestments: 'All Records',
     filterMyInvestments: 'My Contributions',
-    filterCashOnly: '💵 Cash Only',
-    filterBankOnly: '🏦 Bank Accounts',
-    filterInvPending: '⏳ Pending Sign-off',
-    filterInvApproved: '✓ Verified & Cleared',
+    filterCashOnly: 'Cash Only',
+    filterBankOnly: 'Bank Accounts',
+    filterInvPending: 'Pending Sign-off',
+    filterInvApproved: 'Verified & Cleared',
     noInvestmentsFound: 'No investment records matching current filters',
     investedAmount: 'Invested Amount',
     depositAccount: 'Target Vault / Bank',
@@ -283,10 +283,10 @@ const translations = {
     investmentRecordsHistory: 'పెట్టుబడి రికార్డుల చరిత్ర',
     filterAllInvestments: 'అన్ని రికార్డులు',
     filterMyInvestments: 'నా పెట్టుబడులు',
-    filterCashOnly: '💵 నగదు మాత్రమే',
-    filterBankOnly: '🏦 బ్యాంక్ బదిలీలు',
-    filterInvPending: '⏳ ఆమోదం కోసం వేచి ఉంది',
-    filterInvApproved: '✓ ఆమోదించబడింది',
+    filterCashOnly: 'నగదు మాత్రమే',
+    filterBankOnly: 'బ్యాంక్ బదిలీలు',
+    filterInvPending: 'ఆమోదం కోసం వేచి ఉంది',
+    filterInvApproved: 'ఆమోదించబడింది',
     noInvestmentsFound: 'ఎటువంటి పెట్టుబడి రికార్డులు కనుగొనబడలేదు',
     investedAmount: 'పెట్టుబడి మొత్తం',
     depositAccount: 'ఖాతా / నగదు ఖజానా',
@@ -970,47 +970,29 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
       <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-gray-200">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           {/* Partner & Firm Details */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-amber-800 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                <Smartphone className="w-3.5 h-3.5 text-amber-600" />
-                <span>{t('partnerHub')}</span>
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                {t('firmIsolated')}
-              </span>
-              <span className="text-xs text-gray-500 font-mono">
-                {activeFirm.code}
-              </span>
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap text-[11px] font-bold text-gray-500">
+              <span className="uppercase tracking-wider text-amber-800">{lang === 'te' ? 'పెట్టుబడి వాటా' : 'Your partner stake'}</span>
+              <span className="font-mono text-gray-400">{activeFirm.code}</span>
               {contributedFirms.length > 1 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                  ⚡ Multi-Firm Partner ({contributedFirms.length} Firms • {partnerContributedProjects.length} Projects)
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                  {contributedFirms.length} firms, {partnerContributedProjects.length} projects
                 </span>
               )}
             </div>
-
-            <div className="flex items-center gap-2 flex-wrap pt-0.5">
-              <h1 className="text-xl sm:text-2xl font-black text-gray-950">
-                {activeFirm.name}
-              </h1>
-            </div>
-
-            <div className="flex items-center gap-3 text-xs text-gray-600 pt-1 flex-wrap">
-              <span className="flex items-center gap-1.5 font-bold text-gray-950">
-                <span className={`w-2.5 h-2.5 rounded-full ${currentPartner.avatarColor || 'bg-amber-500'}`} />
-                <span>{currentPartner.name}</span>
-              </span>
-
-            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-gray-950 pt-0.5">{activeFirm.name}</h1>
+            <p className="text-xs text-gray-600">
+              {activeProject ? <>Viewing <strong className="text-gray-900">{activeProject.name}</strong> as {currentPartner.name}</> : <>Signed in as {currentPartner.name}</>}
+            </p>
           </div>
 
           {/* Right Side Controls: Firm Selector, Project Selector & Language Switch Button */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 self-start lg:self-center flex-wrap">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto min-w-0 lg:max-w-[65%] self-stretch lg:self-center flex-wrap">
             {/* 1. Firm / Syndicate Selector Dropdown */}
             {onSelectFirm && (
-              <div className="flex items-center gap-2 bg-[#F4F4F6] px-3.5 py-2 rounded-2xl border border-gray-300 shadow-inner">
+              <div className="flex items-center gap-2 bg-[#F4F4F6] px-3.5 py-2 rounded-2xl border border-gray-300 shadow-inner min-w-0 flex-1">
                 <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
-                <div className="flex flex-col min-w-[160px] sm:min-w-[190px]">
+                <div className="flex flex-col min-w-0 flex-1 sm:min-w-[150px]">
                   <span className="text-[9px] font-black text-gray-500 uppercase tracking-wider">
                     {lang === 'te' ? 'సంస్థను మార్చండి' : 'Switch Firm / Syndicate'}
                   </span>
@@ -1024,7 +1006,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                         onSelectProject(targetProjects[0].id);
                       }
                     }}
-                    className="text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-3 outline-none truncate"
+                    className="w-full min-w-0 text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-3 outline-none truncate"
                   >
                     {contributedFirms.map((f) => {
                       const projCount = projects.filter((p) => p.firmId === f.id).length;
@@ -1041,16 +1023,16 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
 
             {/* 2. Project / Venture Selector Dropdown */}
             {onSelectProject && (
-              <div className="flex items-center gap-2 bg-[#F4F4F6] px-3.5 py-2 rounded-2xl border border-gray-300 shadow-inner">
+              <div className="flex items-center gap-2 bg-[#F4F4F6] px-3.5 py-2 rounded-2xl border border-gray-300 shadow-inner min-w-0 flex-1">
                 <FolderOpen className="w-4 h-4 text-amber-600 shrink-0" />
-                <div className="flex flex-col min-w-[160px] sm:min-w-[190px]">
+                <div className="flex flex-col min-w-0 flex-1 sm:min-w-[150px]">
                   <span className="text-[9px] font-black text-gray-500 uppercase tracking-wider">
                     {t('selectProject')}
                   </span>
                   <select
                     value={activeProject?.id || ''}
                     onChange={(e) => onSelectProject(e.target.value)}
-                    className="text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-3 outline-none truncate"
+                    className="w-full min-w-0 text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-3 outline-none truncate"
                   >
                     {firmProjects.length > 0 ? (
                       firmProjects.map((p) => (
@@ -1524,7 +1506,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             {/* Tile 3: Cash In Hand Infusions */}
             <div className="bg-gradient-to-br from-amber-50 to-white p-4 rounded-3xl border border-amber-200 shadow-2xs">
               <div className="flex items-center justify-between text-amber-900 mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider">💵 Cash Vault</span>
+                <span className="text-[10px] font-black uppercase tracking-wider">Cash Vault</span>
                 <Wallet className="w-4 h-4 text-amber-700" />
               </div>
               <div className="text-lg sm:text-xl font-black font-mono text-amber-950">
@@ -1538,7 +1520,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             {/* Tile 4: Bank Wire / RTGS Infusions */}
             <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-3xl border border-blue-200 shadow-2xs">
               <div className="flex items-center justify-between text-blue-900 mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider">🏦 Bank Wires</span>
+                <span className="text-[10px] font-black uppercase tracking-wider">Bank Wires</span>
                 <CreditCard className="w-4 h-4 text-blue-700" />
               </div>
               <div className="text-lg sm:text-xl font-black font-mono text-blue-950">
@@ -1682,12 +1664,12 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                           {isCash ? (
                             <>
                               <Wallet className="w-3 h-3 text-amber-800" />
-                              <span>💵 Cash Treasury Vault</span>
+                              <span>Cash Treasury Vault</span>
                             </>
                           ) : (
                             <>
                               <Landmark className="w-3 h-3 text-blue-800" />
-                              <span>🏦 Commercial Bank Wire</span>
+                              <span>Commercial Bank Wire</span>
                             </>
                           )}
                         </span>
@@ -2433,10 +2415,10 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                             }`}
                           >
                             {draw.status === 'cleared'
-                              ? '✓ Cleared & Disbursed'
+                              ? 'Cleared & Disbursed'
                               : draw.status === 'approved'
-                              ? '✓ Approved (Ready to Pay)'
-                              : '⏳ Pending Signoff'}
+                              ? 'Approved (Ready to Pay)'
+                              : 'Pending Signoff'}
                           </span>
                         </div>
                         <div className="text-[10px] text-gray-500 flex items-center gap-1.5 flex-wrap mt-0.5">
@@ -2718,7 +2700,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                 <span className={`text-xs font-black px-2.5 py-1 rounded-full uppercase ${
                   selectedInvestmentForSlip.accountType === 'cash' ? 'bg-amber-200 text-amber-950' : 'bg-blue-100 text-blue-900'
                 }`}>
-                  {selectedInvestmentForSlip.accountType === 'cash' ? '💵 Cash Treasury' : '🏦 Bank Wire'}
+                  {selectedInvestmentForSlip.accountType === 'cash' ? 'Cash Treasury' : 'Bank Wire'}
                 </span>
               </div>
 
@@ -2766,7 +2748,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                     {selectedInvestmentForSlip.approvedBy || activeFirm.managingPartnerName}
                   </strong>
                   <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
-                    {selectedInvestmentForSlip.status === 'approved' ? '✓ Digitally Verified' : '⏳ Pending Ratification'}
+                    {selectedInvestmentForSlip.status === 'approved' ? 'Digitally Verified' : 'Pending Ratification'}
                   </span>
                 </div>
                 <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-200">

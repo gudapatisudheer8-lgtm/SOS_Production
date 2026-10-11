@@ -87,11 +87,17 @@ public class CommandService {
     private Map<String,Object> updateFirm(SessionAccount actor,JsonNode input) {
         actor.owner(); UUID firm=Values.id(input,"firmId"); String state=Values.text(input,"status",20);
         if (!Set.of("ACTIVE","SUSPENDED").contains(state)) throw ApiProblem.invalid("Choose ACTIVE or SUSPENDED.");
-        if (jdbc.update("UPDATE sos.firms SET name=?,status=?,metadata=metadata || ?::jsonb,revision=revision+1 WHERE id=? AND revision=?",
-            Values.text(input,"name",160),state,firmMetadata(input).toString(),firm,Values.revision(input))!=1) throw ApiProblem.conflict();
+        String code=input.has("clientCode")?Values.text(input,"clientCode",32).toUpperCase(Locale.ROOT):null;
+        if (code!=null && !code.matches("[A-Z0-9-]{3,32}"))
+            throw ApiProblem.invalid("Firm code must contain 3–32 letters, numbers or hyphens.");
+        if (code!=null && jdbc.queryForObject("SELECT count(*) FROM sos.firms WHERE client_code=? AND id<>?",Integer.class,code,firm)>0)
+            throw new ApiProblem(409,"FIRM_CODE_IN_USE","This firm code is already in use. Choose a different code.");
+        if (jdbc.update("UPDATE sos.firms SET client_code=COALESCE(?,client_code),name=?,status=?,metadata=metadata || ?::jsonb,revision=revision+1 WHERE id=? AND revision=?",
+            code,Values.text(input,"name",160),state,firmMetadata(input).toString(),firm,Values.revision(input))!=1) throw ApiProblem.conflict();
         if ("SUSPENDED".equals(state)) jdbc.update("UPDATE sos.auth_sessions SET revoked_at=now() WHERE firm_id=?",firm);
         config.audit(actor,"FIRM_"+state,firm,null);
-        return ok(Map.of("id",firm,"status",state));
+        return ok(Map.of("id",firm,"status",state,"clientCode",
+            jdbc.queryForObject("SELECT client_code FROM sos.firms WHERE id=?",String.class,firm)));
     }
     private Map<String,Object> assign(SessionAccount actor,JsonNode input) {
         actor.owner(); UUID firm=Values.id(input,"firmId"),sector=Values.id(input,"sectorId"),release=Values.id(input,"releaseId");

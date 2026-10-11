@@ -1,12 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Role, TenantFirm, AuthenticatedAppUser } from '../types';
-import { 
-  ShieldCheck, 
-  Building2, 
-  Calculator, 
-  Smartphone, 
-  LogOut 
-} from 'lucide-react';
+import { ShieldCheck, Building2, ChevronDown, KeyRound, LogOut } from 'lucide-react';
+import { ChangePinDialog } from './profile/ChangePinDialog';
 
 interface HeaderProps {
   currentRole: Role;
@@ -22,156 +17,118 @@ interface HeaderProps {
   onToggleStandalone?: () => void;
   currentUser?: AuthenticatedAppUser | null;
   onSignOut?: () => void;
+  onAccountUpdated?: (user: AuthenticatedAppUser) => void;
 }
 
+const roleLabel = (r: Role) => (r === 'super_admin' ? 'Product owner' : r === 'accountant' ? 'Firm accountant' : 'Project partner');
+
 export const Header: React.FC<HeaderProps> = ({
-  currentRole,
-  firms,
-  selectedFirmId,
-  onFirmChange,
-  pendingExpensesCount,
-  currentUser,
-  onSignOut,
+  currentRole, firms, selectedFirmId, onFirmChange, pendingExpensesCount, currentUser, onSignOut, onAccountUpdated,
 }) => {
   const currentFirm = firms.find((f) => f.id === selectedFirmId) || firms[0];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const isOwner = currentRole === 'super_admin';
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setMenuOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenuOpen(false); btnRef.current?.focus(); } };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
+
+  const initials = (currentUser?.name || 'U').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md text-slate-900 shadow-xs border-b border-stone-200">
-      {/* Main Header Row in Clean Enterprise Warm White */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
-        {/* Brand Logo & Active Firm info */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 p-1 flex items-center justify-center shadow-md shadow-amber-500/20">
-            <span className="font-black text-xl tracking-tighter">S<span className="text-amber-950">OS</span></span>
+    <header className="sticky top-0 z-40 bg-[#FBFAF6]/95 backdrop-blur-md text-slate-900 border-b border-stone-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0">
+            <span className="font-black text-base tracking-tighter">S<span className="text-amber-950">OS</span></span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black tracking-tight text-slate-900 flex items-center gap-1.5">
-                Syndicate<span className="text-amber-600 underline decoration-amber-500/40">OS</span>
-              </h1>
-              <span className="text-[10px] uppercase font-bold tracking-wider bg-stone-100 text-slate-800 border border-stone-200 px-2 py-0.5 rounded-full shadow-xs">
-                AP / TG Syndicate
-              </span>
+          <div className="min-w-0">
+            <div className="text-base font-black tracking-tight leading-tight">Syndicate<span className="text-amber-600">OS</span></div>
+            <div className="flex items-center gap-1.5 text-[11px] text-stone-600 min-w-0">
+              {isOwner ? (
+                <><ShieldCheck className="w-3 h-3 text-amber-600 shrink-0" /><span className="truncate">Platform governance, {firms.length} firms</span></>
+              ) : currentFirm ? (
+                <><Building2 className="w-3 h-3 text-amber-600 shrink-0" /><span className="font-bold text-slate-800 truncate">{currentFirm.name}</span><span className="hidden sm:inline text-stone-400 truncate">{currentFirm.location}</span></>
+              ) : (
+                <span className="truncate">No active firm assigned</span>
+              )}
             </div>
-            {currentRole === 'super_admin' ? (
-              <div className="flex items-center gap-2 text-xs font-medium text-stone-600">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                <span className="font-bold text-slate-900">Application / Product Owner Console</span>
-                <span className="text-stone-300">•</span>
-                <span className="text-stone-500 font-medium">Platform SaaS & Tenant Governance</span>
-              </div>
-            ) : currentFirm ? (
-              <div className="flex items-center gap-2 text-xs font-medium text-stone-600">
-                <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                <span className="font-bold text-slate-900">{currentFirm?.name}</span>
-                <span className="text-stone-300">•</span>
-                <span className="text-stone-500 font-medium">{currentFirm?.location}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs font-medium text-stone-600">
-                <span className="font-bold text-slate-900">No Active Firm</span>
-                <span className="text-stone-300">•</span>
-                <span className="text-stone-500 font-medium">Provision firm in Super Admin</span>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Firm Selector: Shown for Accountant if firms exist */}
-        {currentRole === 'accountant' && firms.length > 0 ? (
-          <div className="hidden lg:flex items-center gap-2 bg-[#F7F5EE] px-3 py-1.5 rounded-full border border-stone-200 shadow-xs">
-            <span className="text-xs text-stone-700 font-bold">Syndicate Firm:</span>
-            <select
-              id="tenant-firm-selector"
-              value={selectedFirmId}
-              onChange={(e) => onFirmChange(e.target.value)}
-              className="bg-white text-xs font-bold text-slate-900 border border-stone-300 rounded-full px-3 py-1 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-xs"
-            >
-              {firms.map((firm) => (
-                <option key={firm.id} value={firm.id}>
-                  {firm.name} ({firm.state === 'Andhra Pradesh' ? 'AP' : 'TG'})
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : currentRole === 'field_partner' ? (
-          <div className="hidden lg:flex items-center gap-2 bg-[#F7F5EE] px-3.5 py-1.5 rounded-full border border-stone-200 text-xs font-bold text-slate-900 shadow-xs">
-            <Smartphone className="w-3.5 h-3.5 text-amber-600" />
-            <span>Field Partner Session • {currentFirm?.name || 'Awaiting Firm'}</span>
-          </div>
-        ) : (
-          <div className="hidden lg:flex items-center gap-2 bg-[#F7F5EE] px-3.5 py-1.5 rounded-full border border-stone-200 text-xs font-bold text-slate-900 shadow-xs">
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-            <span>Product Owner Scope • {firms.length} Onboarded Firms</span>
-          </div>
-        )}
-
-        {/* Dedicated Role Badge & User Session info */}
-        <div className="flex items-center gap-3">
-          {currentRole === 'super_admin' ? (
-            <div className="flex items-center gap-2 bg-stone-100 px-4 py-2 rounded-full border border-stone-200 shadow-xs">
-              <ShieldCheck className="w-4 h-4 text-amber-600" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black text-slate-900">Super Admin Console</span>
-                <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-full">
-                  Owner
-                </span>
-              </div>
-            </div>
-          ) : currentRole === 'accountant' ? (
-            <div className="flex items-center gap-2 bg-stone-100 px-4 py-2 rounded-full border border-stone-200 shadow-xs">
-              <Calculator className="w-4 h-4 text-amber-600" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black text-slate-900">Firm Accountant Portal</span>
-                {pendingExpensesCount > 0 && (
-                  <span className="px-1.5 py-0.2 bg-red-500 text-white font-black rounded-full text-[10px] animate-pulse">
-                    {pendingExpensesCount}
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 bg-stone-100 px-4 py-2 rounded-full border border-stone-200 shadow-xs">
-              <Smartphone className="w-4 h-4 text-amber-600" />
-              <span className="text-xs font-black text-slate-900">Partner Mobile Portal</span>
-            </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {currentRole === 'accountant' && firms.length > 1 && (
+            <label className="flex items-center gap-2 text-[11px] font-bold text-stone-600">
+              <span>Firm</span>
+              <select id="tenant-firm-selector" value={selectedFirmId} onChange={(e) => onFirmChange(e.target.value)}
+                className="bg-white text-xs font-bold text-slate-900 border border-stone-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer max-w-[220px]">
+                {firms.map((firm) => (
+                  <option key={firm.id} value={firm.id}>{firm.name} ({firm.code})</option>
+                ))}
+              </select>
+            </label>
           )}
 
-          {/* User Identity Chip & Sign Out */}
-          {currentUser && (
-            <div className="flex items-center gap-2 bg-stone-100 px-3.5 py-1.5 rounded-full border border-stone-200 shadow-xs">
-              <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0">
-                {currentUser.name ? currentUser.name[0].toUpperCase() : 'U'}
-              </div>
-              <div className="text-left hidden sm:block">
-                <div className="text-xs font-black text-slate-900 flex items-center gap-1.5 leading-none">
-                  <span>{currentUser.name}</span>
-                  {currentUser.firmCode && (
-                    <span className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded font-mono font-bold">
-                      {currentUser.firmCode}
-                    </span>
+          {currentUser ? (
+            <div ref={wrapRef} className="relative">
+              <button ref={btnRef} type="button" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="profile-menu"
+                aria-label={`Account menu for ${currentUser.name}`} onClick={() => setMenuOpen((o) => !o)}
+                className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border border-stone-200 bg-white hover:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors">
+                <span className="relative w-7 h-7 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center text-[11px] font-black">
+                  {initials}
+                  {currentRole === 'accountant' && pendingExpensesCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[9px] flex items-center justify-center" aria-label={`${pendingExpensesCount} pending approvals`}>{pendingExpensesCount}</span>
+                  )}
+                </span>
+                <span className="hidden sm:flex flex-col items-start leading-tight text-left">
+                  <span className="text-xs font-black text-slate-900 max-w-[140px] truncate">{currentUser.name}</span>
+                  <span className="text-[10px] text-stone-500">{roleLabel(currentRole)}</span>
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-stone-500 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {menuOpen && (
+                <div id="profile-menu" role="menu" className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] bg-white rounded-2xl border border-stone-200 shadow-lg overflow-hidden z-50">
+                  <div className="px-4 py-3 bg-[#F7F5EE] border-b border-stone-200">
+                    <div className="text-sm font-black text-slate-900 truncate">{currentUser.name}</div>
+                    <div className="text-[11px] text-stone-600 font-mono">{currentUser.phone}</div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300">{roleLabel(currentRole)}</span>
+                      {!isOwner && (currentFirm?.code || currentUser.firmCode) && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-mono">{currentFirm?.code || currentUser.firmCode}</span>}
+                    </div>
+                    {!isOwner && currentFirm && <div className="mt-1 text-[11px] text-stone-500 truncate">{currentFirm.name}</div>}
+                  </div>
+                  {!isOwner && (
+                    <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setPinOpen(true); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-800 hover:bg-stone-50 focus:bg-stone-50 focus:outline-none">
+                      <KeyRound className="w-4 h-4 text-amber-600" /> Change PIN
+                    </button>
+                  )}
+                  {onSignOut && (
+                    <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onSignOut(); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-red-700 hover:bg-red-50 focus:bg-red-50 focus:outline-none border-t border-stone-100">
+                      <LogOut className="w-4 h-4" /> Sign out
+                    </button>
                   )}
                 </div>
-                <div className="text-[10px] text-stone-500 font-mono mt-0.5 leading-none">
-                  +91 {currentUser.phone}
-                </div>
-              </div>
+              )}
             </div>
-          )}
-
-          {onSignOut && (
-            <button
-              type="button"
-              onClick={onSignOut}
-              title="Sign out of session"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-red-50 text-stone-700 hover:text-red-700 rounded-full text-xs font-bold border border-stone-200 hover:border-red-300 transition-colors cursor-pointer shadow-xs"
-            >
-              <LogOut className="w-3.5 h-3.5 text-red-600" />
-              <span className="hidden sm:inline">Sign Out</span>
+          ) : onSignOut ? (
+            <button type="button" onClick={onSignOut} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-stone-200 bg-white text-xs font-bold text-stone-700 hover:text-red-700">
+              <LogOut className="w-3.5 h-3.5" /> Sign out
             </button>
-          )}
+          ) : null}
         </div>
       </div>
+      <ChangePinDialog open={pinOpen} onClose={() => { setPinOpen(false); btnRef.current?.focus(); }} onUpdated={onAccountUpdated} />
     </header>
   );
 };

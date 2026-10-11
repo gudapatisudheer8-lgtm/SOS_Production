@@ -67,8 +67,7 @@ import {
   Tag,
   Printer,
   ChevronRight,
-  CheckSquare,
-  LogOut
+  CheckSquare
 } from 'lucide-react';
 import { formatINR, formatIndianCompact } from '../../utils/formatters';
 
@@ -169,7 +168,6 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   onRecordIndividualInvestment,
   onApproveIndividualInvestment,
   onRejectIndividualInvestment,
-  onSignOut,
   onSubmitDrawing,
   onReviewFinancial,
 }) => {
@@ -386,41 +384,22 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       {/* 1. TOP HEADER: Firm Console & Project Dropdown Selector */}
       {/* ======================================================== */}
       <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-gray-200 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#FFB800] text-gray-950">
-              Firm Accountant Operations Console
-            </span>
-            <span className="text-xs text-gray-500 font-mono">Firm ID: {firm.code}</span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[11px] font-bold text-gray-500">
+            <span className="uppercase tracking-wider text-amber-700">Project treasury</span>
+            <span className="font-mono text-gray-400">{firm.code}</span>
           </div>
-          <div className="flex items-center gap-3 mt-1">
-            <h2 className="text-2xl font-black text-gray-950">{firm.name}</h2>
-            {onSignOut && (
-              <button
-                type="button"
-                onClick={onSignOut}
-                className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-700 border border-gray-200 hover:border-red-200 rounded-xl text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
-                title="Sign out of Accountant Portal"
-              >
-                <LogOut className="w-3 h-3" />
-                <span>Sign Out</span>
-              </button>
-            )}
-          </div>
-          <p className="text-xs text-gray-500">
-            {firm.location} • Managing Partner: <strong className="text-gray-800">{firm.managingPartnerName}</strong> •
-            Firm Accountant: <strong className="text-gray-800">{firm.accountantName}</strong>
-          </p>
-          <p className="text-[11px] text-gray-500 mt-0.5">
-            Independent operations &amp; treasury manager for project accounts, venture projects, partner allocations, and expenditure auditing.
+          <h2 className="text-xl sm:text-2xl font-black text-gray-950 mt-0.5 truncate">{activeProject ? activeProject.name : firm.name}</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {[firm.name, firm.location, firm.managingPartnerName ? `Managing partner: ${firm.managingPartnerName}` : '', firm.accountantName ? `Accountant: ${firm.accountantName}` : ''].filter(Boolean).join(' · ')}
           </p>
         </div>
 
         {/* PROJECT SELECTOR DROPDOWN & + ADD PROJECTS BUTTON */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="flex items-center gap-2.5 bg-[#F4F4F6] px-4 py-2.5 rounded-2xl border border-gray-300 shadow-inner">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 min-w-0 w-full lg:w-auto">
+          <div className="flex items-center gap-2.5 bg-[#F4F4F6] px-4 py-2.5 rounded-2xl border border-gray-300 shadow-inner min-w-0 flex-1 lg:max-w-[420px]">
             <FolderOpen className="w-4 h-4 text-amber-600 shrink-0" />
-            <div className="flex flex-col min-w-[220px] sm:min-w-[280px]">
+            <div className="flex flex-col min-w-0 flex-1 sm:min-w-[240px]">
               <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">
                 Select Project / Venture:
               </span>
@@ -428,7 +407,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                 id="accountant-project-select"
                 value={selectedProjectId}
                 onChange={(e) => onSelectProject(e.target.value)}
-                className="text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate"
+                className="w-full min-w-0 text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate"
               >
                 {firmActiveProjects.length > 0 ? (
                   firmActiveProjects.map((proj) => (

@@ -81,7 +81,8 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
     throw new ApiError(res.status, 'UNEXPECTED_RESPONSE', 'Preview returned a web page instead of an API response. Reopen Preview in Replit and retry.');
   }
   if (!res.ok) {
-    if (res.status === 401 && token && !path.startsWith("/auth/login")) {
+    if (res.status === 401 && token && !path.startsWith("/auth/login")
+        && !(path === '/auth/credential' && data?.error === 'INVALID_CREDENTIALS')) {
       clearSession();
       window.dispatchEvent(new CustomEvent("sos-session-expired"));
     }

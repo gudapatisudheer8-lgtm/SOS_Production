@@ -201,7 +201,7 @@ function App() {
   });
 
   const handleUpdateFirm = (f: TenantFirm) => run(`Firm ${f.name} updated`, () =>
-    command('firm.update', { firmId: f.id, name: f.name, status: f.status === 'active' ? 'ACTIVE' : 'SUSPENDED', revision: (firms.find((x) => x.id === f.id) as any)?.__revision, ...firmMetadata(f) }));
+    command('firm.update', { firmId: f.id, clientCode: f.code.trim().toUpperCase(), name: f.name, status: f.status === 'active' ? 'ACTIVE' : 'SUSPENDED', revision: (firms.find((x) => x.id === f.id) as any)?.__revision, ...firmMetadata(f) }));
 
   const handleToggleFirmStatus = (firmId: string) => {
     const f = firms.find((x) => x.id === firmId) as any;
@@ -468,6 +468,11 @@ function App() {
         firmAccountsCount={(data?.accounts ?? []).length}
         currentUser={currentUser}
         onSignOut={handleSignOut}
+        onAccountUpdated={(user) => {
+          setCurrentUser(user);
+          void reload(user.role);
+          showToast('Your PIN was changed. Other sessions have been signed out.');
+        }}
       />
 
       {(loadError || stickyNotice) && (
@@ -561,7 +566,6 @@ function App() {
             onRecordIndividualInvestment={handleRecordIndividualInvestment}
             onApproveIndividualInvestment={handleApproveIndividualInvestment}
             onRejectIndividualInvestment={handleRejectIndividualInvestment}
-            onSignOut={handleSignOut}
           />
         ) : (
           <div className="bg-white rounded-3xl p-10 border border-red-200 text-center max-w-lg mx-auto my-12 shadow-xl space-y-4">
