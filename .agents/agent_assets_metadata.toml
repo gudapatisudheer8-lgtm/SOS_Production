@@ -378,3 +378,66 @@ mtime_ms = 1791690058610
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/c071032d-7e3a-49c6-9d6e-f2a2e4ea4044/3647f7bd-1572-42ea-9e54-7d8899be30ba"
 storage_version_token = "1791690309107685"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "0VoF4mnyI-rwQ7lsmH9Wh"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/bg_music.mp3"
+type = "audio"
+title = "SyndicateOS background music"
+description = "Generated music: Corporate motivational cinematic instrumental background music for a 60-second B2B real estate operations software product film. Warm piano pulse, restrained low percussion, confiden…"
+
+[[outputs]]
+id = "08BlQ43sqgcY9xrYyl32B"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_01.mp3"
+type = "audio"
+title = "SyndicateOS narration segment 1"
+description = "Text-to-speech audio: Real estate ventures move fast. Projects, funds, site work and partner decisions all need a shared picture."
+
+[[outputs]]
+id = "IK4lHTE81Gtj1abZ7Scer"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_02.mp3"
+type = "audio"
+title = "SyndicateOS narration segment 2"
+description = "Text-to-speech audio: SyndicateOS gives accountants one console for project overview, partner records, and treasury activity."
+
+[[outputs]]
+id = "lY7jfq9nArXfiZIDEHRZz"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_03.mp3"
+type = "audio"
+title = "SyndicateOS narration segment 3"
+description = "Text-to-speech audio: Keep project accounts and site cash in view. Follow connected entries as funds move."
+
+[[outputs]]
+id = "yYooAQzVz_A4IxGymupqJ"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_05.mp3"
+type = "audio"
+title = "SyndicateOS narration segment 5"
+description = "Text-to-speech audio: Scan plot inventory visually by orientation and status, then focus on the details that matter."
+
+[[outputs]]
+id = "tbV8Heh-7hZQgwNiK-uUN"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_04.mp3"
+type = "audio"
+title = "SyndicateOS narration segment 4"
+description = "Text-to-speech audio: Record site expenses and drawing requests. Review each step and see what needs attention."
+
+[[outputs]]
+id = "GmnhLY0vMTCgM6zp-mCkZ"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_08.mp3"
+type = "audio"
+title = "SyndicateOS narration segment 8"
+description = "Text-to-speech audio: SyndicateOS: project operations and partner visibility, in one connected place."
+
+[[outputs]]
+id = "kV-iGqtBQ_BXF2dZJZS4f"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_06.mp3"
+type = "audio"
+title = "SyndicateOS narration segment 6"
+description = "Text-to-speech audio: Partners can review venture position, investment history, drawings and pending requests in one focused portal."
+
+[[outputs]]
+id = "o09uOSuvpucK_rVuQLYHj"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_07.mp3"
+type = "audio"
+title = "SyndicateOS narration segment 7"
+description = "Text-to-speech audio: Both roles work from the same project record—less chasing, and clearer coordination for everyone responsible."
