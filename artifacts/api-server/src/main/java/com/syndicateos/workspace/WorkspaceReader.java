@@ -87,6 +87,11 @@ public class WorkspaceReader {
             if("ACCOUNTANT".equals(actor.role())) {
                 var setup=jdbc.queryForList("SELECT data FROM sos.project_setup_sections WHERE project_id=?",project);
                 if(!setup.isEmpty()) item.put("setupData",config.parse(setup.getFirst().get("data")));
+                if("READY".equals(row.get("setup_state")) && row.get("setup_release_id")!=null) {
+                    item.put("setupReleaseId",row.get("setup_release_id"));
+                    var definitions=jdbc.queryForList("SELECT definition FROM sos.project_setup_effective_definitions WHERE release_id=?",row.get("setup_release_id"));
+                    if(!definitions.isEmpty()) item.put("setupDefinition",config.parse(definitions.getFirst().get("definition")));
+                }
             }
             List<Map<String,Object>> partners=List.of();
             if ("OWNER".equals(actor.role()) || config.permitted(release,actor.role(),"partners.read")) {

@@ -11,10 +11,12 @@ export function setupFields(fields: any[] = [], values: Record<string, any> = {}
 
 export function projectEditContext(workspace: any, erp: any, projectId: string) {
   const project = (workspace?.projects || []).find((row: any) => String(row.id) === projectId);
-  const definition = (workspace?.interfaces || []).find((entry: any) =>
+  const assignedInterface = (workspace?.interfaces || []).find((entry: any) =>
     String(entry.firmId) === String(project?.firmId) && String(entry.sectorId) === String(project?.sectorId) && entry.enabled
-  )?.configuration?.projectSetup;
-  if (!project || !definition?.sections) return undefined;
+  );
+  if (!project || !assignedInterface) return undefined;
+  const definition = project.setupDefinition || assignedInterface.configuration?.projectSetup;
+  if (!definition?.sections || (project.setupReleaseId && !project.setupDefinition)) return undefined;
   return {
     project, definition,
     values: setupFields(definition.sections.flatMap((section: any) => section.fields || []), {
@@ -40,7 +42,8 @@ export function projectEditPayload(project: any, definition: any, values: Record
     groups: previous.groups || [], partners: previous.partners || [],
     accounts: previous.accounts || [], documents: previous.documents || [],
   };
-  return { projectId: String(project.id), sectorId: String(project.sectorId), revision, setup };
+  return { projectId: String(project.id), sectorId: String(project.sectorId),
+    setupReleaseId: project.setupReleaseId || undefined, revision, setup };
 }
 
 /** Retain request IDs and uploaded files across ambiguous network retries. */

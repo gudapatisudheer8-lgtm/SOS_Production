@@ -292,9 +292,24 @@ class OnboardingIntegrationTest {
         ((com.fasterxml.jackson.databind.node.ObjectNode)historical.path("values")).put("name","Reviewed live project");
         ((ObjectNode)historical.path("values")).put("notes","Editable project note");
         ((ObjectNode)historical.path("settings")).put("autoGenerateInventory",false);
+        // Changing the firm's release must not silently migrate or strand an
+        // operational project's previously saved setup contract.
+        ObjectNode upgraded=(ObjectNode)request("GET","/configuration/"+release,null,owner,200);
+        upgraded.remove(java.util.List.of("releaseId","version","revision","state"));
+        upgraded.put("label","New firm release after project completion");
+        String nextRelease=command("configuration.save",upgraded,owner,200).path("entity").path("releaseId").asText();
+        command("configuration.publish",Map.of("releaseId",nextRelease,"revision",1),owner,200);
+        command("firm.assignSector",Map.of("firmId",firm,"sectorId",sector,"releaseId",nextRelease,"enabled",true),owner,200);
+        JsonNode upgradedWorkspace=request("GET","/workspace",null,accountant,200);
+        JsonNode pinnedProject=null;
+        for(JsonNode row:upgradedWorkspace.path("projects")) if(id.equals(row.path("id").asText())) pinnedProject=row;
+        assertNotNull(pinnedProject);
+        assertEquals(release,pinnedProject.path("setupReleaseId").asText());
+        assertTrue(pinnedProject.path("setupDefinition").path("sections").isArray());
         int liveRevision=jdbc.queryForObject("SELECT revision FROM sos.projects WHERE id=?::uuid",Integer.class,id);
         command("project.setup-save",Map.of("projectId",id,"sectorId",sector,"revision",liveRevision,
-            "reviewedReleaseId",release,"requestId",java.util.UUID.randomUUID().toString(),"setup",historical),accountant,200);
+            "setupReleaseId",release,"requestId",java.util.UUID.randomUUID().toString(),"setup",historical),accountant,200);
+        assertEquals(release,jdbc.queryForObject("SELECT setup_release_id::text FROM sos.projects WHERE id=?::uuid",String.class,id));
         JsonNode preserved=json.readTree(jdbc.queryForObject("SELECT data::text FROM sos.project_setup_sections WHERE project_id=?::uuid",String.class,id));
         assertEquals(historical.path("groups"),preserved.path("groups"));
         assertEquals(historical.path("accounts"),preserved.path("accounts"));
@@ -311,6 +326,9 @@ class OnboardingIntegrationTest {
         assertEquals(6,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid",Integer.class,id));
         command("project.setup-save",Map.of("projectId",id,"sectorId",sector,"revision",liveRevision+1,
             "requestId",java.util.UUID.randomUUID().toString(),"setup",historical),accountant,409);
+        command("project.setup-save",Map.of("projectId",id,"sectorId",sector,"revision",liveRevision+2,
+            "setupReleaseId",nextRelease,"requestId",java.util.UUID.randomUUID().toString(),"setup",historical),accountant,409);
+        command("firm.assignSector",Map.of("firmId",firm,"sectorId",sector,"releaseId",release,"enabled",true),owner,200);
         String acct=jdbc.queryForObject("SELECT r.id::text FROM sos.erp_records r JOIN sos.project_cash_accounts c ON c.project_id=r.project_id WHERE r.project_id=?::uuid AND r.kind='accounts' AND r.id<>c.account_record_id",String.class,id);
         assertEquals("1000.00",accountBalance(erp,acct));
         String plot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' LIMIT 1",String.class,id);

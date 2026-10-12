@@ -70,6 +70,25 @@ test('editing never rebuilds children or injects computed money into setup', () 
   assert.throws(() => projectEditPayload({ ...project, setupState: 'DRAFT' }, definition, {}, {}, 3), /Finish project setup/);
 });
 
+test('existing projects use their pinned setup, not a newer assigned firm release', () => {
+  const { projectEditContext, projectEditPayload } = loadAdapter();
+  const pinned = { ...project, name: 'Original', setupReleaseId: 'older-release', setupDefinition: definition };
+  const workspace = { projects: [pinned], interfaces: [{
+    firmId: 'f1', sectorId: 's1', enabled: true, configuration: {
+      projectSetup: { sections: [{ fields: [{ key: 'newRequiredField' }] }], settingsFields: [] },
+    },
+  }] };
+  const context = projectEditContext(workspace, {}, 'p1');
+  assert.equal(context.definition, definition);
+  assert.equal(context.values.notes, 'Old note');
+  assert.equal(projectEditPayload(pinned, definition, context.values, context.settings, 3).setupReleaseId, 'older-release');
+  workspace.projects = [{ ...pinned, setupDefinition: undefined }];
+  assert.equal(projectEditContext(workspace, {}, 'p1'), undefined);
+  workspace.projects = [pinned];
+  workspace.interfaces[0].enabled = false;
+  assert.equal(projectEditContext(workspace, {}, 'p1'), undefined);
+});
+
 test('identical edit retries retain their request ID while changed input gets a new one', async () => {
   const { ProjectEditorSaver, projectEditPayload, calls } = loadAdapter();
   const saver = new ProjectEditorSaver();

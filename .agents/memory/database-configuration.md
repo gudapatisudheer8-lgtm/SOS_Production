@@ -26,3 +26,9 @@ Treat a migration as immutable once its EC2 archive has been shared, even if ins
 **Why:** The user may already have downloaded or installed that archive. Changing its migration checksum would make later upgrades unsafe.
 
 **How to apply:** Repair released behavior with a new additive migration and a clearly named replacement package. Never rewrite a previously shared migration.
+
+Edit operational projects against their pinned setup contract; use the current firm's assignment for authorization, not as an automatic setup migration. New projects use the currently assigned setup.
+
+**Why:** A changed firm release made existing READY projects reject ordinary edits, even after reopening, because the editor and saver selected a different contract from the one stored on the project.
+
+**How to apply:** Supply the project's own effective setup definition to the editor and validate against that same definition on save. Preserve optimistic revision and release checks, and treat a live-project setup upgrade as a separate reviewed operation.

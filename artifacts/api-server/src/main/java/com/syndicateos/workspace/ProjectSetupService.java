@@ -87,6 +87,20 @@ public class ProjectSetupService {
     private Map<String,Object> save(SessionAccount actor,JsonNode input) {
         UUID sector=Values.id(input,"sectorId");
         UUID release=access.accountantAccess(actor,actor.firmId(),sector,"projects.write");
+        UUID id=input.hasNonNull("projectId")?Values.id(input,"projectId"):UUID.randomUUID();
+        Map<String,Object> existing=input.hasNonNull("projectId")?project(actor,id):null;
+        if(existing!=null) {
+            if(!sector.equals(existing.get("sector_id")))
+                throw new ApiProblem(409,"CONFIGURATION_CHANGED","The project sector changed. Reload and review before saving.");
+            // Operational projects retain their own setup contract. A new firm
+            // release must not silently migrate an existing project on edit.
+            if("READY".equals(existing.get("setup_state")) && existing.get("setup_release_id")!=null) {
+                UUID pinned=(UUID)existing.get("setup_release_id");
+                if(input.hasNonNull("setupReleaseId") && !pinned.equals(Values.id(input,"setupReleaseId")))
+                    throw new ApiProblem(409,"CONFIGURATION_CHANGED","The project setup release changed. Reload and review before saving.");
+                release=pinned;
+            }
+        }
         JsonNode def=definition(release);
         JsonNode setup=input.path("setup").deepCopy();
         if(!setup.isObject()||setup.toString().length()>120000) throw ApiProblem.invalid("Supply a bounded setup object.");
@@ -101,12 +115,11 @@ public class ProjectSetupService {
         checkRows(setup.path("accounts"),def.path("rules").path("maxAccounts").asInt(),100);
         checkRows(setup.path("groups"),def.path("inventory").path("maxRows").asInt(0),2000);
         checkRows(setup.path("documents"),100,100);
-        UUID id=input.hasNonNull("projectId")?Values.id(input,"projectId"):UUID.randomUUID();
         int revision=1; String state="DRAFT";
         ObjectNode details=values.deepCopy();details.remove(List.of("name","location"));
         if(details.hasNonNull("projectCode")) details.put("projectCode",details.path("projectCode").asText().trim().toUpperCase(Locale.ROOT));
         if(input.hasNonNull("projectId")) {
-            var row=project(actor,id);
+            var row=existing;
             if(!sector.equals(row.get("sector_id"))||!release.equals(row.get("setup_release_id")) && row.get("setup_release_id")!=null
                 && !release.toString().equals(input.path("reviewedReleaseId").asText()))
                 throw new ApiProblem(409,"CONFIGURATION_CHANGED","The project sector or setup release changed. Reload and review before saving.");

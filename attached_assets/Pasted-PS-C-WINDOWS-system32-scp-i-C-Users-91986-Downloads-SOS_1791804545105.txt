@@ -1,0 +1,70 @@
+PS C:\WINDOWS\system32> scp -i "C:\Users\91986\Downloads\SOS.pem" "C:\Users\91986\Downloads\sos-project-controls-20261012.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
+sos-project-controls-20261012.tar.gz                                                  100%   26MB   1.8MB/s   00:14
+PS C:\WINDOWS\system32> ssh -i C:\Users\91986\Downloads\SOS.pem ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1014-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Mon Oct 12 11:28:11 UTC 2026
+
+  System load:  0.0               Temperature:           -273.1 C
+  Usage of /:   60.5% of 6.61GB   Processes:             119
+  Memory usage: 51%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+ * Ubuntu Pro delivers the most comprehensive open source security and
+   compliance features.
+
+   https://ubuntu.com/aws/pro
+
+Expanded Security Maintenance for Applications is not enabled.
+
+45 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Sun Oct 11 03:52:28 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$ (
+set -e
+cd /home/ubuntu
+
+echo "e3509ec5c3aad5ed83453dc4072dd08ee9312351d2f9955f0cc023076d32e31c  sos-project-controls-20261012.tar.gz" | sha256sum -c -
+
+tar -xzf sos-project-controls-20261012.tar.gz
+cd sos-project-controls-20261012
+sha256sum -c FILES.sha256
+
+sudo python3 apply-api-fix.py
+sudo python3 apply-fix.py
+)
+sos-project-controls-20261012.tar.gz: OK
+README.txt: OK
+apply-api-fix.py: OK
+apply-fix.py: OK
+sos-api.jar: OK
+web/assets/index-C67PQLbL.css: OK
+web/assets/index-Cv6_IDQC.js: OK
+web/favicon.svg: OK
+web/index.html: OK
+web/release.json: OK
+web/robots.txt: OK
+README.txt: OK
+apply-api-fix.py: OK
+apply-fix.py: OK
+sos-api.jar: OK
+web/assets/index-C67PQLbL.css: OK
+web/assets/index-Cv6_IDQC.js: OK
+web/favicon.svg: OK
+web/index.html: OK
+web/release.json: OK
+web/robots.txt: OK
+Project-details update installed; API readiness passed.
+No migration, credential reset or original-release overwrite was performed.
+Frontend sos-project-controls-20261012 activated; HTTPS and API readiness passed.
+Prior routing saved at /opt/syndicateos/frontend-routing-backups/sos-project-controls-20261012-20261012T112852Z.conf. Database, uploads and base release were preserved.
+ubuntu@ip-172-31-13-52:~$
