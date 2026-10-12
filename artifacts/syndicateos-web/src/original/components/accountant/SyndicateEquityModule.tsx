@@ -309,8 +309,8 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
     <div className="space-y-6">
       {/* 1. DYNAMIC SPLIT TABLE & CONTROLS */}
       <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-sm space-y-6 min-w-0">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-gray-200 gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between pb-4 border-b border-gray-200 gap-4">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <PieChart className="w-5 h-5 text-[#FFB800]" />
               <h3 className="text-lg font-black text-gray-950">
@@ -322,7 +322,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col items-end self-end lg:self-start gap-3 min-w-0 max-w-full">
             {/* Add Partner Member Button */}
             {onAddPartnerMember && (
               <button
@@ -344,7 +344,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
             )}
 
             {/* Split Mode Toggle Button */}
-            <div className="flex items-center bg-[#F4F4F6] p-1 rounded-full border border-gray-200 text-xs font-bold">
+            <div className="flex flex-wrap items-center justify-end max-w-full bg-[#F4F4F6] p-1 rounded-full border border-gray-200 text-xs font-bold">
               <span className="text-gray-500 px-3">Equity basis:</span>
               <button
                 id="btn-split-fixed"
