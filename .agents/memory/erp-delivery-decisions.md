@@ -4,7 +4,7 @@ description: Financial integrity and private files on the existing AWS deploymen
 ---
 Keep cleared financial postings immutable, balanced and transactionally saved; corrections are new entries.
 **Why:** the original prototype updated browser balances and trusted approval-name strings, which are unsafe as authoritative financial records.
-**How to apply:** preserve independent approval identities, project/firm checks, request idempotency and explicit account selection when extending source workflows.
+**How to apply:** preserve authenticated actor identities, project/firm checks, request idempotency and explicit account selection when extending source workflows.
 
 Use a private single-instance EC2 attachment adapter for the current AWS release.
 **Why:** the existing deployment is user-operated EC2/RDS; Replit-only storage does not automatically follow it.
@@ -30,10 +30,6 @@ Dashboard delivery requires verifying the firm's assigned release and rendered i
 **Why:** additive configuration updates deliberately preserve existing firm assignments for compatibility; a healthy deployment can still display the old dashboard. Incorrect release names in rollout instructions caused unnecessary user effort.
 **How to apply:** use actual published release labels rather than planning terminology, keep activation owner-controlled, and distinguish successful installation from verified dashboard activation.
 
-Submitters cannot approve their own expenses, investments or drawings when their project has partners. This applies to accountants and partners, including bulk approval and payout controls.
-**Why:** the user explicitly requires independent approval, with an exception only when there are no project partners.
-**How to apply:** self-approval means the server-owned request creator only. A named spender, investor or drawing recipient who did not create the request may approve it if authorized for that project. Never block them solely by partner attribution; make UI eligibility agree with server enforcement and retain the database-configured no-partners exception.
-
-Investment enrollment automatically enters the project's pending approval queue; submitters do not choose signatories or enter another partner's PIN.
-**Why:** the user wants a simple enrollment form and automatic visibility to the project's reviewers rather than manual consensus inputs.
-**How to apply:** preserve pending financial entries and the existing independent-review policy; credit cleared account and capital balances only after server approval.
+The user now requests removing all approval processes throughout the application, replacing them with push notifications and a notification bell. This supersedes the earlier independent-approval requirement.
+**Why:** the user wants to simplify the application and explicitly said approvals must be removed everywhere.
+**How to apply:** treat this as the requested target, not as an already implemented policy. Preserve financial integrity and audit identities while drafting the change; obtain an explicit decision before posting or discarding existing pending records.
