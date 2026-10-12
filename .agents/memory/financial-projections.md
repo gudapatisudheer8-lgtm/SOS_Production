@@ -17,3 +17,9 @@ Read-only repeatable-read dashboard snapshots must use non-locking access checks
 Compare numeric ERP-record values using decimal-safe numerical equality; verify display formatting separately.
 **Why:** JSON validation and reload can produce different insignificant trailing zeroes for the same value, creating false save-regression failures despite unchanged quantities and balances.
 **How to apply:** Do not interpret a change in numeric spelling as a cash movement or lost update. Retain independent checks for allowed precision, rounding and formatted balance contracts.
+
+Use recorded inventory areas and catalog rates for gross-sales projections; do not substitute an assumed percentage return on project cost when inventory is missing.
+
+**Why:** The user stressed that financial numbers must reflect their actual source records. An assumed margin in a financial dashboard can look like a real calculated value.
+
+**How to apply:** Keep projected sales separate from posted cash. Combined project-account balances and their breakdown use posted cash entries only, including opening capital, receipts, expenses and drawings.

@@ -27,7 +27,6 @@ import { LiquorVendSettlementModule } from './LiquorVendSettlementModule';
 import { ProjectStatementModule } from './ProjectStatementModule';
 import { AddProjectModal } from '../modals/AddProjectModal';
 import { FirmAccountsBar } from './FirmAccountsBar';
-import { EditProjectModal } from '../modals/EditProjectModal';
 import { AddFirmAccountModal } from '../modals/AddFirmAccountModal';
 import { FirmAccountStatementModal } from '../modals/FirmAccountStatementModal';
 import { RecordLedgerTransactionModal } from '../modals/RecordLedgerTransactionModal';
@@ -125,6 +124,8 @@ interface AccountantDashboardProps {
   onUpdateProjectSetup?: (projectId: string, values: Record<string, any>, settings: Record<string, any>, revision: number, plotEdits?: Array<{ recordId: string; revision: number; data: Record<string, any> }>) => Promise<boolean>;
   projectPlotResource?: any;
   projectPlotRecords?: any[];
+  projectEditSeed?: Project;
+  onSaveProjectForm?: (project: Project, accounts?: FirmAccount[]) => Promise<boolean>;
   onUploadProjectDocuments?: (projectId: string, documents: PlanUploadDocument[]) => Promise<boolean>;
 }
 
@@ -190,6 +191,8 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   onUploadProjectDocuments,
   projectPlotResource,
   projectPlotRecords,
+  projectEditSeed,
+  onSaveProjectForm,
 }) => {
   const [editProjectId, setEditProjectId] = useState<string | null>(null);
   const [addProjectSession, setAddProjectSession] = useState(0);
@@ -387,14 +390,10 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   const totalActualEstimatedValue = !activeProject
     ? 0
     : isPlotSector
-    ? totalPlotsSellableValue > 0
-      ? totalPlotsSellableValue
-      : activeProjectCost * 1.35
+    ? totalPlotsSellableValue
     : isConstructionSector
-    ? totalUnitsSellableValue > 0
-      ? totalUnitsSellableValue
-      : activeProjectCost * 1.32
-    : activeProjectCost * 1.25;
+    ? totalUnitsSellableValue
+    : 0;
 
   const totalAdvancesCollected = isPlotSector ? totalPlotAdvancesCollected : totalUnitAdvancesCollected;
   const totalPendingReceivables = Math.max(0, totalActualEstimatedValue - totalAdvancesCollected);
@@ -411,6 +410,34 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       )
     : [];
   const totalProjectLiquidity = projectAccounts.reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
+
+  // Posted cash-only breakdown from the server financial statement (affectsCash entries only).
+  // Categories follow FinancialStatementService: partner_capital, plot_booking_advance / flat_booking_advance,
+  // opening_balance, field_* (expenses), partner_draw. Internal transfers net to zero and are excluded.
+  const cashBreakdown = (() => {
+    const st = activeProject?.financialStatement;
+    if (!Array.isArray(st)) return null;
+    const b = { opening: 0, investments: 0, receipts: 0, otherIn: 0, expenses: 0, drawings: 0, otherOut: 0, net: 0 };
+    for (const t of st) {
+      if (t.affectsCash !== true) continue;
+      const cat = String(t.category || '');
+      if (cat === 'inter_account_transfer') continue;
+      const amt = Number(t.amount) || 0;
+      const signed = t.type === 'credit' ? amt : -amt;
+      b.net += signed;
+      if (cat === 'opening_balance') b.opening += signed;
+      else if (cat === 'partner_capital') b.investments += signed;
+      else if (cat === 'plot_booking_advance' || cat === 'flat_booking_advance') b.receipts += signed;
+      else if (cat.startsWith('field_') || (t as any).kind === 'expenses') b.expenses -= signed;
+      else if (cat === 'partner_draw') b.drawings -= signed;
+      else if (signed >= 0) b.otherIn += signed;
+      else b.otherOut -= signed;
+    }
+    return b;
+  })();
+  const canEditProject = !!activeProject && !!onSaveProjectForm && projectEditSeed?.id === activeProject.id && projectEditSeed?.firmId === firm.id;
+  const salesTab: TopBarTab = activeProject?.sector === 'real_estate_construction' && firm.sectors.includes('real_estate_construction') ? 'construction' : 'open_plotting';
+  const kpiCardCls = 'group text-left w-full bg-white rounded-3xl p-5 border border-gray-200 shadow-sm hover:border-amber-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 transition-all flex flex-col justify-between cursor-pointer';
 
   return (
     <div className="space-y-6">
@@ -483,9 +510,9 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             id="btn-edit-project"
             data-testid="button-edit-project"
             type="button"
-            disabled={!activeProject}
-            title={activeProject ? `Edit ${activeProject.name}` : 'Select a project to edit'}
-            onClick={() => activeProject && setEditProjectId(activeProject.id)}
+            disabled={!canEditProject}
+            title={!activeProject ? 'Select a project to edit' : canEditProject ? `Edit ${activeProject.name}` : 'Project details are still loading'}
+            onClick={() => canEditProject && activeProject && setEditProjectId(activeProject.id)}
             className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white hover:bg-gray-50 text-gray-950 font-black text-xs shadow-sm transition-all border border-gray-300 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Pencil className="w-4 h-4" />
@@ -757,136 +784,94 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
           </div>
         ) : (
         <div className="space-y-6">
-          {/* ======================================================== */}
-          {/* THE 6 CORE KPI CARDS REQUESTED FOR RAPID VIEWABILITY    */}
-          {/* ======================================================== */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* KPI Card 1: Total Project Estimated Cost */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm hover:border-amber-300 transition-all flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
+          {/* CORE KPI CARDS — each card navigates to its module for the selected project */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* KPI Card 1: Total Project Estimated Cost -> Partners & Equity */}
+            <button
+              type="button"
+              data-testid="card-kpi-project-cost"
+              onClick={() => setActiveTab('partners')}
+              aria-label="Total estimated project cost. Open Partners and Equity"
+              className={kpiCardCls}
+            >
+              <div className="w-full">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
                     <Coins className="w-4 h-4 text-amber-600" />
                     <span>Total Est. Project Cost</span>
                   </span>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-100 text-gray-800">
-                    Budget Outlay
-                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
                 </div>
-                <h4 className="text-2xl sm:text-3xl font-black text-gray-950 font-mono mt-2">
-                  {formatINR(activeProjectCost)}
-                </h4>
-                <p className="text-xs text-gray-500 mt-1">
-                  Statutory venture outlay for land, LP approval, civil earthwork &amp; development.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs flex-wrap gap-2">
-                <div>
-                  <span className="text-gray-500 block text-[10px] uppercase font-bold">Partner Target Commitment:</span>
-                  <strong className="text-gray-900 font-mono font-bold">
-                    {formatINR(activeProjectTotalCapital)}
-                  </strong>
-                </div>
-                <div className="text-right">
-                  <span className="text-gray-500 block text-[10px] uppercase font-bold">Actual Invested:</span>
-                  <strong className="text-emerald-700 font-mono font-bold">
-                    {formatINR(activeProjectTotalActualInvested)}
-                  </strong>
+                <h4 className="text-2xl sm:text-3xl font-black text-gray-950 font-mono mt-2">{formatINR(activeProjectCost)}</h4>
+                <div className="mt-3 space-y-1.5">
+                  {activeProjectPartners.length === 0 ? (
+                    <p className="text-xs font-semibold text-amber-800">No partners assigned to this project yet.</p>
+                  ) : (
+                    activeProjectPartners.map((p) => (
+                      <div key={p.id} data-testid={`text-kpi-partner-${p.id}`} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className={`w-5 h-5 rounded-full ${p.avatarColor} text-white text-[10px] font-bold flex items-center justify-center shrink-0`}>{p.name.charAt(0).toUpperCase()}</span>
+                          <span className="truncate font-bold text-gray-900 group-hover:underline">{p.name}</span>
+                          <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-black text-amber-800 border border-amber-200">{p.fixedEquityPercent}%</span>
+                        </span>
+                        <span className="shrink-0 font-mono font-bold text-gray-700">{formatINR(p.initialCapital || 0)}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-            </div>
+              <div className="w-full mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs gap-2">
+                <span className="text-gray-500 text-[10px] uppercase font-bold">Partner Target Commitment</span>
+                <strong className="text-gray-900 font-mono font-bold">{formatINR(activeProjectTotalCapital)}</strong>
+              </div>
+            </button>
 
-            {/* KPI Card 2: Projected Gross Sales Realization */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm hover:border-amber-300 transition-all flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
+            {/* KPI Card 2: Projected Gross Sales -> Open Plotting */}
+            <button
+              type="button"
+              data-testid="card-kpi-gross-sales"
+              onClick={() => setActiveTab(salesTab)}
+              aria-label="Projected gross sales. Open inventory"
+              className={kpiCardCls}
+            >
+              <div className="w-full">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
                     <TrendingUp className="w-4 h-4 text-emerald-600" />
-                    <span>Projected Gross Sales Realization</span>
+                    <span>Projected Gross Sales</span>
                   </span>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                    Full Inventory Value
-                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
                 </div>
-                <h4 className="text-2xl sm:text-3xl font-black text-emerald-700 font-mono mt-2">
-                  {formatINR(totalActualEstimatedValue)}
-                </h4>
+                <h4 className="text-2xl sm:text-3xl font-black text-emerald-700 font-mono mt-2">{formatINR(totalActualEstimatedValue)}</h4>
                 <p className="text-xs text-gray-500 mt-1">
-                  Projected revenue if all {totalInventoryCount} {isPlotSector ? 'plots' : isConstructionSector ? 'units' : 'units'} are sold at catalog rates.
+                  Projected revenue if all {totalInventoryCount} {isPlotSector ? 'plots' : 'units'} are sold at catalog rates.
                 </p>
               </div>
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs flex-wrap gap-2">
-                <div>
-                  <span className="text-gray-500 block text-[10px] uppercase font-bold">Realized to Date:</span>
-                  <strong className="text-gray-900 font-mono font-bold">
-                    {formatINR(totalAdvancesCollected)}
-                  </strong>
-                </div>
-                <div className="text-right">
-                  <span className="text-gray-500 block text-[10px] uppercase font-bold">Projected Net Surplus:</span>
-                  <strong className="text-emerald-800 font-mono font-bold">
-                    +{formatINR(projectedSurplus)} (+{projectedRoiPercent}%)
-                  </strong>
-                </div>
+              <div className="w-full mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs gap-2">
+                <span className="text-gray-500 text-[10px] uppercase font-bold">Projected Net Surplus</span>
+                <strong className="text-emerald-800 font-mono font-bold">{projectedSurplus >= 0 ? '+' : ''}{formatINR(projectedSurplus)} ({projectedRoiPercent}%)</strong>
               </div>
-            </div>
+            </button>
 
-            {/* KPI Card 3: Respective Partners Summary */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm hover:border-amber-300 transition-all flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                    <PieChart className="w-4 h-4 text-indigo-600" />
-                    <span>Respective Partners</span>
-                  </span>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-200">
-                    Venture Syndicate
-                  </span>
-                </div>
-                <h4 className="text-2xl sm:text-3xl font-black text-gray-950 mt-2">
-                  {activeProjectPartners.length} {activeProjectPartners.length === 1 ? 'Partner' : 'Partners'}
-                </h4>
-                <p className="text-xs text-gray-500 mt-1">
-                  {activeProjectPartners.length === 0 ? (
-                    <span className="text-amber-800 font-semibold">No partners assigned yet</span>
-                  ) : (
-                    <span>
-                      Managing Partner:{' '}
-                      <strong className="text-gray-800">
-                        {activeProjectPartners.find((p) => p.userRole === 'managing_partner')?.name || activeProjectPartners[0].name}
-                      </strong>{' '}
-                      ({(activeProjectPartners.find((p) => p.userRole === 'managing_partner') || activeProjectPartners[0]).fixedEquityPercent}%)
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-                <span className="text-gray-500">Equity Pool Allocation:</span>
-                <strong className="text-indigo-900 font-mono font-bold">
-                  {activeProjectPartners.reduce((acc, p) => acc + p.fixedEquityPercent, 0)}% Allocated
-                </strong>
-              </div>
-            </div>
-
-            {/* KPI Card 4: Inventory Status (Plots or Flats) */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm hover:border-amber-300 transition-all flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
+            {/* KPI Card 3: Inventory -> Open Plotting */}
+            <button
+              type="button"
+              data-testid="card-kpi-inventory"
+              onClick={() => setActiveTab(salesTab)}
+              aria-label="Inventory status. Open inventory"
+              className={kpiCardCls}
+            >
+              <div className="w-full">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
                     <Layers className="w-4 h-4 text-amber-600" />
-                    <span>
-                      {isPlotSector
-                        ? 'Total Plots Inventory'
-                        : isConstructionSector
-                        ? 'Total Apartment Units'
-                        : 'Venture Assets'}
-                    </span>
+                    <span>{isPlotSector ? 'Plot Inventory' : isConstructionSector ? 'Apartment Units' : 'Venture Assets'}</span>
                   </span>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-300">
-                    {totalInventoryCount} Total
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-300">{totalInventoryCount} Total</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
                   </span>
                 </div>
-
                 <div className="grid grid-cols-3 gap-2 mt-3 text-center">
                   <div className="bg-emerald-50 p-2 rounded-2xl border border-emerald-200">
                     <span className="text-[10px] font-bold text-emerald-800 block">Available</span>
@@ -896,153 +881,75 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                     <span className="text-[10px] font-bold text-amber-800 block">Booked</span>
                     <span className="text-base font-black text-amber-950">{bookedInventoryCount}</span>
                   </div>
-                  <div className="bg-purple-50 p-2 rounded-2xl border border-purple-200">
-                    <span className="text-[10px] font-bold text-purple-800 block">Sold / Reg</span>
-                    <span className="text-base font-black text-purple-950">{soldInventoryCount}</span>
+                  <div className="bg-slate-100 p-2 rounded-2xl border border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-700 block">Sold / Reg</span>
+                    <span className="text-base font-black text-slate-950">{soldInventoryCount}</span>
                   </div>
                 </div>
               </div>
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+              <div className="w-full mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
                 <span className="text-gray-500">Inventory Sell-Through:</span>
                 <strong className="text-gray-950 font-bold">
-                  {totalInventoryCount > 0
-                    ? Math.round(((bookedInventoryCount + soldInventoryCount) / totalInventoryCount) * 100)
-                    : 0}
-                  % Committed
+                  {totalInventoryCount > 0 ? Math.round(((bookedInventoryCount + soldInventoryCount) / totalInventoryCount) * 100) : 0}% Committed
                 </strong>
               </div>
-            </div>
+            </button>
 
-            {/* KPI Card 5: Realized Collections vs Pending Receivables */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm hover:border-amber-300 transition-all flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
+            {/* KPI Card 4: Project Account -> Project Statement */}
+            <button
+              type="button"
+              data-testid="card-kpi-project-account"
+              onClick={() => setActiveTab('project_statement')}
+              aria-label="Project account balance. Open Project Statement"
+              className={kpiCardCls}
+            >
+              <div className="w-full">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Realized Inflows</span>
+                    <Landmark className="w-4 h-4 text-amber-600" />
+                    <span>Project Account</span>
                   </span>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                    Advances Cleared
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 border border-gray-200">Bank + Cash · {projectAccounts.length} A/Cs</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
                   </span>
                 </div>
-                <h4 className="text-2xl sm:text-3xl font-black text-gray-950 font-mono mt-2">
-                  {formatINR(totalAdvancesCollected)}
-                </h4>
-                <p className="text-xs text-gray-500 mt-1">
-                  Customer booking advances and milestone payments deposited in escrow.
-                </p>
+                <h4 data-testid="text-project-net-balance" className="text-2xl sm:text-3xl font-black text-gray-950 font-mono mt-2">{cashBreakdown ? formatINR(totalProjectLiquidity) : 'Unavailable'}</h4>
+                <p className="text-[11px] text-gray-500 mt-0.5">Net balance from live bank and cash account balances.</p>
+                {cashBreakdown ? (
+                  <div className="mt-3 space-y-1 text-xs">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">Posted cash movements</p>
+                    {([
+                      ['Opening balance', cashBreakdown.opening, 1],
+                      ['Investments', cashBreakdown.investments, 1],
+                      ['Plot booking / customer receipts', cashBreakdown.receipts, 1],
+                      ['Other inflows', cashBreakdown.otherIn, 1],
+                      ['Expenses', cashBreakdown.expenses, -1],
+                      ['Drawings', cashBreakdown.drawings, -1],
+                      ['Other outflows', cashBreakdown.otherOut, -1],
+                    ] as Array<[string, number, number]>).map(([label, val, sign]) => (
+                      <div key={label} className="flex items-center justify-between gap-2">
+                        <span className="text-gray-600">{sign > 0 ? '+' : '-'} {label}</span>
+                        <span className={`font-mono font-bold ${sign > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatINR(val)}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-1">
+                      <span className="font-bold text-gray-800">= Posted net</span>
+                      <span className="font-mono font-black text-gray-950">{formatINR(cashBreakdown.net)}</span>
+                    </div>
+                    {Math.abs(cashBreakdown.net - totalProjectLiquidity) >= 0.005 && (
+                      <p data-testid="text-reconciliation-gap" className="text-[11px] font-semibold text-amber-800">
+                        Differs from live balances by {formatINR(Math.abs(cashBreakdown.net - totalProjectLiquidity))}. Review the Project Statement to reconcile.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p data-testid="text-breakdown-unavailable" className="mt-3 rounded-xl border border-dashed border-gray-300 p-2.5 text-[11px] text-gray-600">
+                    Posted cash breakdown unavailable: the server statement for this project has not loaded. Open the Project Statement for the full ledger.
+                  </p>
+                )}
               </div>
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-                <span className="text-gray-500">Pending Receivables:</span>
-                <strong className="text-amber-700 font-mono font-bold">
-                  {formatINR(totalPendingReceivables)}
-                </strong>
-              </div>
-            </div>
-
-            {/* KPI Card 6: Dedicated Project Bank Accounts & Liquidity */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm hover:border-amber-300 transition-all flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                    <Landmark className="w-4 h-4 text-indigo-600" />
-                    <span>Project Bank Accounts</span>
-                  </span>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-200">
-                    {projectAccounts.length} Dedicated A/Cs
-                  </span>
-                </div>
-                <h4 className="text-2xl sm:text-3xl font-black text-gray-950 font-mono mt-2">
-                  {formatINR(totalProjectLiquidity)}
-                </h4>
-                <p className="text-xs text-gray-500 mt-1">
-                  Dedicated RERA escrow accounts, current operational accounts &amp; cash vaults.
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-                <button
-                  type="button"
-                  onClick={() => setIsAddFirmAccountModalOpen(true)}
-                  className="text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>+ Add Project Account</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('accounts')}
-                  className="text-gray-900 hover:underline font-bold"
-                >
-                  View Accounts &rarr;
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Action Navigation Shortcuts */}
-          <div className="bg-gray-900 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/20">
-                Direct Module Shortcuts
-              </span>
-              <h4 className="text-lg font-black text-white mt-1">
-                Explore {activeProject.name} Operations
-              </h4>
-              <p className="text-xs text-gray-400">
-                Jump directly into inventory booking, partner distribution, banking, or cost tracking.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              {firm.sectors.includes('real_estate_open_plotting') && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('open_plotting')}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-gray-950 font-bold text-xs transition-colors shadow-sm cursor-pointer"
-                >
-                  <Compass className="w-4 h-4" />
-                  <span>Open Plot Grid ({activePlots.length})</span>
-                </button>
-              )}
-
-              {firm.sectors.includes('real_estate_construction') && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('construction')}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-gray-950 font-bold text-xs transition-colors shadow-sm cursor-pointer"
-                >
-                  <Building className="w-4 h-4" />
-                  <span>Apartment Matrix ({activeUnits.length})</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('partners')}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs border border-gray-700 transition-colors cursor-pointer"
-              >
-                <PieChart className="w-4 h-4 text-amber-400" />
-                <span>Partner Equity ({activeProjectPartners.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('accounts')}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs border border-gray-700 transition-colors cursor-pointer"
-              >
-                <Landmark className="w-4 h-4 text-amber-400" />
-                <span>Project Bank Accounts ({projectAccounts.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('project_statement')}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer"
-              >
-                <FileText className="w-4 h-4 text-emerald-200" />
-                <span>Project Statement &amp; Passbook</span>
-              </button>
-            </div>
+            </button>
           </div>
         </div>
       )
@@ -1856,17 +1763,17 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       />
 
       {/* Modal: + Add Projects */}
-      {editingProject && (
-        <EditProjectModal
-          key={`${firm.id}:${editingProject.id}`}
-          project={editingProject}
-          definition={projectSetupDefinition}
-          initialValues={projectSetupValues}
-          initialSettings={projectSetupSettings}
-          plotResource={projectPlotResource}
-          plotRecords={projectPlotRecords}
+      {editingProject && projectEditSeed && projectEditSeed.id === editingProject.id && projectEditSeed.firmId === firm.id && onSaveProjectForm && (
+        <AddProjectModal
+          key={`edit-${firm.id}-${editingProject.id}`}
+          isOpen
           onClose={() => setEditProjectId(null)}
-          onSave={onUpdateProjectSetup}
+          firm={firm}
+          existingPartners={partners}
+          initialProject={projectEditSeed}
+          onAddProject={(p, _plots, _units, accounts) => onSaveProjectForm(p, accounts)}
+          firmAccounts={firmAccounts}
+          onAddFirmAccount={onAddFirmAccount}
           onUploadDocuments={onUploadProjectDocuments}
         />
       )}

@@ -170,7 +170,7 @@ export async function loadAll(role: string): Promise<LoadedData> {
             status: r.status === 'approved' ? 'active' : 'frozen',
             authorizedSignatories: Array.isArray(d.authorizedSignatories) ? d.authorizedSignatories
               : d.authorizedSignatories ? [String(d.authorizedSignatories)] : [],
-            createdDate: r.createdAt, recentTransactions: txs } as FirmAccount);
+            createdDate: r.createdAt, recentTransactions: txs, __revision: r.revision } as FirmAccount);
           break;
         }
         case 'expenses': out.fieldExpenses.push({ ...d, ...base, id,

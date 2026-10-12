@@ -1,5 +1,6 @@
 import { MasterOptions, masterNumber, masterItem } from '../../../adapter/config';
 import React, { useState } from 'react';
+import { downloadProjectAttachment } from '../../../adapter/api';
 import {
   TenantFirm,
   Project,
@@ -47,7 +48,10 @@ import {
   Receipt,
   Upload,
   Dumbbell,
-  PieChart
+  PieChart,
+  Download,
+  Pencil,
+  Lock
 } from 'lucide-react';
 import { formatINR, formatIndianCompact } from '../../utils/formatters';
 import { ConstructionPlanBuilder } from './ConstructionPlanBuilder';
@@ -64,6 +68,10 @@ interface AddProjectModalProps {
   onAddProject: (newProject: Project, initialPlots?: Plot[], initialUnits?: ApartmentUnit[], initialAccounts?: FirmAccount[]) => boolean | Promise<boolean>;
   firmAccounts?: FirmAccount[];
   onAddFirmAccount?: (account: FirmAccount) => void | boolean | Promise<boolean>;
+  /** Edit mode: seeds every form field from this saved project. Inventory is never regenerated. */
+  initialProject?: Project;
+  /** Edit mode: uploads NEW documents privately to the saved project. */
+  onUploadDocuments?: (projectId: string, documents: PlanUploadDocument[]) => Promise<boolean>;
 }
 
 const AVATAR_COLORS = [
@@ -214,17 +222,34 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   onAddProject,
   firmAccounts = [],
   onAddFirmAccount,
+  initialProject,
+  onUploadDocuments,
 }) => {
-  // Project ID established upfront for strict account isolation and mapping
-  const [projectId] = useState<string>(() => `proj-${crypto.randomUUID()}`);
+  const [ip] = useState(() => initialProject ? structuredClone(initialProject) : undefined);
+  const isEdit = !!ip;
+  const ipAny = (ip || {}) as any;
+  // Project ID: the real saved ID in edit mode, a fresh local draft ID only for creation
+  const [projectId] = useState<string>(() => ip ? ip.id : `proj-${crypto.randomUUID()}`);
 
   // Only this draft's accounts are available. Its Cash ledger is provisioned
   // by the server on creation, never borrowed from another project.
   const [pendingAccounts, setPendingAccounts] = useState<FirmAccount[]>([]);
+  const [savedAccounts] = useState(() => ip ? structuredClone(firmAccounts) : undefined);
   const [submitting, setSubmitting] = useState(false);
-  const availableFirmAccounts = [...pendingAccounts, ...firmAccounts].filter((a) => {
-    return a.firmId === firm.id && a.linkedProjectId === projectId;
-  });
+  // Staged copies (same stable ID) replace their saved originals; no duplicate rows.
+  const stagedIds = new Set(pendingAccounts.map((a) => a.id));
+  const availableFirmAccounts = [
+    ...(savedAccounts || firmAccounts).filter((a) => !stagedIds.has(a.id)),
+    ...pendingAccounts,
+  ].filter((a) => a.firmId === firm.id && a.linkedProjectId === projectId);
+  const savedAccountIds = new Set(firmAccounts.map((a) => a.id));
+  const [editingAccount, setEditingAccount] = useState<FirmAccount | null>(null);
+  // Edit-mode documents: new uploads are sent explicitly, never re-uploading saved files
+  const [newDocs, setNewDocs] = useState<PlanUploadDocument[]>([]);
+  const [docUploading, setDocUploading] = useState(false);
+  const [docMsg, setDocMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [downloadingDoc, setDownloadingDoc] = useState('');
+  const [downloadError, setDownloadError] = useState('');
   const [selectedFirmAccountId, setSelectedFirmAccountId] = useState<string>(() => {
     const primary = availableFirmAccounts.find((a) => a.isPrimary);
     return primary ? primary.id : availableFirmAccounts[0]?.id || '';
@@ -237,65 +262,66 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     : firm.sectors[0] || 'real_estate_open_plotting';
 
   // Basic Info State - starts clean with empty fields
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [sector, setSector] = useState<SectorType>(defaultSector);
-  const [status, setStatus] = useState<Project['status']>('active_sales');
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [name, setName] = useState(ip?.name ?? '');
+  const [code, setCode] = useState(ip?.code ?? '');
+  const [sector, setSector] = useState<SectorType>(ip?.sector ?? defaultSector);
+  const [status, setStatus] = useState<Project['status']>(ip?.status ?? 'active_sales');
+  const [startDate, setStartDate] = useState(() => ip ? (ip.startDate || '') : new Date().toISOString().split('T')[0]);
   const [targetCompletionDate, setTargetCompletionDate] = useState(() => {
+    if (ip) return ip.targetCompletionDate || '';
     const d = new Date();
     d.setMonth(d.getMonth() + 14);
     return d.toISOString().split('T')[0];
   });
 
   // Location & Statutory - start clean/empty with placeholders
-  const [location, setLocation] = useState('');
-  const [mandalDistrict, setMandalDistrict] = useState('');
-  const [surveyNumbers, setSurveyNumbers] = useState('');
-  const [approvalAuthority, setApprovalAuthority] = useState<string>('');
-  const [lpOrReraNumber, setLpOrReraNumber] = useState('');
+  const [location, setLocation] = useState(ip?.location ?? '');
+  const [mandalDistrict, setMandalDistrict] = useState(ip?.mandalDistrict ?? '');
+  const [surveyNumbers, setSurveyNumbers] = useState(ip?.surveyNumbers ?? '');
+  const [approvalAuthority, setApprovalAuthority] = useState<string>(ip?.approvalAuthority ?? '');
+  const [lpOrReraNumber, setLpOrReraNumber] = useState(ip?.lpOrReraNumber ?? '');
 
   // Specifications - start clean
-  const [extentValue, setExtentValue] = useState<number>(0);
+  const [extentValue, setExtentValue] = useState<number>(ip?.extentValue ?? 0);
   const [extentUnit, setExtentUnit] = useState<string>(
-    defaultSector === 'real_estate_construction' ? 'Units / Flats' :
+    ip ? ip.extentUnit : defaultSector === 'real_estate_construction' ? 'Units / Flats' :
     defaultSector === 'liquor_vends' ? 'Counters / Shops' :
     defaultSector === 'custom_infra' ? 'KM Stretch' : 'Acres'
   );
-  const [roadWidth, setRoadWidth] = useState<20 | 30 | 40 | 60>((masterNumber('layout_defaults', 'road_width') ?? 0) as any);
-  const [openSpacePercent, setOpenSpacePercent] = useState<number>(masterNumber('layout_defaults', 'open_space_percent') ?? 0);
-  const [floorRatePerSqYard, setFloorRatePerSqYard] = useState<number>(0);
-  const [baseSqFtRate, setBaseSqFtRate] = useState<number>(0);
-  const [totalEstimatedOutlay, setTotalEstimatedOutlay] = useState<number>(0);
-  const [notes, setNotes] = useState('');
+  const [roadWidth, setRoadWidth] = useState<20 | 30 | 40 | 60>((ip?.roadWidth ?? masterNumber('layout_defaults', 'road_width') ?? 0) as any);
+  const [openSpacePercent, setOpenSpacePercent] = useState<number>(ip?.openSpacePercent ?? masterNumber('layout_defaults', 'open_space_percent') ?? 0);
+  const [floorRatePerSqYard, setFloorRatePerSqYard] = useState<number>(ip?.floorRatePerSqYard ?? 0);
+  const [baseSqFtRate, setBaseSqFtRate] = useState<number>(ip?.baseSqFtRate ?? 0);
+  const [totalEstimatedOutlay, setTotalEstimatedOutlay] = useState<number>(ip?.totalEstimatedOutlay ?? 0);
+  const [notes, setNotes] = useState(ip?.notes ?? '');
   const [autoGeneratePlots, setAutoGeneratePlots] = useState(false);
 
   // Sector-specific properties
-  const [floorsCount, setFloorsCount] = useState<number>(0);
-  const [facingPremium, setFacingPremium] = useState<number>(0);
-  const [countersCount, setCountersCount] = useState<number>(0);
-  const [dailySalesTarget, setDailySalesTarget] = useState<number>(0);
-  const [securityDeposit, setSecurityDeposit] = useState<number>(0);
-  const [contractType, setContractType] = useState<string>('Item-Rate Schedule (BoQ)');
-  const [retentionPercent, setRetentionPercent] = useState<number>(5.0);
+  const [floorsCount, setFloorsCount] = useState<number>(ip?.floorsCount ?? 0);
+  const [facingPremium, setFacingPremium] = useState<number>(ip?.facingPremium ?? 0);
+  const [countersCount, setCountersCount] = useState<number>(ip?.countersCount ?? 0);
+  const [dailySalesTarget, setDailySalesTarget] = useState<number>(ip?.dailySalesTarget ?? 0);
+  const [securityDeposit, setSecurityDeposit] = useState<number>(ip?.securityDeposit ?? 0);
+  const [contractType, setContractType] = useState<string>(ip ? (ip.contractType ?? '') : 'Item-Rate Schedule (BoQ)');
+  const [retentionPercent, setRetentionPercent] = useState<number>(ip ? (ip.retentionPercent ?? 0) : 5.0);
 
   // CUSTOMIZATION: Construction Plan Builder State
   const [floorPlans, setFloorPlans] = useState<FloorFlatConfig[]>(() =>
-    createInitialFloorPlans(5, 4800)
+    ip ? structuredClone(ip.floorPlans ?? []) : createInitialFloorPlans(5, 4800)
   );
-  const [amenities, setAmenities] = useState<ProjectAmenity[]>(defaultConstructionAmenities);
+  const [amenities, setAmenities] = useState<ProjectAmenity[]>(() => ip ? structuredClone(ip.amenities ?? []) : defaultConstructionAmenities);
 
   // CUSTOMIZATION: Open Plotting Plan Builder State
-  const [plotDistribution, setPlotDistribution] = useState<PlotDistributionConfig>(defaultPlotDistribution);
-  const [layoutAmenities, setLayoutAmenities] = useState<LayoutAmenity[]>(defaultLayoutAmenities);
+  const [plotDistribution, setPlotDistribution] = useState<PlotDistributionConfig>(() => ip?.plotDistribution ? { ...defaultPlotDistribution, ...ip.plotDistribution } : defaultPlotDistribution);
+  const [layoutAmenities, setLayoutAmenities] = useState<LayoutAmenity[]>(() => ip ? structuredClone(ip.layoutAmenities ?? []) : defaultLayoutAmenities);
 
   // CUSTOMIZATION: Liquor Vends State
-  const [liquorCounters, setLiquorCounters] = useState<RetailCounterConfig[]>(defaultLiquorCounters);
-  const [liquorFacilities, setLiquorFacilities] = useState<LiquorFacilityConfig[]>(defaultLiquorFacilities);
+  const [liquorCounters, setLiquorCounters] = useState<RetailCounterConfig[]>(() => ip ? structuredClone(ipAny.liquorCounters ?? []) : defaultLiquorCounters);
+  const [liquorFacilities, setLiquorFacilities] = useState<LiquorFacilityConfig[]>(() => ip ? structuredClone(ipAny.liquorFacilities ?? []) : defaultLiquorFacilities);
 
   // CUSTOMIZATION: Custom Infra State
-  const [infraPackages, setInfraPackages] = useState<InfraPackageConfig[]>(defaultInfraPackages);
-  const [infraFacilities, setInfraFacilities] = useState<InfraFacilityConfig[]>(defaultInfraFacilities);
+  const [infraPackages, setInfraPackages] = useState<InfraPackageConfig[]>(() => ip ? structuredClone(ipAny.infraPackages ?? []) : defaultInfraPackages);
+  const [infraFacilities, setInfraFacilities] = useState<InfraFacilityConfig[]>(() => ip ? structuredClone(ipAny.infraFacilities ?? []) : defaultInfraFacilities);
 
   // CUSTOMIZATION: Plan & Blueprint Upload Documents
   const [planDocuments, setPlanDocuments] = useState<PlanUploadDocument[]>([]);
@@ -304,9 +330,28 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   const [activeFormTab, setActiveFormTab] = useState<'all' | 'custom_plan' | 'blueprint_upload' | 'partners' | 'accounts'>('all');
 
   // Dynamic Partners for THIS project (Partners vary from project to project, initialized empty so user explicitly assigns partners)
-  const [projectPartners, setProjectPartners] = useState<ProjectPartnerShare[]>([]);
+  const [projectPartners, setProjectPartners] = useState<ProjectPartnerShare[]>(() => ip ? structuredClone(ip.partners ?? []) : []);
 
   const [error, setError] = useState('');
+  // Edit mode: facing groups with plots but no single area are mixed-size groups
+  const [initialDistribution] = useState<PlotDistributionConfig | null>(() => ip?.plotDistribution ? { ...defaultPlotDistribution, ...ip.plotDistribution } : null);
+  const MATRIX_GROUPS: Array<[string, keyof PlotDistributionConfig, keyof PlotDistributionConfig]> = [
+    ['East', 'eastPlotsCount', 'eastAreaSqYards'], ['North', 'northPlotsCount', 'northAreaSqYards'],
+    ['West', 'westPlotsCount', 'westAreaSqYards'], ['South', 'southPlotsCount', 'southAreaSqYards'],
+    ['Corner', 'cornerPlotsCount', 'cornerAreaSqYards'], ['Commercial', 'commercialPlotsCount', 'commercialAreaSqYards'],
+  ];
+  const seededMixed: string[] = Array.isArray(ipAny.__mixedPlotGroups) ? ipAny.__mixedPlotGroups.map((g: unknown) => String(g).toLowerCase()) : [];
+  const mixedGroups = initialDistribution
+    ? MATRIX_GROUPS.filter(([l, c, a]) =>
+        seededMixed.length
+          ? seededMixed.some((g) => g === l.toLowerCase() || String(c).toLowerCase().startsWith(g) || g === String(a).toLowerCase())
+          : (Number(initialDistribution[c]) || 0) > 0 && !(Number(initialDistribution[a]) > 0)
+      ).map(([l]) => l)
+    : [];
+  const livePlotArea: number | null = typeof ipAny.__livePlotArea === 'number' ? ipAny.__livePlotArea : null;
+  const pendingCountGroups = initialDistribution
+    ? MATRIX_GROUPS.filter(([, c]) => (Number(plotDistribution[c]) || 0) !== (Number(initialDistribution[c]) || 0)).map(([l, c]) => `${l} ${Number(initialDistribution[c]) || 0} to ${Number(plotDistribution[c]) || 0}`)
+    : [];
 
   if (!isOpen) return null;
 
@@ -326,11 +371,12 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   const handleOutlayChange = (val: number) => {
     const numericVal = Math.max(0, val);
     setTotalEstimatedOutlay(numericVal);
-    setProjectPartners((prev) => syncPartnersCapitalWithTotalOutlay(prev, numericVal));
+    if (!isEdit) setProjectPartners((prev) => syncPartnersCapitalWithTotalOutlay(prev, numericVal));
   };
 
   // Handle Sector Engine Change dynamically updates unit types and sub-builders without injecting dummy data
   const handleSectorChange = (newSector: SectorType) => {
+    if (isEdit) return; // sector of a saved project is fixed
     setSector(newSector);
 
     if (newSector === 'real_estate_open_plotting') {
@@ -572,6 +618,95 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
       return;
     }
 
+    if (isEdit && ip) {
+      // Validate only matrix groups whose values changed; the backend is authoritative.
+      if (sector === 'real_estate_open_plotting' && initialDistribution) {
+        for (const [label, c, a] of MATRIX_GROUPS) {
+          const cnt = Number(plotDistribution[c]) || 0;
+          const area = Number(plotDistribution[a]) || 0;
+          const changed = cnt !== (Number(initialDistribution[c]) || 0) || area !== (Number(initialDistribution[a]) || 0);
+          if (cnt < 0 || area < 0) { setError(`${label} plots: counts and areas cannot be negative.`); return; }
+          const wasMixed = mixedGroups.includes(label);
+          if (changed && cnt > 0 && area <= 0 && !(wasMixed && cnt <= (Number(initialDistribution[c]) || 0))) {
+            setError(`${label} plots: enter an area in Sq. Yards for the new or resized plots.`);
+            return;
+          }
+        }
+      }
+      const reductions = initialDistribution ? MATRIX_GROUPS
+        .map(([label, countKey]) => ({ label, count: Number(initialDistribution[countKey]) - Number(plotDistribution[countKey]) }))
+        .filter((row) => row.count > 0) : [];
+      if (reductions.length && !window.confirm(
+        `Remove ${reductions.map((row) => `${row.count} ${row.label}`).join(', ')} unused available plots? ` +
+        'Plots with bookings or history cannot be removed. This also saves your other project and account changes.'
+      )) return;
+      const { financialStatement: _fs, financialForms: _ff, reviewableRecordIds: _rr, ...base } = ip as any;
+      const totalCustomFlatsEdit = floorPlans.reduce((sum, f) => sum + f.units.length, 0);
+      const draft: Project = {
+        ...base,
+        id: ip.id,
+        firmId: ip.firmId,
+        name: name.trim(),
+        code: code.trim().toUpperCase(),
+        sector: ip.sector,
+        location: location.trim(),
+        mandalDistrict: mandalDistrict.trim(),
+        surveyNumbers: surveyNumbers.trim(),
+        approvalAuthority,
+        lpOrReraNumber: lpOrReraNumber.trim(),
+        extentValue: Number(extentValue) || 0,
+        extentUnit,
+        roadWidth: sector === 'real_estate_open_plotting' ? roadWidth : ip.roadWidth,
+        openSpacePercent: sector === 'real_estate_open_plotting' ? openSpacePercent : ip.openSpacePercent,
+        floorRatePerSqYard: sector === 'real_estate_open_plotting' ? floorRatePerSqYard : ip.floorRatePerSqYard,
+        baseSqFtRate: sector === 'real_estate_construction' ? baseSqFtRate : ip.baseSqFtRate,
+        totalEstimatedOutlay: Number(totalEstimatedOutlay) || 0,
+        status,
+        startDate,
+        targetCompletionDate,
+        partners: ip.partners, // managed in Partners & Equity, preserved unchanged
+        notes: notes.trim(),
+        floorsCount: sector === 'real_estate_construction' ? floorsCount : ip.floorsCount,
+        facingPremium: sector === 'real_estate_construction' ? facingPremium : ip.facingPremium,
+        floorPlans: sector === 'real_estate_construction' ? floorPlans : ip.floorPlans,
+        amenities: sector === 'real_estate_construction' ? amenities : ip.amenities,
+        flatsPerFloor: sector === 'real_estate_construction' && floorsCount > 0 ? Math.round(totalCustomFlatsEdit / floorsCount) : ip.flatsPerFloor,
+        plotDistribution: sector === 'real_estate_open_plotting'
+          ? (() => {
+              // Mixed-size groups left at 0 send null so the backend keeps each existing plot size.
+              const out: any = { ...plotDistribution };
+              for (const [l, , areaKey] of MATRIX_GROUPS) if (mixedGroups.includes(l) && !(Number(plotDistribution[areaKey]) > 0)) out[areaKey] = null;
+              return out as PlotDistributionConfig;
+            })()
+          : ip.plotDistribution,
+        layoutAmenities: sector === 'real_estate_open_plotting' ? layoutAmenities : ip.layoutAmenities,
+        planDocuments: ip.planDocuments, // saved docs only; new docs use Upload Documents
+        autoGenerateInventory: false,
+        dailySalesTarget: sector === 'liquor_vends' ? dailySalesTarget : ip.dailySalesTarget,
+        securityDeposit: sector === 'liquor_vends' ? securityDeposit : ip.securityDeposit,
+        contractType: sector === 'custom_infra' ? contractType : ip.contractType,
+        retentionPercent: sector === 'custom_infra' ? retentionPercent : ip.retentionPercent,
+      };
+      if (sector === 'liquor_vends' && Array.isArray(ipAny.liquorCounters)) {
+        (draft as any).liquorCounters = liquorCounters; (draft as any).liquorFacilities = liquorFacilities;
+        draft.countersCount = liquorCounters.length;
+      }
+      if (sector === 'custom_infra' && Array.isArray(ipAny.infraPackages)) {
+        (draft as any).infraPackages = infraPackages; (draft as any).infraFacilities = infraFacilities;
+      }
+      setSubmitting(true);
+      try {
+        const ok = await onAddProject(draft, undefined, undefined, pendingAccounts);
+        if (ok === false) setError('Changes were not saved. Review the highlighted values; plot counts cannot drop below booked or sold plots.');
+        else onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Changes could not be saved. Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     // If partners were added, ensure all have names
     for (const p of projectPartners) {
       if (!p.name.trim()) {
@@ -802,6 +937,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     try {
       const ok = await onAddProject(newProject, initialPlots, initialUnits, pendingAccounts);
       if (ok !== false) onClose();
+      else setError('The project was not created. Review the fields and try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The project could not be created. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -831,14 +969,15 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                 </span>
               </div>
               <h3 className="text-lg sm:text-xl font-black text-gray-950">
-                + Add New Syndicate Project / Venture
+                {isEdit ? 'Edit Project' : '+ Add New Syndicate Project / Venture'}
               </h3>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-950 hover:bg-gray-100 rounded-full transition-colors shrink-0"
+            disabled={submitting || docUploading}
+            className="p-2 text-gray-400 hover:text-gray-950 hover:bg-gray-100 rounded-full transition-colors shrink-0 disabled:opacity-40"
             title="Close"
           >
             <X className="w-5 h-5" />
@@ -887,7 +1026,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Blueprint &amp; Plan Upload ({planDocuments.length})</span>
+            <span>Blueprint &amp; Plan Upload ({isEdit ? (ip?.planDocuments?.length || 0) + newDocs.length : planDocuments.length})</span>
           </button>
           <button
             type="button"
@@ -983,8 +1122,10 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                     </label>
                     <select
                       value={sector}
+                      disabled={isEdit}
+                      title={isEdit ? 'The sector of a saved project cannot be changed' : undefined}
                       onChange={(e) => handleSectorChange(e.target.value as SectorType)}
-                      className="w-full px-3 py-2.5 bg-amber-50/70 border-2 border-amber-300 text-gray-950 font-bold rounded-xl text-xs focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
+                      className="w-full px-3 py-2.5 bg-amber-50/70 border-2 border-amber-300 text-gray-950 font-bold rounded-xl text-xs focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       <MasterOptions group="sector_types" valueKey="uiCode" only={firm.sectors} />
                     </select>
@@ -1589,6 +1730,20 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                   />
                 )}
 
+                {isEdit && sector === 'real_estate_open_plotting' && (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-[11px] leading-relaxed text-sky-900 space-y-1">
+                    <p>Matrix values reflect the saved plot inventory. Area changes apply to available plots only; booked, sold and historical plots are preserved. Counts cannot be reduced below protected plots.</p>
+                    {livePlotArea !== null && (
+                      <p data-testid="text-recorded-plot-area"><strong>Recorded plot area:</strong> {livePlotArea.toLocaleString('en-IN')} Sq. Yards across saved plots. Matrix area totals below exclude mixed-size groups and are not the recorded total.</p>
+                    )}
+                    {pendingCountGroups.length > 0 && (
+                      <p data-testid="text-pending-counts" className="font-semibold text-amber-900"><strong>Pending count changes (unsaved):</strong> {pendingCountGroups.join('; ')}.</p>
+                    )}
+                    {mixedGroups.length > 0 && (
+                      <p data-testid="text-mixed-sizes"><strong>Mixed sizes:</strong> {mixedGroups.join(', ')} facing plots have different saved sizes, so the area field is blank-equivalent 0 and is NOT an actual zero area. Leave it at 0 to keep every existing size, or enter one area to resize the available plots in that group.</p>
+                    )}
+                  </div>
+                )}
                 {sector === 'real_estate_open_plotting' && (
                   <OpenPlottingPlanBuilder
                     extentValue={extentValue}
@@ -1600,6 +1755,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                     onAmenitiesChange={setLayoutAmenities}
                     roadWidth={roadWidth}
                     openSpacePercent={openSpacePercent}
+                    mixedGroups={isEdit ? mixedGroups : undefined}
+                    recordedArea={isEdit ? livePlotArea : undefined}
                   />
                 )}
 
@@ -1631,11 +1788,62 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                   <span>4. Sanctioned Blueprint &amp; Venture Plan Documents</span>
                 </div>
 
-                <PlanDocumentUploader
-                  documents={planDocuments}
-                  onChange={setPlanDocuments}
-                  sector={sector}
-                />
+                {isEdit ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-gray-600">Saved documents</p>
+                      {(ip?.planDocuments || []).length === 0 ? (
+                        <p className="rounded-xl border border-dashed border-gray-300 p-3 text-center text-[11px] text-gray-500">No documents saved for this project yet.</p>
+                      ) : (ip?.planDocuments || []).map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2">
+                          <div className="min-w-0"><p className="truncate text-xs font-bold text-gray-900">{doc.title}</p><p className="truncate text-[11px] text-gray-500">{doc.fileName}</p></div>
+                          <button type="button" data-testid={`button-download-doc-${doc.id}`} disabled={!!downloadingDoc}
+                            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                            onClick={async () => {
+                              setDownloadError(''); setDownloadingDoc(doc.id);
+                              try { await downloadProjectAttachment(projectId, doc.id); }
+                              catch (err) { setDownloadError(err instanceof Error ? err.message : 'Download failed. Please try again.'); }
+                              finally { setDownloadingDoc(''); }
+                            }}>
+                            <Download className="w-3.5 h-3.5" /><span className="hidden sm:inline">{downloadingDoc === doc.id ? 'Downloading…' : 'Download'}</span>
+                          </button>
+                        </div>
+                      ))}
+                      {downloadError && <p role="alert" className="text-xs font-semibold text-red-700">{downloadError}</p>}
+                    </div>
+                    <div className="space-y-2 border-t border-gray-100 pt-3">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-gray-600">Add new documents</p>
+                      <PlanDocumentUploader documents={newDocs} onChange={(d) => { setNewDocs(d); setDocMsg(null); }} sector={sector} />
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-[11px] text-gray-500">
+                          {!onUploadDocuments ? 'Document upload is unavailable right now.' : newDocs.length === 0 ? 'Select files above, then upload. Uploads are separate from Save changes.' : `${newDocs.length} file${newDocs.length > 1 ? 's' : ''} ready to upload.`}
+                        </p>
+                        <button type="button" data-testid="button-upload-documents" disabled={docUploading || submitting || !onUploadDocuments || newDocs.length === 0}
+                          onClick={async () => {
+                            if (docUploading || !onUploadDocuments || newDocs.length === 0) return;
+                            setDocMsg(null); setDocUploading(true);
+                            try {
+                              const ok = await onUploadDocuments(projectId, newDocs);
+                              if (ok) { setDocMsg({ ok: true, text: `${newDocs.length} document${newDocs.length > 1 ? 's' : ''} uploaded privately.` }); setNewDocs([]); }
+                              else setDocMsg({ ok: false, text: 'Upload failed. Your selected files are kept; try again.' });
+                            } catch (err) {
+                              setDocMsg({ ok: false, text: err instanceof Error ? err.message : 'Upload failed.' });
+                            } finally { setDocUploading(false); }
+                          }}
+                          className="flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+                          <Upload className="w-4 h-4" />{docUploading ? 'Uploading…' : 'Upload Documents'}
+                        </button>
+                      </div>
+                      {docMsg && <p role={docMsg.ok ? 'status' : 'alert'} className={`text-xs font-semibold ${docMsg.ok ? 'text-emerald-700' : 'text-red-700'}`}>{docMsg.text}</p>}
+                    </div>
+                  </div>
+                ) : (
+                  <PlanDocumentUploader
+                    documents={planDocuments}
+                    onChange={setPlanDocuments}
+                    sector={sector}
+                  />
+                )}
               </div>
             )}
 
@@ -1654,7 +1862,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                   </div>
 
                   {/* Equity Total Badge & Quick Helper */}
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <fieldset disabled={isEdit} className="flex flex-wrap items-center gap-2 shrink-0 disabled:opacity-60">
                     <div
                       className={`px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 ${
                         Math.abs(totalEquity - 100) < 0.1
@@ -1693,9 +1901,16 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                       <CheckCircle2 className="w-3 h-3 text-emerald-800" />
                       <span>Sync Cost from Capital ({formatIndianCompact(totalCapital)})</span>
                     </button>
-                  </div>
+                  </fieldset>
                 </div>
 
+                {isEdit && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-white p-3 text-[11px] text-amber-950">
+                    <Lock className="w-4 h-4 shrink-0 text-amber-700" />
+                    <span>Existing allocations are shown read-only. Manage partner identities, equity and capital in the <strong>Partners &amp; Equity</strong> tab; saving here keeps them unchanged.</span>
+                  </div>
+                )}
+                <fieldset disabled={isEdit} className="contents">
                 {/* Partners Table / Cards */}
                 {projectPartners.length === 0 ? (
                   <div className="bg-white p-6 rounded-2xl border border-dashed border-gray-300 text-center space-y-3">
@@ -1878,6 +2093,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                   </div>
                 </div>
                 )}
+                </fieldset>
               </div>
             )}
 
@@ -1893,7 +2109,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                       <h4 className="text-xs font-black uppercase tracking-wider text-gray-950 flex items-center gap-1.5">
                         <span>Project Bank Accounts &amp; Escrow</span>
                         <span className="text-[10px] font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                          {availableFirmAccounts.length + (cashDefaults ? 1 : 0)} Dedicated Accounts
+                          {availableFirmAccounts.length + (!isEdit && cashDefaults ? 1 : 0)} Dedicated Accounts
                         </span>
                       </h4>
                       <p className="text-[11px] text-gray-500">
@@ -1913,7 +2129,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                   </button>
                 </div>
 
-                {cashDefaults ? (
+                {isEdit ? (
+                  <p className="mb-3 text-[11px] text-gray-600">Balances are live and read-only. Add or edit bank account details here; changes are staged and saved with Save changes. The default Cash account is managed by the system.</p>
+                ) : cashDefaults ? (
                   <div className="mb-3 max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
                     <div className="flex items-center justify-between">
                       <h5 className="text-sm font-bold text-gray-950">{String(cashDefaults.cashAccountName)}</h5>
@@ -1984,9 +2202,23 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
                           </div>
 
                           <div className="mt-2.5 pt-2 border-t border-gray-200/60 flex items-center justify-between">
-                            <span className="text-[10px] text-gray-400 font-medium">Available Balance:</span>
+                            <span className="text-[10px] text-gray-400 font-medium">{savedAccountIds.has(acc.id) ? 'Live Balance:' : 'Opening Balance:'}</span>
                             <span className="text-xs font-bold font-mono text-gray-900">{formatINR(acc.currentBalance)}</span>
                           </div>
+                          {(stagedIds.has(acc.id) || (isEdit && savedAccountIds.has(acc.id) && acc.accountType !== cashDefaults?.cashAccountType && acc.accountType !== 'field_petty_cash')) && (
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              {stagedIds.has(acc.id) ? (
+                                <span className="text-[9px] font-black uppercase text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">{savedAccountIds.has(acc.id) ? 'Edited · unsaved' : 'New · unsaved'}</span>
+                              ) : <span />}
+                              {savedAccountIds.has(acc.id) && (
+                                <button type="button" data-testid={`button-edit-account-${acc.id}`}
+                                  onClick={(e) => { e.stopPropagation(); setEditingAccount(acc); }}
+                                  className="flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2 py-1 text-[10px] font-bold text-gray-800 hover:bg-gray-50">
+                                  <Pencil className="w-3 h-3" /> Edit
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1995,8 +2227,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
               </div>
             )}
 
-            {/* SECTION 6: AUTO-INVENTORY / REGISTERS GENERATION */}
-            {activeFormTab === 'all' && (
+            {/* SECTION 6: AUTO-INVENTORY / REGISTERS GENERATION (create only) */}
+            {activeFormTab === 'all' && !isEdit && (
               <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-200 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <input
@@ -2066,21 +2298,42 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-950 hover:bg-gray-200/70 transition-colors"
+                disabled={submitting || docUploading}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-950 hover:bg-gray-200/70 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 border border-amber-500/40 cursor-pointer"
+                data-testid={isEdit ? 'button-save-project-changes' : 'button-create-project'}
+                disabled={submitting || docUploading}
+                className="px-6 py-2.5 rounded-xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 border border-amber-500/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FolderPlus className="w-4 h-4" />
-                <span>Create Project &amp; Load Data</span>
+                <span>{submitting ? 'Saving…' : isEdit ? 'Save changes' : 'Create Project & Load Data'}</span>
               </button>
             </div>
           </div>
         </form>
       </div>
+
+      {/* Sub-modal: Edit existing Project Account (staged until Save changes) */}
+      {editingAccount && (
+        <AddFirmAccountModal
+          key={`edit-acc-${editingAccount.id}`}
+          isOpen
+          onClose={() => setEditingAccount(null)}
+          firm={firm}
+          projects={ip ? [ip] : []}
+          activeProjectId={projectId}
+          initialAccount={editingAccount}
+          onAddAccount={(updated) => {
+            const staged = { ...updated, id: editingAccount.id, linkedProjectId: editingAccount.linkedProjectId, openingBalance: editingAccount.openingBalance, currentBalance: editingAccount.currentBalance };
+            setPendingAccounts((prev) => [...prev.filter((a) => a.id !== staged.id), staged]);
+            return true;
+          }}
+        />
+      )}
 
       {/* Sub-modal: Add Project Account */}
       {isAddAccountSubModalOpen && (
@@ -2092,6 +2345,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
             {
               id: projectId,
               firmId: firm.id,
+              ...(ip || {}),
               name: name.trim() || 'New Project Venture',
               code: code.trim().toUpperCase() || 'PROJECT',
               sector,

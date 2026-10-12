@@ -25,6 +25,8 @@ interface AddFirmAccountModalProps {
   projects: Project[];
   activeProjectId?: string;
   onAddAccount: (account: FirmAccount) => void | boolean | Promise<boolean>;
+  /** When set, the form edits this existing account's metadata. ID, project link and opening balance are preserved. */
+  initialAccount?: FirmAccount;
 }
 
 export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
@@ -34,26 +36,30 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
   projects,
   activeProjectId,
   onAddAccount,
+  initialAccount,
 }) => {
+  const ia = initialAccount;
+  const isEdit = !!ia;
   const firmProjects = projects.filter((p) => p.firmId === firm.id);
-  const targetProjectId = activeProjectId || '';
+  const targetProjectId = ia?.linkedProjectId || activeProjectId || '';
   const currentProject = projects.find((p) => p.id === (targetProjectId || activeProjectId));
 
-  const [accountName, setAccountName] = useState('');
-  const [bankName, setBankName] = useState('');
+  const [accountName, setAccountName] = useState(ia?.accountName ?? '');
+  const [bankName, setBankName] = useState(ia?.bankName ?? '');
   const [accountType, setAccountType] = useState<FirmAccountType>(
-    masterItem('project_account_defaults', 'standard')?.metadata.bankAccountType as FirmAccountType
+    ia?.accountType ?? (masterItem('project_account_defaults', 'standard')?.metadata.bankAccountType as FirmAccountType)
   );
-  const [accountNumber, setAccountNumber] = useState('');
-  const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
-  const [ifscCode, setIfscCode] = useState('');
-  const [branchName, setBranchName] = useState('');
-  const [city, setCity] = useState('');
-  const [openingBalance, setOpeningBalance] = useState<number>(0);
-  const [upiId, setUpiId] = useState('');
-  const [isPrimary, setIsPrimary] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [signatories, setSignatories] = useState<string[]>([]);
+  const [accountNumber, setAccountNumber] = useState(ia?.accountNumber ?? '');
+  const [confirmAccountNumber, setConfirmAccountNumber] = useState(ia?.accountNumber ?? '');
+  const [ifscCode, setIfscCode] = useState(ia?.ifscCode ?? '');
+  const [branchName, setBranchName] = useState(ia?.branchName ?? '');
+  const [city, setCity] = useState(ia?.city ?? '');
+  const [openingBalance, setOpeningBalance] = useState<number>(ia?.openingBalance ?? 0);
+  const [upiId, setUpiId] = useState(ia?.upiId ?? '');
+  const [isPrimary, setIsPrimary] = useState(ia?.isPrimary ?? false);
+  const [notes, setNotes] = useState(ia?.notes ?? '');
+  const [signatories, setSignatories] = useState<string[]>(ia?.authorizedSignatories ? [...ia.authorizedSignatories] : []);
+  const [saving, setSaving] = useState(false);
   const [newSignatoryInput, setNewSignatoryInput] = useState('');
   const [error, setError] = useState('');
 
@@ -75,9 +81,14 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
     setSignatories(signatories.filter((s) => s !== sig));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     setError('');
+    if (ia && ia.accountType === masterItem('project_account_defaults', 'standard')?.metadata.cashAccountType) {
+      setError('The default project Cash account is managed by the system and cannot be edited.');
+      return;
+    }
     if (!accountType || accountType === masterItem('project_account_defaults', 'standard')?.metadata.cashAccountType) {
       setError('Project bank-account defaults are not configured.');
       return;
@@ -143,7 +154,32 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
       ] : []
     };
 
-    void Promise.resolve(onAddAccount(newAccount)).then((ok) => { if (ok !== false) onClose(); });
+    const finalAccount: FirmAccount = ia
+      ? {
+          ...ia,
+          accountName: newAccount.accountName,
+          bankName: newAccount.bankName,
+          accountType: newAccount.accountType,
+          accountNumber: newAccount.accountNumber,
+          ifscCode: newAccount.ifscCode,
+          branchName: newAccount.branchName,
+          city: newAccount.city,
+          upiId: newAccount.upiId,
+          isPrimary: newAccount.isPrimary,
+          authorizedSignatories: newAccount.authorizedSignatories,
+          notes: newAccount.notes,
+        }
+      : newAccount;
+    setSaving(true);
+    try {
+      const ok = await onAddAccount(finalAccount);
+      if (ok !== false) onClose();
+      else setError(isEdit ? 'The account changes were not staged. Review the fields and try again.' : 'The account was not added. Review the fields and try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The account could not be saved.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -167,7 +203,7 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
                 )}
               </div>
               <h3 className="text-lg sm:text-xl font-black text-gray-950 flex items-center gap-2 mt-0.5">
-                + Add Project Account
+                {isEdit ? 'Edit Project Account' : '+ Add Project Account'}
               </h3>
             </div>
           </div>
@@ -295,12 +331,14 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
                   min="0"
                   step="1000"
                   value={openingBalance || ''}
+                  disabled={isEdit}
+                  title={isEdit ? 'Opening balance is fixed once the account exists' : undefined}
                   onChange={(e) => setOpeningBalance(Math.max(0, Number(e.target.value) || 0))}
                   placeholder="0"
                   className="w-full text-xs font-mono font-bold text-gray-900 border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
                 <span className="text-[10px] text-gray-500 font-medium mt-1 block">
-                  Amount in words: <strong className="text-gray-900">{formatINR(openingBalance)}</strong>
+                  {isEdit ? 'Fixed once the account exists. ' : ''}Amount in words: <strong className="text-gray-900">{formatINR(openingBalance)}</strong>
                 </span>
               </div>
 
@@ -409,10 +447,11 @@ export const AddFirmAccountModal: React.FC<AddFirmAccountModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-500/40 cursor-pointer"
+              disabled={saving}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-500/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>Save &amp; Register Bank Account</span>
+              <span>{saving ? 'Saving…' : isEdit ? 'Stage Account Changes' : 'Save & Register Bank Account'}</span>
             </button>
           </div>
         </form>

@@ -380,7 +380,8 @@ class OnboardingIntegrationTest {
         assertEquals("Reviewed live project",jdbc.queryForObject("SELECT name FROM sos.projects WHERE id=?::uuid",String.class,id));
         assertEquals(0,new java.math.BigDecimal("100").compareTo(jdbc.queryForObject("SELECT (data->>'areaSqYards')::numeric FROM sos.erp_records WHERE id=?::uuid",java.math.BigDecimal.class,plot)));
         assertEquals("1100.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
-        String otherPlot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND id<>?::uuid LIMIT 1",String.class,id,plot);
+        exerciseMatrixEditor(id,sector,accountant,historical,acct,plot);
+        String otherPlot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND status<>'deleted' AND id<>?::uuid LIMIT 1",String.class,id,plot);
         Map<String,Object> lifecycleData=Map.of("inventoryId",otherPlot,"buyerName","Lifecycle test buyer","buyerPhone","9888880099",
             "advanceReceived","0.00","ratePerSqYard","11.00","accountId",acct,"paymentMode","UPI","date","2026-10-09");
         String deletedBooking=saveRecord(accountant,id,"bookings",lifecycleData);
@@ -489,5 +490,76 @@ class OnboardingIntegrationTest {
             "SELECT release_id::text FROM sos.firm_sector_assignments WHERE firm_id=(SELECT firm_id FROM sos.projects WHERE id=?::uuid)",String.class,project),null,
             login("OWNER","9888880000","Owner-updated-123","",200).path("token").asText(),200);
         assertTrue(config.path("resources").size()>0);
+    }
+    private ObjectNode matrixSnapshot(String project) throws Exception {
+        ObjectNode matrix=json.createObjectNode();
+        var rows=jdbc.queryForList("SELECT id::text AS id,revision,data::text AS data FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND status<>'deleted'",project);
+        var revisions=matrix.putArray("records");
+        Map<String,Integer> counts=new java.util.LinkedHashMap<>();
+        for(String key:java.util.List.of("east","north","west","south","corner","commercial")) counts.put(key,0);
+        for(var row:rows) {
+            revisions.addObject().put("recordId",row.get("id").toString()).put("revision",(Integer)row.get("revision"));
+            String facing=json.readTree(row.get("data").toString()).path("facing").asText();
+            String key=facing.contains("Corner")?"corner":facing.toLowerCase();
+            counts.put(key,counts.get(key)+1);
+        }
+        var groups=matrix.putArray("groups");
+        counts.forEach((key,count)->groups.addObject().put("key",key).put("count",count).putNull("areaSqYards"));
+        return matrix;
+    }
+    private void exerciseMatrixEditor(String id,String sector,String accountant,ObjectNode historical,String acct,String booked) throws Exception {
+        int plotCount=jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND status<>'deleted'",Integer.class,id);
+        int bankCount=jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid AND kind='accounts'",Integer.class,id);
+        String facing=jdbc.queryForObject("SELECT data->>'facing' FROM sos.erp_records WHERE id=?::uuid",String.class,booked);
+        String groupKey=facing.contains("Corner")?"corner":facing.toLowerCase();
+        ObjectNode save=json.createObjectNode().put("projectId",id).put("sectorId",sector)
+            .put("revision",jdbc.queryForObject("SELECT revision FROM sos.projects WHERE id=?::uuid",Integer.class,id))
+            .put("requestId",java.util.UUID.randomUUID().toString());
+        save.set("setup",historical.deepCopy());save.set("plotMatrix",matrixSnapshot(id));
+        ObjectNode group=matrixGroup(save.path("plotMatrix"),groupKey);
+        int groupCount=group.path("count").asInt();
+        group.put("count",groupCount+1).put("areaSqYards",150);
+        ObjectNode bank=(ObjectNode)json.readTree(jdbc.queryForObject("SELECT data::text FROM sos.erp_records WHERE id=?::uuid",String.class,acct));
+        var accounts=save.putArray("accountEdits");
+        accounts.addObject().put("recordId",acct)
+            .put("revision",jdbc.queryForObject("SELECT revision FROM sos.erp_records WHERE id=?::uuid",Integer.class,acct))
+            .set("data",bank.deepCopy().put("bankName","Updated bank"));
+        accounts.addObject().set("data",bank.deepCopy().put("accountName","Additional bank")
+            .put("accountNumber","000077771234").put("openingBalance",0).put("isPrimary",false));
+        long before=jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE project_id=?::uuid",Long.class,id);
+        command("project.setup-save",save,accountant,200);
+        command("project.setup-save",save,accountant,200);
+        assertEquals(plotCount+1,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND status<>'deleted'",Integer.class,id));
+        assertEquals(bankCount+1,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid AND kind='accounts'",Integer.class,id));
+        assertEquals(before,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE project_id=?::uuid",Long.class,id));
+        assertEquals("Updated bank",jdbc.queryForObject("SELECT data->>'bankName' FROM sos.erp_records WHERE id=?::uuid",String.class,acct));
+        assertEquals(0,new java.math.BigDecimal("100").compareTo(jdbc.queryForObject("SELECT (data->>'areaSqYards')::numeric FROM sos.erp_records WHERE id=?::uuid",java.math.BigDecimal.class,booked)));
+        assertEquals("1100.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
+        ObjectNode invalid=save.deepCopy().put("requestId",java.util.UUID.randomUUID().toString())
+            .put("revision",jdbc.queryForObject("SELECT revision FROM sos.projects WHERE id=?::uuid",Integer.class,id));
+        invalid.set("plotMatrix",matrixSnapshot(id));
+        matrixGroup(invalid.path("plotMatrix"),groupKey).put("count",groupCount+2).put("areaSqYards",175);
+        invalid.remove("accountEdits");
+        invalid.putArray("accountEdits").addObject().put("recordId",acct)
+            .put("revision",jdbc.queryForObject("SELECT revision FROM sos.erp_records WHERE id=?::uuid",Integer.class,acct))
+            .set("data",bank.deepCopy().put("openingBalance",2000));
+        command("project.setup-save",invalid,accountant,400);
+        assertEquals(plotCount+1,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND status<>'deleted'",Integer.class,id));
+        assertEquals(before,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE project_id=?::uuid",Long.class,id));
+        ObjectNode shrink=save.deepCopy().put("requestId",java.util.UUID.randomUUID().toString())
+            .put("revision",jdbc.queryForObject("SELECT revision FROM sos.projects WHERE id=?::uuid",Integer.class,id));
+        shrink.remove("accountEdits");shrink.set("plotMatrix",matrixSnapshot(id));
+        matrixGroup(shrink.path("plotMatrix"),groupKey).put("count",0);
+        command("project.setup-save",shrink,accountant,400);
+        // Restore the original available count/size for the subsequent lifecycle tests.
+        shrink.put("requestId",java.util.UUID.randomUUID().toString());
+        matrixGroup(shrink.path("plotMatrix"),groupKey).put("count",groupCount).put("areaSqYards",100);
+        command("project.setup-save",shrink,accountant,200);
+        assertEquals(plotCount,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND status<>'deleted'",Integer.class,id));
+        assertEquals("1100.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
+    }
+    private ObjectNode matrixGroup(JsonNode matrix,String key) {
+        return (ObjectNode)matrix.path("groups").findParents("key").stream()
+            .filter(group->key.equals(group.path("key").asText())).findFirst().orElseThrow();
     }
 }

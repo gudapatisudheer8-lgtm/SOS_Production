@@ -27,6 +27,10 @@ interface OpenPlottingPlanBuilderProps {
   onAmenitiesChange: (amenities: LayoutAmenity[]) => void;
   roadWidth: number;
   openSpacePercent: number;
+  /** Edit mode only: facing groups whose saved plots have different sizes (e.g. 'East'). */
+  mixedGroups?: string[];
+  /** Edit mode only: actual recorded total area of saved plots, in Sq. Yards. */
+  recordedArea?: number | null;
 }
 
 export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = ({
@@ -39,6 +43,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
   onAmenitiesChange,
   roadWidth,
   openSpacePercent,
+  mixedGroups = [],
+  recordedArea = null,
 }) => {
   const [newAmenityName, setNewAmenityName] = useState('');
   const [newAmenityArea, setNewAmenityArea] = useState<number>(0);
@@ -81,8 +87,21 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
   const totalCornerArea = cornerCount * cornerArea;
   const totalCommercialArea = commercialCount * commercialArea;
 
+  // A group is "mixed" only while it was saved with mixed sizes, still has plots, and no single area is entered.
+  const mixedSet = new Set(mixedGroups.map((g) => String(g).toLowerCase()));
+  const isMixed = (key: string, count: number, area: number) => mixedSet.has(key) && count > 0 && !(area > 0);
+  const mixedEast = isMixed('east', eastCount, eastArea);
+  const mixedNorth = isMixed('north', northCount, northArea);
+  const mixedWest = isMixed('west', westCount, westArea);
+  const mixedSouth = isMixed('south', southCount, southArea);
+  const mixedCorner = isMixed('corner', cornerCount, cornerArea);
+  const mixedCommercial = isMixed('commercial', commercialCount, commercialArea);
+  const anyMixed = mixedEast || mixedNorth || mixedWest || mixedSouth || mixedCorner || mixedCommercial;
+
   const totalPlottedArea =
     totalEastArea + totalNorthArea + totalWestArea + totalSouthArea + totalCornerArea + totalCommercialArea;
+  const subtotalText = (mixed: boolean, total: number) => (mixed ? 'Mixed sizes' : `${total.toLocaleString('en-IN')} Sq.Yds`);
+  const avgText = (mixed: boolean, area: number) => (mixed ? 'Mixed sizes' : `Avg ${area} Sq.Yds / Plot`);
 
   const totalPlotsCount =
     eastCount + northCount + westCount + southCount + cornerCount + commercialCount;
@@ -158,8 +177,13 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
           <div className="text-right">
             <span className="text-[10px] font-bold text-gray-500 uppercase block">Total Plotted Units</span>
             <span className="text-sm font-black text-gray-900 font-mono">
-              {totalPlotsCount} Plots ({totalPlottedArea.toLocaleString('en-IN')} Sq.Yds)
+              {totalPlotsCount} Plots ({anyMixed ? 'Mixed sizes · Pending calculation' : `${totalPlottedArea.toLocaleString('en-IN')} Sq.Yds`})
             </span>
+            {recordedArea !== null && recordedArea !== undefined && (
+              <span data-testid="text-builder-recorded-area" className="block text-[10px] font-semibold text-gray-600">
+                Recorded actual area: {recordedArea.toLocaleString('en-IN')} Sq.Yds
+              </span>
+            )}
           </div>
 
           <button
@@ -205,7 +229,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
                 type="number"
                 step="1"
                 min="0"
-                placeholder="0"
+                placeholder={mixedEast ? 'Mixed sizes' : '0'}
+                title={mixedEast ? 'Saved plots have different sizes. Leave blank to keep them, or enter one area to resize available plots.' : undefined}
                 value={eastArea === 0 ? '' : eastArea}
                 onChange={(e) => handleUpdate('eastAreaSqYards', e.target.value === '' ? 0 : Number(e.target.value))}
                 className="w-full px-2 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold text-gray-950 outline-none"
@@ -215,7 +240,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 
           <div className="pt-2 border-t border-amber-100 flex items-center justify-between text-[11px] text-amber-900 font-semibold">
             <span>Sub-total:</span>
-            <strong className="text-amber-950 font-bold">{totalEastArea.toLocaleString('en-IN')} Sq.Yds</strong>
+            <strong className="text-amber-950 font-bold">{subtotalText(mixedEast, totalEastArea)}</strong>
           </div>
         </div>
 
@@ -249,7 +274,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
                 type="number"
                 step="1"
                 min="0"
-                placeholder="0"
+                placeholder={mixedNorth ? 'Mixed sizes' : '0'}
+                title={mixedNorth ? 'Saved plots have different sizes. Leave blank to keep them, or enter one area to resize available plots.' : undefined}
                 value={northArea === 0 ? '' : northArea}
                 onChange={(e) => handleUpdate('northAreaSqYards', e.target.value === '' ? 0 : Number(e.target.value))}
                 className="w-full px-2 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-bold text-gray-950 outline-none"
@@ -259,7 +285,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 
           <div className="pt-2 border-t border-blue-100 flex items-center justify-between text-[11px] text-blue-900 font-semibold">
             <span>Sub-total:</span>
-            <strong className="text-blue-950 font-bold">{totalNorthArea.toLocaleString('en-IN')} Sq.Yds</strong>
+            <strong className="text-blue-950 font-bold">{subtotalText(mixedNorth, totalNorthArea)}</strong>
           </div>
         </div>
 
@@ -293,7 +319,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
                 type="number"
                 step="1"
                 min="0"
-                placeholder="0"
+                placeholder={mixedWest ? 'Mixed sizes' : '0'}
+                title={mixedWest ? 'Saved plots have different sizes. Leave blank to keep them, or enter one area to resize available plots.' : undefined}
                 value={westArea === 0 ? '' : westArea}
                 onChange={(e) => handleUpdate('westAreaSqYards', e.target.value === '' ? 0 : Number(e.target.value))}
                 className="w-full px-2 py-1.5 bg-white border border-purple-300 rounded-lg text-xs font-bold text-gray-950 outline-none"
@@ -303,7 +330,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 
           <div className="pt-2 border-t border-purple-100 flex items-center justify-between text-[11px] text-purple-900 font-semibold">
             <span>Sub-total:</span>
-            <strong className="text-purple-950 font-bold">{totalWestArea.toLocaleString('en-IN')} Sq.Yds</strong>
+            <strong className="text-purple-950 font-bold">{subtotalText(mixedWest, totalWestArea)}</strong>
           </div>
         </div>
 
@@ -337,7 +364,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
                 type="number"
                 step="1"
                 min="0"
-                placeholder="0"
+                placeholder={mixedSouth ? 'Mixed sizes' : '0'}
+                title={mixedSouth ? 'Saved plots have different sizes. Leave blank to keep them, or enter one area to resize available plots.' : undefined}
                 value={southArea === 0 ? '' : southArea}
                 onChange={(e) => handleUpdate('southAreaSqYards', e.target.value === '' ? 0 : Number(e.target.value))}
                 className="w-full px-2 py-1.5 bg-white border border-rose-300 rounded-lg text-xs font-bold text-gray-950 outline-none"
@@ -347,7 +375,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 
           <div className="pt-2 border-t border-rose-100 flex items-center justify-between text-[11px] text-rose-900 font-semibold">
             <span>Sub-total:</span>
-            <strong className="text-rose-950 font-bold">{totalSouthArea.toLocaleString('en-IN')} Sq.Yds</strong>
+            <strong className="text-rose-950 font-bold">{subtotalText(mixedSouth, totalSouthArea)}</strong>
           </div>
         </div>
 
@@ -381,7 +409,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
                 type="number"
                 step="1"
                 min="0"
-                placeholder="0"
+                placeholder={mixedCorner ? 'Mixed sizes' : '0'}
+                title={mixedCorner ? 'Saved plots have different sizes. Leave blank to keep them, or enter one area to resize available plots.' : undefined}
                 value={cornerArea === 0 ? '' : cornerArea}
                 onChange={(e) => handleUpdate('cornerAreaSqYards', e.target.value === '' ? 0 : Number(e.target.value))}
                 className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-bold text-gray-950 outline-none"
@@ -391,7 +420,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 
           <div className="pt-2 border-t border-emerald-100 flex items-center justify-between text-[11px] text-emerald-900 font-semibold">
             <span>Sub-total:</span>
-            <strong className="text-emerald-950 font-bold">{totalCornerArea.toLocaleString('en-IN')} Sq.Yds</strong>
+            <strong className="text-emerald-950 font-bold">{subtotalText(mixedCorner, totalCornerArea)}</strong>
           </div>
         </div>
 
@@ -425,7 +454,8 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
                 type="number"
                 step="1"
                 min="0"
-                placeholder="0"
+                placeholder={mixedCommercial ? 'Mixed sizes' : '0'}
+                title={mixedCommercial ? 'Saved plots have different sizes. Leave blank to keep them, or enter one area to resize available plots.' : undefined}
                 value={commercialArea === 0 ? '' : commercialArea}
                 onChange={(e) => handleUpdate('commercialAreaSqYards', e.target.value === '' ? 0 : Number(e.target.value))}
                 className="w-full px-2 py-1.5 bg-white border border-indigo-300 rounded-lg text-xs font-bold text-gray-950 outline-none"
@@ -435,7 +465,7 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
 
           <div className="pt-2 border-t border-indigo-100 flex items-center justify-between text-[11px] text-indigo-900 font-semibold">
             <span>Sub-total:</span>
-            <strong className="text-indigo-950 font-bold">{totalCommercialArea.toLocaleString('en-IN')} Sq.Yds</strong>
+            <strong className="text-indigo-950 font-bold">{subtotalText(mixedCommercial, totalCommercialArea)}</strong>
           </div>
         </div>
       </div>
@@ -467,25 +497,25 @@ export const OpenPlottingPlanBuilder: React.FC<OpenPlottingPlanBuilderProps> = (
             <div className="p-3 bg-slate-800/80 rounded-2xl border border-amber-500/30">
               <span className="text-[10px] text-amber-300 font-bold uppercase block">Sector A (East)</span>
               <strong className="text-base text-white font-mono block mt-1">{eastCount} Plots</strong>
-              <span className="text-[10px] text-slate-400">Avg {eastArea} Sq.Yds / Plot</span>
+              <span className="text-[10px] text-slate-400">{avgText(mixedEast, eastArea)}</span>
             </div>
 
             <div className="p-3 bg-slate-800/80 rounded-2xl border border-blue-500/30">
               <span className="text-[10px] text-blue-300 font-bold uppercase block">Sector B (North)</span>
               <strong className="text-base text-white font-mono block mt-1">{northCount} Plots</strong>
-              <span className="text-[10px] text-slate-400">Avg {northArea} Sq.Yds / Plot</span>
+              <span className="text-[10px] text-slate-400">{avgText(mixedNorth, northArea)}</span>
             </div>
 
             <div className="p-3 bg-slate-800/80 rounded-2xl border border-purple-500/30">
               <span className="text-[10px] text-purple-300 font-bold uppercase block">Sector C (West)</span>
               <strong className="text-base text-white font-mono block mt-1">{westCount} Plots</strong>
-              <span className="text-[10px] text-slate-400">Avg {westArea} Sq.Yds / Plot</span>
+              <span className="text-[10px] text-slate-400">{avgText(mixedWest, westArea)}</span>
             </div>
 
             <div className="p-3 bg-slate-800/80 rounded-2xl border border-emerald-500/30">
               <span className="text-[10px] text-emerald-300 font-bold uppercase block">Corner Enclaves</span>
               <strong className="text-base text-white font-mono block mt-1">{cornerCount} Plots</strong>
-              <span className="text-[10px] text-slate-400">Avg {cornerArea} Sq.Yds / Plot</span>
+              <span className="text-[10px] text-slate-400">{avgText(mixedCorner, cornerArea)}</span>
             </div>
           </div>
 

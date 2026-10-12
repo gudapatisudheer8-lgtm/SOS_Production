@@ -102,6 +102,25 @@ public class ProjectSetupService {
             }
         }
         JsonNode def=definition(release);
+        JsonNode accountEdits=input.path("accountEdits");
+        if(!accountEdits.isMissingNode() && (!accountEdits.isArray() || accountEdits.size()>100))
+            throw ApiProblem.invalid("Supply at most 100 project account edits.");
+        if((!accountEdits.isMissingNode() && !accountEdits.isEmpty()) || input.has("plotMatrix")) {
+            if(existing==null || !"READY".equals(existing.get("setup_state")))
+                throw ApiProblem.invalid("Edit live accounts and inventory only on an operational project.");
+        }
+        Set<UUID> accountIds=new HashSet<>();
+        for(JsonNode edit:accountEdits) {
+            if(!edit.isObject() || !edit.path("data").isObject()) throw ApiProblem.invalid("Supply valid project account data.");
+            if(edit.hasNonNull("recordId")) {
+                UUID account=Values.id(edit,"recordId");
+                if(!accountIds.add(account)) throw ApiProblem.invalid("Repeated project account.");
+                Values.revision(edit);
+                var found=jdbc.queryForList("SELECT kind,status FROM sos.erp_records WHERE project_id=? AND id=?",id,account);
+                if(found.isEmpty() || !"accounts".equals(found.getFirst().get("kind")) ||
+                    !"approved".equals(found.getFirst().get("status"))) throw ApiProblem.denied();
+            }
+        }
         JsonNode plotEdits=input.path("plotEdits");
         if(!plotEdits.isMissingNode() && (!plotEdits.isArray() || plotEdits.size()>2000))
             throw ApiProblem.invalid("Supply at most 2000 saved plot edits.");
@@ -195,8 +214,20 @@ public class ProjectSetupService {
             mutation.set("data",edit.path("data"));
             erp.execute(actor,"erp.save",mutation);
         }
+        if(input.has("plotMatrix") && !plotEdits.isEmpty())
+            throw ApiProblem.invalid("Use either the facing matrix or individual plot edits in one save.");
+        int matrixChanges=new ProjectMatrixEditor(jdbc,json,erp).apply(actor,id,Values.id(input,"requestId"),def,values,input.path("plotMatrix"));
+        int accountIndex=0;
+        for(JsonNode edit:accountEdits) {
+            ObjectNode mutation=json.createObjectNode().put("projectId",id.toString()).put("kind","accounts")
+                .put("requestId",UUID.nameUUIDFromBytes((Values.id(input,"requestId")+":account:"+accountIndex++)
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
+            if(edit.hasNonNull("recordId")) mutation.put("recordId",Values.id(edit,"recordId").toString()).put("revision",Values.revision(edit));
+            mutation.set("data",edit.path("data"));
+            erp.execute(actor,"erp.save",mutation);
+        }
         config.audit(actor,"PROJECT_SETUP_SAVED",actor.firmId(),release);
-        return ok(Map.of("id",id,"revision",revision,"setupState",state,"updatedPlots",plotEdits.size()));
+        return ok(Map.of("id",id,"revision",revision,"setupState",state,"updatedPlots",plotEdits.size()+matrixChanges,"updatedAccounts",accountEdits.size()));
     }
     private void normalizeRows(JsonNode definition,ObjectNode setup) {
         for(String group:List.of("partners","accounts","groups")) {

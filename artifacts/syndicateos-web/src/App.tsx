@@ -19,6 +19,7 @@ import { investmentInput, drawingInput, bookingInput } from './adapter/financial
 import { BookingReceiptApprovals } from './components/BookingReceiptApprovals';
 import { ProjectPlanSaver } from './adapter/projectPlans';
 import { ProjectEditorSaver, projectEditContext, projectEditPayload } from './adapter/projectEditing';
+import { projectFormSeed, projectFormPayload } from './adapter/projectFormEditing';
 import { MarketingAccessPage } from './marketing/MarketingAccessPage';
 import { expenseInput } from './adapter/expenseInput';
 
@@ -330,6 +331,18 @@ function App() {
       await projectEditorSaver.current.uploadDocuments(projectId, erpOf(projectId), documents);
     });
 
+  const handleSaveProjectForm = (project: Project, accounts: FirmAccount[] = []) => run('Project changes saved', async () => {
+    const context = projectEditContext(data?.workspace, erpOf(project.id), project.id);
+    if (!context || project.firmId !== selectedFirmId || project.id !== activeProjectId)
+      throw new Error('Select an authorized project before saving its details.');
+    const oldRoad = context.values.roadWidth;
+    const deduction = String(oldRoad) !== String(project.roadWidth) &&
+      context.definition.sections.some((section: any) => section.fields?.some((f: any) => f.key === 'roadDeductionPercent'))
+        ? masterNumber('road_widths', String(project.roadWidth), 'deductionPercent') : undefined;
+    const payload = projectFormPayload(project, context, erpOf(project.id), accounts, pickConfigured, deduction);
+    await projectEditorSaver.current.save(payload);
+  });
+
   const handleAddPartnerMember = (m: SyndicatePartner) => run(`Partner ${m.name} added`, async () => {
     if (!activeProjectId) throw new Error('Select a project first.');
     const res = (erpOf(activeProjectId)?.resources || []).find((r: any) => r.kind === 'partner-profiles');
@@ -575,6 +588,12 @@ function App() {
             projectSetupValues={selectedProjectSetup?.values}
             projectSetupSettings={selectedProjectSetup?.settings}
             onUpdateProjectSetup={handleUpdateProjectSetup}
+            onSaveProjectForm={handleSaveProjectForm}
+            projectEditSeed={selectedProjectSetup && projects.find((p) => p.id === activeProjectId)
+              ? { ...projectFormSeed(projects.find((p) => p.id === activeProjectId)!, selectedProjectSetup, erpOf(activeProjectId)),
+                  __plotRevisions: (erpOf(activeProjectId)?.records || []).filter((r: any) => r.kind === 'plots')
+                    .map((r: any) => ({ recordId: r.id, revision: r.revision })) } as Project
+              : undefined}
             onUploadProjectDocuments={handleUploadProjectDocuments}
             projectPlotResource={(erpOf(activeProjectId)?.resources || []).find((resource: any) => resource.kind === 'plots')}
             projectPlotRecords={(erpOf(activeProjectId)?.records || []).filter((record: any) => record.kind === 'plots')}

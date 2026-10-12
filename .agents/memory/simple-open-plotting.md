@@ -43,8 +43,8 @@ For the project-form simplification request, do not remove any project fields. A
 
 **How to apply:** Keep create and edit modes distinct, retain all setup fields, and scope the selected project to the selected authorized firm. The user also requested removing the top dashboard files section; keep document access inside Add/Edit Project without deleting uploaded files.
 
-Edit Project must include the saved live plot details, not just the original inventory-generation template.
+Edit Project must use the same UI as Add Project, including the facing-wise plot matrix and bank-account section—not a separate individual saved-plot editor.
 
-**Why:** The user clarified that plot details were missing and asked for editing fields. Re-running the original template to implement those edits would risk the identities referenced by bookings and receipts.
+**Why:** The user explicitly rejected the individual saved-plot editor and repeated that editing should match the original entry form. Re-running the original creation template would risk the identities referenced by bookings and receipts.
 
-**How to apply:** Edit existing available plot records without regenerating inventory or changing booking statuses. Keep booked/sold plots protected. A single Save details action must commit project and plot changes together, or roll back all of them if any record is stale, invalid, or protected.
+**How to apply:** Seed the matrix from actual live inventory, retain mixed sizes unless explicitly changed, and reconcile available inventory while preserving existing identities and booked/sold records. Confirm count reductions; archive only unused available plots without history. Allow bank creation and metadata edits in the same form, but never edit an existing opening balance or default Cash ledger. Project, plot and bank changes must save atomically or all roll back.
