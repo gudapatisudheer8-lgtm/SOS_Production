@@ -18,6 +18,10 @@ Run password-change and onboarding acceptance tests against a separate disposabl
 **Why:** bootstrap secrets do not override an existing changed owner password; tests must not leave the user's account inaccessible or populate their application with test firms.
 **How to apply:** use synthetic identities on the isolated target and restore the Preview API proxy afterward. Verify browser saves through the real proxy, not only independent frontend/backend builds.
 
+Use fresh disposable integration fixtures for each independent acceptance/build run.
+**Why:** onboarding scenarios rotate the synthetic owner's credential, and committed snapshot fixtures can survive a prior run; reusing them produces misleading login and duplicate-identity failures.
+**How to apply:** reset only positively identified isolated test targets, never the customer's Preview database or owner credentials.
+
 Check the testing runner's database target before using its database tools.
 **Why:** the runner may expose a separate built-in database rather than this application's local PostgreSQL; an isolated application database is not automatically available through that connection.
 **How to apply:** seed the disposable local database from the main workspace when necessary, check its name explicitly, and provide the tester with browser-only fixture access. Do not substitute the runner's default database.

@@ -464,3 +464,31 @@ mtime_ms = 1791804370152
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/e2edaf4d-662d-49e8-8093-6e854bfcb2f4/b31f6517-88a6-4e6f-9693-9f2c01452bb1"
 storage_version_token = "1791804415021247"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "-j8VcLr6bShcyEto5b7VF"
+uri = "file://generated-artifacts/ec2/sos-consolidated-20261012.tar.gz"
+type = "unspecified"
+title = "SyndicateOS — Consolidated EC2 Update"
+description = "Verified web + API package, database migrations V1–V21, guarded backup/upgrade installer and complete change checklist. Approximately 26 MB."
+logical_id = "357cadbb-774f-4c9c-bb5c-e8b3b3597b02"
+content_hash = "sha256:674c45b082538b0f23330d32effeb16ec6eae651adf9f90c0700a0cbe5a20756"
+size = 26938466
+mtime_ms = 1791828544233
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/357cadbb-774f-4c9c-bb5c-e8b3b3597b02/56295f4e-1a37-4ea6-b960-2cd1e59f7e4a"
+storage_version_token = "1791828750088620"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "MRBy-vjNPqdjP1u3O-brk"
+uri = "file://generated-artifacts/ec2/sos-consolidated-20261012-Deployment-Guide.html"
+type = "html"
+title = "EC2 Deployment Guide — Consolidated Update"
+description = "Exact PowerShell and EC2 commands with the archive checksum inline, backup precautions, complete included-change checklist, known limitations, verification and recovery instructions."
+logical_id = "f9a6054d-c2ac-4c4d-8d9f-4a3e33eeb74f"
+content_hash = "sha256:90e46fea8c3cf710a6597cb5966c446d0107169944495119ab1131ba63e2d184"
+size = 17747
+mtime_ms = 1791828544261
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/f9a6054d-c2ac-4c4d-8d9f-4a3e33eeb74f/fc80c362-8cfd-43e2-98ef-317bcd94b321"
+storage_version_token = "1791828751432812"
+content_type = "text/html"

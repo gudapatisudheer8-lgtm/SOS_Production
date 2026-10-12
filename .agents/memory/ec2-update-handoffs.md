@@ -38,3 +38,9 @@ API hotfixes must also preserve the original checksummed release: install the ja
 **Why:** Replacing the base jar in place would invalidate future deployment checks just as replacing the original frontend would.
 
 **How to apply:** Preserve the base environment file, JVM limits, private uploads, disabled runtime migrations and loopback binding. Verify the active command and readiness; restore the prior override on failure.
+
+Do not reuse a no-migration hotfix installer for a schema-bearing consolidated release. Back up database metadata and file bytes during the same stopped-API window.
+
+**Why:** later blueprint and financial-correction work needs additive storage that the earlier API/frontend patches did not install. API health alone does not establish that those tables or runtime privileges exist.
+
+**How to apply:** explicitly upgrade the existing database without bootstrap/reset, apply runtime-role grants, and verify migration history before activating the matched web/API pair. Treat preserved base metadata as historical; check the served release and effective API command. After a migration-stage failure, leave the API stopped for diagnosis rather than silently restarting an older financial API or automatically restoring customer data.
