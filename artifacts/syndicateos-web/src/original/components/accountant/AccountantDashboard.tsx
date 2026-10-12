@@ -446,12 +446,14 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
     <div className="space-y-6">
       {/* ======================================================== */}
       {/* Project treasury controls live in the shared sticky Header (one combined bar). */}
+      <HeaderSlot position="brand">
+        <div className="text-[9px] leading-tight font-black uppercase tracking-wider text-amber-700 truncate"
+          title={[activeProject?.name, firm.name, firm.location, firm.accountantName ? `Accountant: ${firm.accountantName}` : ''].filter(Boolean).join(' · ')}>
+          Project treasury <span className="font-mono text-stone-400 normal-case">{firm.code}</span>
+        </div>
+      </HeaderSlot>
       <HeaderSlot>
         <div className="flex flex-wrap items-center gap-2 min-w-0 lg:justify-end" data-testid="header-project-treasury">
-          <div className="hidden xl:flex flex-col min-w-0 mr-auto pl-3 border-l border-stone-200 max-w-[16rem]">
-            <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">Project treasury <span className="font-mono text-stone-400 normal-case">{firm.code}</span></span>
-            <span className="text-xs font-black text-slate-900 truncate" title={[firm.name, firm.location, firm.accountantName ? `Accountant: ${firm.accountantName}` : ''].filter(Boolean).join(' · ')}>{activeProject ? activeProject.name : firm.name}</span>
-          </div>
           <label className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[12rem] sm:max-w-[300px]">
             <FolderOpen className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span className="sr-only">Select project</span>

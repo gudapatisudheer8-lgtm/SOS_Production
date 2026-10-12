@@ -64,6 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="truncate">No active firm assigned</span>
               )}
             </div>
+            <div ref={slot.brandRef} data-testid="header-brand-context" className="min-w-0 mt-0.5 empty:hidden" />
           </div>
         </div>
 

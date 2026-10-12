@@ -972,16 +972,15 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
       )}
 
       {/* Partner context controls live in the shared sticky Header (one combined bar). */}
+      <HeaderSlot position="brand">
+        <div className="text-[9px] leading-tight font-black uppercase tracking-wider text-amber-800 truncate"
+          data-testid="text-partner-context"
+          title={activeProject ? `${activeProject.name} as ${currentPartner.name}` : `Signed in as ${currentPartner.name}`}>
+          {lang === 'te' ? 'పెట్టుబడి వాటా' : 'Your partner stake'} <span className="font-mono text-stone-400 normal-case">{activeFirm.code}</span>
+        </div>
+      </HeaderSlot>
       <HeaderSlot>
         <div className="flex flex-wrap items-center gap-2 min-w-0 lg:justify-end" data-testid="header-partner-stake">
-          <div className="hidden xl:flex flex-col min-w-0 mr-auto pl-3 border-l border-stone-200 max-w-[16rem]">
-            <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">
-              {lang === 'te' ? 'పెట్టుబడి వాటా' : 'Your partner stake'} <span className="font-mono text-stone-400 normal-case">{activeFirm.code}</span>
-            </span>
-            <span className="text-xs text-stone-600 truncate" data-testid="text-partner-context">
-              {activeProject ? <><strong className="text-slate-900">{activeProject.name}</strong> as {currentPartner.name}</> : <>Signed in as {currentPartner.name}</>}
-            </span>
-          </div>
 
           {onSelectFirm && contributedFirms.length > 0 && (
             <label className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[10rem] sm:max-w-[240px]">
@@ -1042,12 +1041,14 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                 type="button"
                 data-testid={`button-lang-${code}`}
                 aria-pressed={lang === code}
+                aria-label={code === 'en' ? 'English' : 'Telugu'}
+                title={code === 'en' ? 'English' : 'తెలుగు (Telugu)'}
                 onClick={() => handleLanguageChange(code)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-colors cursor-pointer ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-black transition-colors cursor-pointer ${
                   lang === code ? 'bg-[#111827] text-white' : 'text-stone-700 hover:text-slate-950'
                 }`}
               >
-                {code === 'en' ? 'English' : 'తెలుగు'}
+                {code === 'en' ? 'En' : 'Te'}
               </button>
             ))}
           </div>

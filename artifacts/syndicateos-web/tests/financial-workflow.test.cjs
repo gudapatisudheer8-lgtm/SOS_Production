@@ -23,6 +23,7 @@ const ordering = require('../src/adapter/statementOrdering.ts');
 const { normalizeFeed, freshIds } = require('../src/original/components/NotificationBell.tsx');
 const { ProjectStatementModule } = require('../src/original/components/accountant/ProjectStatementModule.tsx');
 const { ConfigProvider } = require('../src/adapter/config.tsx');
+const { Header } = require('../src/original/components/Header.tsx');
 
 const rows = [
   { id: 'a', type: 'credit', amount: 1000, date: '2024-01-01', affectsCash: true, postingState: 'posted' },
@@ -96,6 +97,18 @@ test('enrolled-by filter derives people from current rows and matches exactly', 
   assert.equal(ordering.enrolledMatches(entries[0], null), true);
   assert.equal(ordering.enrolledMatches(entries[3], ''), true);
   assert.deepEqual(ordering.enrolledPeople([{ enrolledBy: 'New project author' }]), ['New project author']);
+});
+
+test('header context mount sits below the firm name, before the controls mount', () => {
+  for (const role of ['accountant', 'field_partner']) {
+    const html = renderToStaticMarkup(React.createElement(Header, {
+      currentRole: role, onRoleChange: () => {}, firms: [{ id: 'firm-a', name: 'Shiva Constructions', code: 'SHA' }],
+      selectedFirmId: 'firm-a', onFirmChange: () => {}, pendingExpensesCount: 0,
+    }));
+    assert.ok(html.indexOf('Shiva Constructions') < html.indexOf('data-testid="header-brand-context"'));
+    assert.ok(html.indexOf('data-testid="header-brand-context"') < html.indexOf('data-testid="header-slot"'));
+    assert.match(html, /sticky top-0/);
+  }
 });
 
 test('statement headings sort dates, numeric vouchers, names and signed amounts without modifying money', () => {
