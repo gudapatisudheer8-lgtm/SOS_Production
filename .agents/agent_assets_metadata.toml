@@ -492,3 +492,31 @@ mtime_ms = 1791828544261
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/f9a6054d-c2ac-4c4d-8d9f-4a3e33eeb74f/fc80c362-8cfd-43e2-98ef-317bcd94b321"
 storage_version_token = "1791828751432812"
 content_type = "text/html"
+
+[[outputs]]
+id = "V2On6g93HPJScBE3XcoZM"
+uri = "file://generated-artifacts/ec2/sos-consolidated-20261013-plot-payments.tar.gz"
+type = "unspecified"
+title = "Latest EC2 application update"
+description = "Consolidated web/API package including locked plot pricing, cumulative payments and saved receipts. Preserves the existing SOS installation; no deployment has been executed."
+logical_id = "0d7a9570-a33c-4187-9714-38efafa44593"
+content_hash = "sha256:00488dcf1f25c54bd0e1fcfb1ef15a664d9186d34b19213f9500101166e9f10b"
+size = 26949389
+mtime_ms = 1791834403686
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/0d7a9570-a33c-4187-9714-38efafa44593/4c587024-8b5d-433c-8d46-f52ce91c2e27"
+storage_version_token = "1791834482417075"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "VWaJHRRrlRUcOYqhezLIL"
+uri = "file://generated-artifacts/ec2/sos-consolidated-20261013-plot-payments-Deployment-Guide.html"
+type = "html"
+title = "EC2 deployment instructions"
+description = "Upload/install commands, inline SHA-256 verification, backups, acceptance checklist, known limits and recovery instructions."
+logical_id = "68f8c991-03da-41b9-beeb-65f589ddc028"
+content_hash = "sha256:ea19979ef9da00fec8f43d840e19a310ac5a8edd5100815eb2b6f08e557d1716"
+size = 14376
+mtime_ms = 1791834403717
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/68f8c991-03da-41b9-beeb-65f589ddc028/46d43879-4726-4fa2-ae49-8895834d4b46"
+storage_version_token = "1791834483629751"
+content_type = "text/html"

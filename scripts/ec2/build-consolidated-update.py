@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Assemble current verified builds, never overwrite a shared archive or contact EC2."""
+import argparse
 import hashlib
 import html
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -47,6 +49,19 @@ pre{overflow-x:auto;padding:18px;background:#111827;color:#f5f5f5;border-radius:
 
 
 def main():
+    global FIX, STAGE, ARCHIVE
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--release-name", default=FIX)
+    parser.add_argument("--guide-source", default="docs/sos-consolidated-ec2-update.md")
+    args = parser.parse_args()
+    if not re.fullmatch(r"sos-consolidated-[a-z0-9-]{1,50}", args.release_name):
+        raise SystemExit("Invalid release name.")
+    FIX = args.release_name
+    STAGE = OUT / FIX
+    ARCHIVE = OUT / f"{FIX}.tar.gz"
+    guide_source = (ROOT / args.guide_source).resolve()
+    if not guide_source.is_relative_to(ROOT) or not guide_source.is_file():
+        raise SystemExit("Guide must be an existing file inside this workspace.")
     if STAGE.exists() or ARCHIVE.exists():
         raise SystemExit("Release output already exists. Never overwrite a shared release.")
     web = ROOT / "artifacts/syndicateos-web/dist/public"
@@ -71,7 +86,7 @@ def main():
     shutil.copyfile(ROOT / "scripts/ec2/consolidated-update.py", STAGE / "update.py")
     shutil.copyfile(ROOT / "scripts/ec2/sql/03_update_runtime_permissions.sql", STAGE / "permissions.sql")
     shutil.copytree(migrations, STAGE / "migrations")
-    documentation = (ROOT / "docs/sos-consolidated-ec2-update.md").read_text()
+    documentation = guide_source.read_text()
     (STAGE / "README.md").write_text(documentation)
     meta = {"update": FIX, "base_release": "sos-fresh-ec2-20261010", "schema_version": 21,
             "api_sha256": digest(jar), "index_sha256": digest(web / "index.html"),
