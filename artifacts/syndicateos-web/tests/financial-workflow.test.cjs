@@ -124,6 +124,14 @@ test('firm selectors remain openable with one authorized firm and accountant ord
   assert.doesNotMatch(accountant, /<span>Edit Project<\/span>/);
 });
 
+test('no dashboard renders the floating unavailable-actions panel; unsupported operations still fail explicitly', () => {
+  const app = fs.readFileSync(path.resolve(__dirname, '../src/App.tsx'), 'utf8');
+  assert.doesNotMatch(app, /unavailable actions|BLOCKED_ACTIONS|showGaps|setShowGaps/);
+  assert.match(app, /const unsupported = /);
+  assert.match(app, /Not supported by backend/);
+  assert.match(app, /onBlockedAction=\{unsupported\}/);
+});
+
 test('statement headings sort dates, numeric vouchers, names and signed amounts without modifying money', () => {
   const entries = [
     { id: 'a', date: '2026-10-01', type: 'credit', amount: 50, referenceNo: 'REF-10', description: 'Investment', accountName: 'Bank', enrolledBy: 'Zoya' },

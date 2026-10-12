@@ -29,13 +29,6 @@ import { expenseInput } from './adapter/expenseInput';
 const EMPTY_LAYOUT: LayoutCalculation = { totalExtentValue: 0, unit: 'Acres', roadWidth: 30, openSpacePercent: 10, floorRatePerSqYard: 0 };
 const EMPTY_MATRIX: ApartmentPricingMatrix = { baseSqFtRate: 0, eastPremium: 0, northPremium: 0, cornerPremium: 0, floorRisePerFloor: 0, carParkingFee: 0, amenitiesFee: 0, floorRatePerSqFt: 0 };
 
-// Original-UI actions with no backing endpoint in the Spring API. Shown visibly, never faked.
-const BLOCKED_ACTIONS = [
-  'Owner sign-in into accountant / partner consoles (owner has no ERP scope)',
-  'Feature flags: WhatsApp, Tally export, voice notes, audit lock, dual ledger',
-  'Separate drawing disbursement (drawings post when recorded)',
-];
-
 function App() {
   const config = useConfig();
   const loadConfigRef = useRef(config.load);
@@ -52,7 +45,6 @@ function App() {
   const [ledgerMode, setLedgerMode] = useState<LedgerMode>('internal_syndicate');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [stickyNotice, setStickyNotice] = useState<string | null>(null);
-  const [showGaps, setShowGaps] = useState(false);
   const toastTimer = useRef<number | undefined>(undefined);
   const projectPlanSaver = useRef(new ProjectPlanSaver());
   const projectEditorSaver = useRef(new ProjectEditorSaver());
@@ -684,18 +676,6 @@ function App() {
           </div>
         ))}
       </main>
-
-      {/* Visible list of original actions the backend cannot serve yet */}
-      <div className="fixed bottom-5 left-5 z-40 max-w-sm">
-        <button onClick={() => setShowGaps((v) => !v)} className="px-3 py-1.5 bg-white border border-stone-300 rounded-full text-[10px] font-black text-stone-700 shadow-xs">
-          {showGaps ? 'Hide' : 'Show'} unavailable actions ({BLOCKED_ACTIONS.length})
-        </button>
-        {showGaps && (
-          <ul className="mt-2 bg-white border border-stone-200 rounded-2xl p-3 text-[11px] text-stone-700 space-y-1 shadow-xl">
-            {BLOCKED_ACTIONS.map((a) => <li key={a}>• {a}</li>)}
-          </ul>
-        )}
-      </div>
 
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-[#111827] border border-amber-500/80 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs max-w-md animate-fade-in">
