@@ -100,6 +100,17 @@ test('identical edit retries retain their request ID while changed input gets a 
   assert.notEqual(calls[1].body.requestId, calls[2].body.requestId);
 });
 
+test('plot edits carry captured record IDs and revisions without rebuilding inventory', () => {
+  const { projectEditPayload } = loadAdapter();
+  const edits = [{ recordId: 'plot-1', revision: 2, data: { plotNumber: '1', areaSqYards: 120, status: 'available' } }];
+  const payload = projectEditPayload(project, definition, { name: 'New' }, {}, 3, edits);
+  assert.deepEqual(payload.plotEdits, edits);
+  assert.deepEqual(payload.setup.groups, snapshot.groups);
+  assert.throws(() => projectEditPayload(project, definition, {}, {}, 3, [...edits, ...edits]), /Reload the saved plots/);
+  assert.throws(() => projectEditPayload(project, definition, {}, {}, 3, [{ ...edits[0], revision: 0 }]), /Reload the saved plots/);
+  assert.throws(() => projectEditPayload(project, definition, {}, {}, 3, [{ ...edits[0], data: { status: 'reserved' } }]), /Reload the saved plots/);
+});
+
 test('document retry reuses uploaded attachment and posted document instead of duplicating', async () => {
   const { ProjectEditorSaver, calls } = loadAdapter();
   const saver = new ProjectEditorSaver();

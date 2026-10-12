@@ -30,9 +30,16 @@ export function projectEditContext(workspace: any, erp: any, projectId: string) 
 }
 
 export function projectEditPayload(project: any, definition: any, values: Record<string, any>,
-  settings: Record<string, any>, revision: number) {
+  settings: Record<string, any>, revision: number,
+  plotEdits: Array<{ recordId: string; revision: number; data: Record<string, any> }> = []) {
   if (!Number.isInteger(revision) || revision < 1) throw new Error('Reload the project before editing its details.');
   if (project.setupState !== 'READY') throw new Error('Finish project setup before editing operational details.');
+  const ids = new Set<string>();
+  for (const edit of plotEdits) {
+    if (!edit.recordId || ids.has(edit.recordId) || !Number.isInteger(edit.revision) || edit.revision < 1 ||
+        !edit.data || edit.data.status !== 'available') throw new Error('Reload the saved plots before editing them.');
+    ids.add(edit.recordId);
+  }
   const previous = project.setupData || {};
   // READY setups cannot recreate their children. Keep the exact historical
   // arrays, including files uploaded at creation, rather than current balances.
@@ -43,7 +50,7 @@ export function projectEditPayload(project: any, definition: any, values: Record
     accounts: previous.accounts || [], documents: previous.documents || [],
   };
   return { projectId: String(project.id), sectorId: String(project.sectorId),
-    setupReleaseId: project.setupReleaseId || undefined, revision, setup };
+    setupReleaseId: project.setupReleaseId || undefined, revision, setup, plotEdits };
 }
 
 /** Retain request IDs and uploaded files across ambiguous network retries. */

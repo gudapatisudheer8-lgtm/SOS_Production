@@ -332,6 +332,34 @@ class OnboardingIntegrationTest {
         String acct=jdbc.queryForObject("SELECT r.id::text FROM sos.erp_records r JOIN sos.project_cash_accounts c ON c.project_id=r.project_id WHERE r.project_id=?::uuid AND r.kind='accounts' AND r.id<>c.account_record_id",String.class,id);
         assertEquals("1000.00",accountBalance(erp,acct));
         String plot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' LIMIT 1",String.class,id);
+        ObjectNode originalPlot=(ObjectNode)json.readTree(jdbc.queryForObject("SELECT data::text FROM sos.erp_records WHERE id=?::uuid",String.class,plot));
+        String secondPlot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND id<>?::uuid LIMIT 1",String.class,id,plot);
+        ObjectNode secondPlotData=(ObjectNode)json.readTree(jdbc.queryForObject("SELECT data::text FROM sos.erp_records WHERE id=?::uuid",String.class,secondPlot));
+        ObjectNode editedPlot=originalPlot.deepCopy().put("areaSqYards",120).put("ratePerSqYard",12)
+            .put("roadWidthFt",24).put("notes","Edited inside project form");
+        ObjectNode plotRequest=json.createObjectNode().put("projectId",id).put("sectorId",sector)
+            .put("revision",liveRevision+2).put("requestId",java.util.UUID.randomUUID().toString());
+        plotRequest.set("setup",historical.deepCopy());
+        plotRequest.putArray("plotEdits").addObject().put("recordId",plot).put("revision",1).set("data",editedPlot);
+        assertEquals(1,command("project.setup-save",plotRequest,accountant,200).path("entity").path("updatedPlots").asInt());
+        command("project.setup-save",plotRequest,accountant,200);
+        assertEquals(2,jdbc.queryForObject("SELECT revision FROM sos.erp_records WHERE id=?::uuid",Integer.class,plot));
+        assertEquals(0,new java.math.BigDecimal("120").compareTo(jdbc.queryForObject("SELECT (data->>'areaSqYards')::numeric FROM sos.erp_records WHERE id=?::uuid",java.math.BigDecimal.class,plot)));
+        assertEquals("1000.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
+        ObjectNode failedBatch=plotRequest.deepCopy().put("revision",liveRevision+3).put("requestId",java.util.UUID.randomUUID().toString());
+        ((ObjectNode)failedBatch.path("setup").path("values")).put("name","Must roll back");
+        var changes=failedBatch.putArray("plotEdits");
+        changes.addObject().put("recordId",plot).put("revision",2).set("data",editedPlot.deepCopy().put("areaSqYards",125));
+        changes.addObject().put("recordId",secondPlot).put("revision",2).set("data",secondPlotData);
+        command("project.setup-save",failedBatch,accountant,409);
+        assertEquals("Reviewed live project",jdbc.queryForObject("SELECT name FROM sos.projects WHERE id=?::uuid",String.class,id));
+        assertEquals(liveRevision+3,jdbc.queryForObject("SELECT revision FROM sos.projects WHERE id=?::uuid",Integer.class,id));
+        assertEquals(0,new java.math.BigDecimal("120").compareTo(jdbc.queryForObject("SELECT (data->>'areaSqYards')::numeric FROM sos.erp_records WHERE id=?::uuid",java.math.BigDecimal.class,plot)));
+        assertEquals(2,jdbc.queryForObject("SELECT revision FROM sos.erp_records WHERE id=?::uuid",Integer.class,plot));
+        assertEquals(6,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid",Integer.class,id));
+        ObjectNode restorePlot=plotRequest.deepCopy().put("revision",liveRevision+3).put("requestId",java.util.UUID.randomUUID().toString());
+        restorePlot.putArray("plotEdits").addObject().put("recordId",plot).put("revision",2).set("data",originalPlot);
+        command("project.setup-save",restorePlot,accountant,200);
         Object booking=Map.of("projectId",id,"kind","bookings","requestId",java.util.UUID.randomUUID().toString(),
             "data",Map.of("inventoryId",plot,"buyerName","Integration buyer","buyerPhone","9888880099","advanceReceived","100.00",
                 "ratePerSqYard","11.00","accountId",acct,"paymentMode","UPI","date","2026-10-09"));
@@ -341,6 +369,16 @@ class OnboardingIntegrationTest {
         assertEquals("1000.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
         command("erp.review",Map.of("projectId",id,"recordId",bookingId,"revision",1,"decision","approved"),accountant,400);
         command("erp.review",Map.of("projectId",id,"recordId",bookingId,"revision",1,"decision","approved"),partner,200);
+        assertEquals("1100.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
+        ObjectNode protectedRequest=plotRequest.deepCopy().put("revision",liveRevision+4)
+            .put("requestId",java.util.UUID.randomUUID().toString());
+        ((ObjectNode)protectedRequest.path("setup").path("values")).put("name","Booked edit must roll back");
+        protectedRequest.putArray("plotEdits").addObject().put("recordId",plot)
+            .put("revision",jdbc.queryForObject("SELECT revision FROM sos.erp_records WHERE id=?::uuid",Integer.class,plot))
+            .set("data",originalPlot.deepCopy().put("status","reserved").put("areaSqYards",999));
+        command("project.setup-save",protectedRequest,accountant,400);
+        assertEquals("Reviewed live project",jdbc.queryForObject("SELECT name FROM sos.projects WHERE id=?::uuid",String.class,id));
+        assertEquals(0,new java.math.BigDecimal("100").compareTo(jdbc.queryForObject("SELECT (data->>'areaSqYards')::numeric FROM sos.erp_records WHERE id=?::uuid",java.math.BigDecimal.class,plot)));
         assertEquals("1100.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
         String otherPlot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND id<>?::uuid LIMIT 1",String.class,id,plot);
         Map<String,Object> lifecycleData=Map.of("inventoryId",otherPlot,"buyerName","Lifecycle test buyer","buyerPhone","9888880099",

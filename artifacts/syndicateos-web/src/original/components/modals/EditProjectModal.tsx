@@ -3,9 +3,10 @@ import { Download, FileText, Info, Plus, Save, Trash2, Upload, X } from 'lucide-
 import { downloadProjectAttachment } from '../../../adapter/api';
 import type { PlanUploadDocument, Project } from '../../types';
 import { PlanDocumentUploader } from './PlanDocumentUploader';
+import { ProjectPlotEditor, buildPlotEdits, plotEditErrors, type PlotRecord } from './ProjectPlotEditor';
 
-type Row = Record<string, any>;
-interface FieldDef {
+export type Row = Record<string, any>;
+export interface FieldDef {
   key: string; label: string; kind: string; required?: boolean; options?: string[];
   optionLabels?: Record<string, string>; min?: number; max?: number; decimalPlaces?: number;
   integer?: boolean; unit?: string; maxLength?: number; readOnly?: boolean; ui?: string;
@@ -14,16 +15,16 @@ interface FieldDef {
 interface SectionDef { key: string; title: string; fields: FieldDef[] }
 
 const LIVE_KINDS = ['account', 'partner', 'inventory'];
-const asFields = (x: unknown): FieldDef[] => (Array.isArray(x) ? x.filter((f) => f && typeof f.key === 'string' && typeof f.label === 'string') : []);
+export const asFields = (x: unknown): FieldDef[] => (Array.isArray(x) ? x.filter((f) => f && typeof f.key === 'string' && typeof f.label === 'string') : []);
 const clone = <T,>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 
-const isVisible = (f: FieldDef, row: Row) => {
+export const isVisible = (f: FieldDef, row: Row) => {
   if (!f.visibleWhen) return true;
   const v = row[f.visibleWhen.field];
   return (f.visibleWhen.values || []).includes(v === undefined || v === null ? '' : String(v));
 };
 
-function fieldError(f: FieldDef, raw: unknown): string | null {
+export function fieldError(f: FieldDef, raw: unknown): string | null {
   if (f.fields) return null;
   const blank = raw === undefined || raw === null || (typeof raw === 'string' && raw.trim() === '');
   if (blank) return f.required && f.kind !== 'boolean' ? `${f.label} is required.` : null;
@@ -40,7 +41,7 @@ function fieldError(f: FieldDef, raw: unknown): string | null {
   return null;
 }
 
-function normalize(fields: FieldDef[], row: Row): Row {
+export function normalize(fields: FieldDef[], row: Row): Row {
   const out: Row = { ...row };
   for (const f of fields) {
     const v = row[f.key];
@@ -50,7 +51,7 @@ function normalize(fields: FieldDef[], row: Row): Row {
   return out;
 }
 
-function collectErrors(fields: FieldDef[], row: Row, prefix = ''): string[] {
+export function collectErrors(fields: FieldDef[], row: Row, prefix = ''): string[] {
   const errs: string[] = [];
   for (const f of fields) {
     if (LIVE_KINDS.includes(f.kind) || !isVisible(f, row) || f.readOnly) continue;
@@ -68,7 +69,7 @@ function collectErrors(fields: FieldDef[], row: Row, prefix = ''): string[] {
 
 const inputCls = 'w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-950 outline-none focus:border-amber-500 disabled:bg-gray-100 disabled:text-gray-500';
 
-function FieldInput({ f, row, onChange, disabled, idBase }: { f: FieldDef; row: Row; onChange: (v: any) => void; disabled: boolean; idBase: string }) {
+export function FieldInput({ f, row, onChange, disabled, idBase }: { f: FieldDef; row: Row; onChange: (v: any) => void; disabled: boolean; idBase: string }) {
   const id = `${idBase}-${f.key}`;
   const v = row[f.key];
   const err = fieldError(f, v);
@@ -155,13 +156,15 @@ export interface EditProjectModalProps {
   definition?: any;
   initialValues?: Record<string, any>;
   initialSettings?: Record<string, any>;
+  plotResource?: any;
+  plotRecords?: any[];
   onClose: () => void;
-  onSave?: (projectId: string, values: Record<string, any>, settings: Record<string, any>, revision: number) => Promise<boolean>;
+  onSave?: (projectId: string, values: Record<string, any>, settings: Record<string, any>, revision: number, plotEdits?: Array<{ recordId: string; revision: number; data: Record<string, any> }>) => Promise<boolean>;
   onUploadDocuments?: (projectId: string, documents: PlanUploadDocument[]) => Promise<boolean>;
 }
 
 /** Mount only while open (seeded once on mount; remount per project via key). */
-export function EditProjectModal({ project, definition, initialValues, initialSettings, onClose, onSave, onUploadDocuments }: EditProjectModalProps) {
+export function EditProjectModal({ project, definition, initialValues, initialSettings, plotResource, plotRecords, onClose, onSave, onUploadDocuments }: EditProjectModalProps) {
   const projectId = project.id;
   const sections: SectionDef[] = Array.isArray(definition?.sections)
     ? definition.sections.filter((s: any) => s && typeof s.key === 'string').map((s: any) => ({ key: s.key, title: String(s.title ?? s.key), fields: asFields(s.fields) }))
@@ -172,6 +175,10 @@ export function EditProjectModal({ project, definition, initialValues, initialSe
   const [values, setValues] = useState<Row>(() => clone(initialValues || {}));
   const [settings, setSettings] = useState<Row>(() => clone(initialSettings || {}));
   const [revision] = useState<number>(() => Number((project as any).__revision ?? 0));
+  const [plotSnapshot] = useState<PlotRecord[]>(() => (Array.isArray(plotRecords) ? clone(plotRecords) : []));
+  const [plotDrafts, setPlotDrafts] = useState<Record<string, Row>>({});
+  const [plotFields] = useState<FieldDef[]>(() => clone(asFields(plotResource?.fields)));
+  const canManagePlots = plotResource?.canManage === true;
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [newDocs, setNewDocs] = useState<PlanUploadDocument[]>([]);
@@ -182,8 +189,8 @@ export function EditProjectModal({ project, definition, initialValues, initialSe
   const savedDocs = project.planDocuments || [];
   const busy = saving || uploading;
 
-  const errors = [...collectErrors(allValueFields, values), ...collectErrors(settingsFields, settings)];
-  const canSave = !!onSave && sections.length + settingsFields.length > 0;
+  const errors = [...collectErrors(allValueFields, values), ...collectErrors(settingsFields, settings), ...plotEditErrors(plotFields, plotSnapshot, plotDrafts)];
+  const canSave = !!onSave && (sections.length + settingsFields.length > 0 || Object.keys(plotDrafts).length > 0);
 
   const handleSave = async () => {
     if (busy || !onSave) return;
@@ -191,7 +198,7 @@ export function EditProjectModal({ project, definition, initialValues, initialSe
     if (errors.length) { setSaveError(errors[0]); return; }
     setSaving(true);
     try {
-      const ok = await onSave(projectId, normalize(allValueFields, values), normalize(settingsFields, settings), revision);
+      const ok = await onSave(projectId, normalize(allValueFields, values), normalize(settingsFields, settings), revision, buildPlotEdits(plotFields, plotSnapshot, plotDrafts));
       if (ok) onClose();
       else setSaveError('Project details were not saved. Another editor may have changed this project, or a field was rejected. Close and reopen to load the latest version, then try again.');
     } catch (e) {
@@ -268,6 +275,11 @@ export function EditProjectModal({ project, definition, initialValues, initialSe
                 ))}
               </div>
             </section>
+          )}
+
+          {(plotResource || plotSnapshot.length > 0) && (
+            <ProjectPlotEditor fields={plotFields} records={plotSnapshot} drafts={plotDrafts} onChangeDrafts={setPlotDrafts}
+              canManage={canManagePlots} disabled={busy} />
           )}
 
           <section className="space-y-3 rounded-2xl border border-gray-200 p-4">

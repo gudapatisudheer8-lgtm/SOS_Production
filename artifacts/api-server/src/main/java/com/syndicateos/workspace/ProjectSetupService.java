@@ -102,6 +102,23 @@ public class ProjectSetupService {
             }
         }
         JsonNode def=definition(release);
+        JsonNode plotEdits=input.path("plotEdits");
+        if(!plotEdits.isMissingNode() && (!plotEdits.isArray() || plotEdits.size()>2000))
+            throw ApiProblem.invalid("Supply at most 2000 saved plot edits.");
+        if(!plotEdits.isMissingNode() && !plotEdits.isEmpty()) {
+            if(existing==null || !"READY".equals(existing.get("setup_state")))
+                throw ApiProblem.invalid("Edit saved plots only on an operational project.");
+            Set<UUID> editedIds=new HashSet<>();
+            for(JsonNode edit:plotEdits) {
+                if(!edit.isObject() || !edit.path("data").isObject() || !editedIds.add(Values.id(edit,"recordId")))
+                    throw ApiProblem.invalid("Supply distinct saved plot records with their data.");
+                Values.revision(edit);
+                var records=jdbc.queryForList("SELECT kind,status FROM sos.erp_records WHERE id=? AND project_id=?",
+                    Values.id(edit,"recordId"),id);
+                if(records.isEmpty() || !"plots".equals(records.getFirst().get("kind")) ||
+                    !"approved".equals(records.getFirst().get("status"))) throw ApiProblem.denied();
+            }
+        }
         JsonNode setup=input.path("setup").deepCopy();
         if(!setup.isObject()||setup.toString().length()>120000) throw ApiProblem.invalid("Supply a bounded setup object.");
         for(String key:List.of("values","settings")) if(!setup.path(key).isObject()) throw ApiProblem.invalid("Setup "+key+" must be an object.");
@@ -167,8 +184,19 @@ public class ProjectSetupService {
             jdbc.update("INSERT INTO sos.erp_project_settings(project_id,data) VALUES (?,?::jsonb) ON CONFLICT(project_id) DO UPDATE SET data=excluded.data,revision=sos.erp_project_settings.revision+1",
                 id,saved.toString());
         }
+        // The enclosing transaction includes every plot change: a stale,
+        // protected or invalid plot rolls back the project details as well.
+        for(JsonNode edit:plotEdits) {
+            UUID record=Values.id(edit,"recordId");
+            ObjectNode mutation=json.createObjectNode().put("projectId",id.toString()).put("kind","plots")
+                .put("recordId",record.toString()).put("revision",Values.revision(edit))
+                .put("requestId",UUID.nameUUIDFromBytes((Values.id(input,"requestId")+":plot:"+record)
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
+            mutation.set("data",edit.path("data"));
+            erp.execute(actor,"erp.save",mutation);
+        }
         config.audit(actor,"PROJECT_SETUP_SAVED",actor.firmId(),release);
-        return ok(Map.of("id",id,"revision",revision,"setupState",state));
+        return ok(Map.of("id",id,"revision",revision,"setupState",state,"updatedPlots",plotEdits.size()));
     }
     private void normalizeRows(JsonNode definition,ObjectNode setup) {
         for(String group:List.of("partners","accounts","groups")) {

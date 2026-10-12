@@ -305,12 +305,22 @@ function App() {
   });
 
   const handleUpdateProjectSetup = (projectId: string, values: Record<string, any>,
-    settings: Record<string, any>, revision: number) => run('Project details saved', async () => {
+    settings: Record<string, any>, revision: number,
+    plotEdits: Array<{ recordId: string; revision: number; data: Record<string, any> }> = []) =>
+    run(plotEdits.length ? 'Project details and plot changes saved' : 'Project details saved', async () => {
     const context = projectEditContext(data?.workspace, erpOf(projectId), projectId);
     if (!context || String(context.project.firmId) !== selectedFirmId || projectId !== activeProjectId) {
       throw new Error('Select an authorized project before editing its details.');
     }
-    await projectEditorSaver.current.save(projectEditPayload(context.project, context.definition, values, settings, revision));
+    const erp = erpOf(projectId);
+    if (plotEdits.length && !(erp?.resources || []).some((resource: any) => resource.kind === 'plots' && resource.canManage))
+      throw new Error('You do not have permission to edit this project’s plots.');
+    for (const edit of plotEdits) {
+      const record = (erp?.records || []).find((row: any) => String(row.id) === edit.recordId && row.kind === 'plots');
+      if (!record || record.status !== 'approved' || record.data?.status !== 'available')
+        throw new Error('A selected plot is no longer available for editing. Close and reopen the project.');
+    }
+    await projectEditorSaver.current.save(projectEditPayload(context.project, context.definition, values, settings, revision, plotEdits));
   });
 
   const handleUploadProjectDocuments = (projectId: string, documents: import('./original/types').PlanUploadDocument[]) =>
@@ -566,6 +576,8 @@ function App() {
             projectSetupSettings={selectedProjectSetup?.settings}
             onUpdateProjectSetup={handleUpdateProjectSetup}
             onUploadProjectDocuments={handleUploadProjectDocuments}
+            projectPlotResource={(erpOf(activeProjectId)?.resources || []).find((resource: any) => resource.kind === 'plots')}
+            projectPlotRecords={(erpOf(activeProjectId)?.records || []).filter((record: any) => record.kind === 'plots')}
             plots={data.plots}
             onUpdatePlot={handleUpdatePlot}
             onApproveBooking={handleApproveBooking}

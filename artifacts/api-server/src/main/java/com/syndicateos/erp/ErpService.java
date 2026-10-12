@@ -344,6 +344,9 @@ public class ErpService {
             }
         }
         if(Set.of("plots","units").contains(kind)) {
+            if("plots".equals(kind) && previous!=null &&
+                !"available".equals(parse(previous.get("data")).path("status").asText("available")))
+                throw ApiProblem.invalid("Booked or sold plots are protected. Use the booking workflow instead of changing plot details.");
             if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_inventory_reservations WHERE inventory_id=? AND state='active'",Integer.class,id)>0)
                 throw ApiProblem.invalid("Inventory with a pending reservation cannot be changed.");
             String numberKey="plots".equals(kind)?"plotNumber":"unitNumber";

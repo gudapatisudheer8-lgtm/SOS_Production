@@ -122,7 +122,9 @@ interface AccountantDashboardProps {
   projectSetupDefinition?: any;
   projectSetupValues?: Record<string, any>;
   projectSetupSettings?: Record<string, any>;
-  onUpdateProjectSetup?: (projectId: string, values: Record<string, any>, settings: Record<string, any>, revision: number) => Promise<boolean>;
+  onUpdateProjectSetup?: (projectId: string, values: Record<string, any>, settings: Record<string, any>, revision: number, plotEdits?: Array<{ recordId: string; revision: number; data: Record<string, any> }>) => Promise<boolean>;
+  projectPlotResource?: any;
+  projectPlotRecords?: any[];
   onUploadProjectDocuments?: (projectId: string, documents: PlanUploadDocument[]) => Promise<boolean>;
 }
 
@@ -186,6 +188,8 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   projectSetupSettings,
   onUpdateProjectSetup,
   onUploadProjectDocuments,
+  projectPlotResource,
+  projectPlotRecords,
 }) => {
   const [editProjectId, setEditProjectId] = useState<string | null>(null);
   const [addProjectSession, setAddProjectSession] = useState(0);
@@ -1859,6 +1863,8 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
           definition={projectSetupDefinition}
           initialValues={projectSetupValues}
           initialSettings={projectSetupSettings}
+          plotResource={projectPlotResource}
+          plotRecords={projectPlotRecords}
           onClose={() => setEditProjectId(null)}
           onSave={onUpdateProjectSetup}
           onUploadDocuments={onUploadProjectDocuments}

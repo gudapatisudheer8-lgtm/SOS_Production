@@ -13,3 +13,7 @@ Plot reservation alone is not proof of a posted cash credit. Keep the saved rece
 Read-only repeatable-read dashboard snapshots must use non-locking access checks; retain project row locks for financial writes.
 **Why:** PostgreSQL rejects FOR UPDATE inside a read-only transaction. Tests wrapped in an outer writable transaction can conceal this failure.
 **How to apply:** include a dashboard-read regression outside an enclosing writable test transaction whenever changing financial snapshot isolation or authorization queries.
+
+Compare numeric ERP-record values using decimal-safe numerical equality; verify display formatting separately.
+**Why:** JSON validation and reload can produce different insignificant trailing zeroes for the same value, creating false save-regression failures despite unchanged quantities and balances.
+**How to apply:** Do not interpret a change in numeric spelling as a cash movement or lost update. Retain independent checks for allowed precision, rounding and formatted balance contracts.
