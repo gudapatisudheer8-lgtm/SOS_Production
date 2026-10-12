@@ -48,3 +48,9 @@ Edit Project must use the same UI as Add Project, including the facing-wise plot
 **Why:** The user explicitly rejected the individual saved-plot editor and repeated that editing should match the original entry form. Re-running the original creation template would risk the identities referenced by bookings and receipts.
 
 **How to apply:** Seed the matrix from actual live inventory, retain mixed sizes unless explicitly changed, and reconcile available inventory while preserving existing identities and booked/sold records. Confirm count reductions; archive only unused available plots without history. Allow bank creation and metadata edits in the same form, but never edit an existing opening balance or default Cash ledger. Project, plot and bank changes must save atomically or all roll back.
+
+Keep the partner dashboard focused on project plot inventory and bank-plus-cash balance. Investment entry, expense entry and drawing requests belong in Project Statements, not separate partner navigation tabs or repeated dashboard shortcuts.
+
+**Why:** The user explicitly requested this simpler partner layout and the same project-wide counts and account balance used by the accountant, rather than the crossed personal investment/drawings/profit cards.
+
+**How to apply:** Preserve underlying records and permissions when removing navigation. Keep partner drawing requests distinct from accountant drawing entry, and make the statement buttons open forms directly.

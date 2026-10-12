@@ -58,6 +58,8 @@ import { ProjectStatementModule } from '../accountant/ProjectStatementModule';
 import { CustomerPlotBookingModal } from '../modals/CustomerPlotBookingModal';
 import { IndividualInvestmentModal, IndividualInvestmentData } from '../modals/IndividualInvestmentModal';
 import { EntryDialog } from './EntryDialog';
+import { EnrollExpenseModal } from '../modals/EnrollExpenseModal';
+import { computePlotCounts, computeProjectBalance } from './partnerDashboardStats';
 
 export type Language = 'en' | 'te';
 
@@ -445,8 +447,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     return translations[lang]?.[key] || translations['en'][key] || String(key);
   };
 
-  // Top Bar 5 Tabs: dashboard | investments | expenses_approvals | plots | statements
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'investments' | 'expenses_approvals' | 'plots' | 'statements'>('dashboard');
+  // Top Bar tabs: dashboard | plots | statements
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'plots' | 'statements'>('dashboard');
 
   // Investment Tab & Modal State
   const [isEnrollInvestmentModalOpen, setIsEnrollInvestmentModalOpen] = useState(false);
@@ -648,6 +650,12 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     if (!activeProject) return [];
     return firmAccounts.filter((a) => a.firmId === activeFirm.id && a.linkedProjectId === activeProject.id);
   }, [firmAccounts, activeFirm.id, activeProject]);
+
+  const plotCounts = useMemo(() => computePlotCounts(plots, activeProject?.id), [plots, activeProject?.id]);
+  const projectBalance = useMemo(
+    () => computeProjectBalance(firmAccounts, activeFirm.id, activeProject?.id),
+    [firmAccounts, activeFirm.id, activeProject?.id]
+  );
 
   // Drawing requests strictly scoped to the active project
   const submittedDrawings = useMemo(() => {
@@ -1096,52 +1104,6 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             <span>{t('tabDashboard')}</span>
           </button>
 
-          {/* Bar 2: Enroll Investment & History */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('investments')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activeTab === 'investments'
-                ? 'bg-[#111827] text-white shadow-md'
-                : 'text-gray-700 hover:text-gray-950 hover:bg-gray-100'
-            }`}
-          >
-            <Coins className="w-4 h-4 text-amber-400" />
-            <span>{t('tabInvestments')}</span>
-            {pendingInvestmentApprovalsCount > 0 ? (
-              <span className="px-2 py-0.5 rounded-full bg-amber-500 text-gray-950 font-black text-[10px] animate-pulse">
-                {pendingInvestmentApprovalsCount} {lang === 'te' ? 'బాకీ' : 'Pending'}
-              </span>
-            ) : (
-              <span
-                className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                  activeTab === 'investments' ? 'bg-amber-400 text-gray-950' : 'bg-gray-200 text-gray-800'
-                }`}
-              >
-                {activeProjectInvestments.length}
-              </span>
-            )}
-          </button>
-
-          {/* Bar 3: Expenses, Approvals & Drawing Request */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('expenses_approvals')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activeTab === 'expenses_approvals'
-                ? 'bg-[#111827] text-white shadow-md'
-                : 'text-gray-700 hover:text-gray-950 hover:bg-gray-100'
-            }`}
-          >
-            <FileText className="w-4 h-4 text-amber-400" />
-            <span>{t('tabExpensesApprovals')}</span>
-            {pendingDeskApprovalsCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-red-600 text-white font-black text-[10px] animate-pulse">
-                {pendingDeskApprovalsCount}
-              </span>
-            )}
-          </button>
-
           {/* Bar 4: Plots (Recreated same as in accountant dashboard) */}
           <button
             type="button"
@@ -1225,92 +1187,76 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
               </div>
             </div>
 
-            {/* Quick Summary Pill Bar */}
-            <div className="mt-5 pt-4 border-t border-amber-200/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('estimatedInvestment')}</span>
-                <strong className="text-sm font-black font-mono text-gray-950">{formatINR(estimatedInvestment)}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('actualInvestment')}</span>
-                <strong className="text-sm font-black font-mono text-emerald-800">{formatINR(actualInvestmentDone)}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('cashDrawings')}</span>
-                <strong className="text-sm font-black font-mono text-rose-700">{formatINR(totalDrawingsCombined)}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('expectedProfit')}</span>
-                <strong className="text-sm font-black font-mono text-indigo-900">~{formatINR(expectedProfitAsPerShare)}</strong>
-              </div>
-            </div>
           </div>
 
-          {/* 4 Core Financial Breakdown KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Total Estimated Investment */}
-            <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-2xs space-y-1.5">
+          {/* Two live venture cards: plot inventory and project account balance */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              type="button"
+              data-testid="card-partner-plot-counts"
+              onClick={() => setActiveTab('plots')}
+              className="group text-left w-full bg-white p-5 rounded-3xl border border-gray-200 shadow-2xs hover:border-amber-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 transition-all cursor-pointer space-y-3"
+            >
               <div className="flex items-center justify-between text-gray-500 text-xs">
-                <span className="font-bold uppercase text-[10px]">{t('estimatedInvestment')}</span>
-                <Coins className="w-4 h-4 text-amber-500" />
+                <span className="font-bold uppercase text-[10px]">{lang === 'te' ? 'ప్లాట్ల స్థితి' : 'Plot Inventory'}</span>
+                <Grid3X3 className="w-4 h-4 text-amber-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-gray-950">
-                {formatINR(estimatedInvestment)}
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black font-mono text-gray-950" data-testid="text-partner-plot-total">{plotCounts.total}</span>
+                <span className="text-[11px] text-gray-500 font-bold">{t('totalPlots')}</span>
               </div>
-              <p className="text-[11px] text-gray-500">
-                {t('estimatedInvestmentDesc')} ({formatIndianCompact(estimatedInvestment)})
-              </p>
-            </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                {([
+                  ['available', lang === 'te' ? 'అందుబాటులో' : 'Available', plotCounts.available, 'bg-emerald-50 border-emerald-200 text-emerald-900'],
+                  ['booked', lang === 'te' ? 'బుక్' : 'Booked', plotCounts.booked, 'bg-sky-50 border-sky-200 text-sky-900'],
+                  ['sold', lang === 'te' ? 'అమ్మబడింది' : 'Sold', plotCounts.sold, 'bg-gray-100 border-gray-300 text-gray-900'],
+                  ['blocked', lang === 'te' ? 'బ్లాక్' : 'Blocked', plotCounts.blocked, 'bg-rose-50 border-rose-200 text-rose-900'],
+                ] as const).map(([key, label, count, cls]) => (
+                  <div key={key} className={`rounded-xl border px-1.5 py-2 ${cls}`} data-testid={`text-partner-plots-${key}`}>
+                    <strong className="block text-base font-black font-mono">{count}</strong>
+                    <span className="block text-[9px] font-bold uppercase tracking-wide truncate">{label}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-500">{lang === 'te' ? 'బుక్‌లో టోకెన్ రిజర్వేషన్లు కూడా ఉన్నాయి' : 'Booked includes token reservations'}</p>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 group-hover:text-amber-800">
+                {t('viewPlotsBtn')} <ArrowUpRight className="w-3.5 h-3.5" />
+              </span>
+            </button>
 
-            {/* Card 2: Actual Investment Done */}
-            <div className="bg-white p-5 rounded-3xl border border-emerald-200 shadow-2xs space-y-1.5 bg-emerald-50/20">
+            <button
+              type="button"
+              data-testid="card-partner-project-balance"
+              onClick={() => setActiveTab('statements')}
+              className="group text-left w-full bg-white p-5 rounded-3xl border border-emerald-200 shadow-2xs hover:border-emerald-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 transition-all cursor-pointer space-y-3"
+            >
               <div className="flex items-center justify-between text-emerald-800 text-xs">
-                <span className="font-bold uppercase text-[10px]">{t('actualInvestment')}</span>
-                <TrendingUp className="w-4 h-4 text-emerald-600" />
+                <span className="font-bold uppercase text-[10px]">{lang === 'te' ? 'ప్రాజెక్ట్ ఖాతా నికర బ్యాలెన్స్' : 'Project Account Balance'}</span>
+                <Wallet className="w-4 h-4 text-emerald-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-emerald-950">
-                {formatINR(actualInvestmentDone)}
+              <div className={`text-2xl font-black font-mono ${projectBalance.net < 0 ? 'text-rose-700' : 'text-emerald-950'}`} data-testid="text-partner-project-balance">
+                {formatINR(projectBalance.net)}
               </div>
-              <p className="text-[11px] text-emerald-800 font-medium">
-                {t('actualInvestmentDesc')}
-              </p>
-            </div>
-
-            {/* Card 3: Pending Investment Amount or Surplus */}
-            <div className={`p-5 rounded-3xl border shadow-2xs space-y-1.5 ${
-              isInvestmentPending ? 'bg-amber-50/40 border-amber-300' : 'bg-emerald-50/40 border-emerald-300'
-            }`}>
-              <div className="flex items-center justify-between text-xs">
-                <span className={`font-bold uppercase text-[10px] ${isInvestmentPending ? 'text-amber-900' : 'text-emerald-900'}`}>
-                  {isInvestmentPending ? t('pendingToClear') : t('targetMet')}
-                </span>
-                <Clock className="w-4 h-4 text-amber-600" />
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2" data-testid="text-partner-balance-bank">
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-500"><Landmark className="w-3 h-3" /> Bank</span>
+                  <strong className="block font-mono font-black text-gray-950 truncate">{formatINR(projectBalance.bank)}</strong>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2" data-testid="text-partner-balance-cash">
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-500"><Coins className="w-3 h-3" /> Cash</span>
+                  <strong className="block font-mono font-black text-gray-950 truncate">{formatINR(projectBalance.cash)}</strong>
+                </div>
               </div>
-              <div className={`text-2xl font-black font-mono ${isInvestmentPending ? 'text-amber-950' : 'text-emerald-950'}`}>
-                {isInvestmentPending ? formatINR(pendingInvestmentAmount) : `+${formatINR(investmentDifference)}`}
-              </div>
-              <p className={`text-[11px] ${isInvestmentPending ? 'text-amber-800' : 'text-emerald-800'} font-medium`}>
-                {isInvestmentPending ? t('pendingToClearDesc') : t('surplusInvestedDesc')}
-              </p>
-            </div>
-
-            {/* Card 4: Total Drawings Taken */}
-            <div className="bg-white p-5 rounded-3xl border border-rose-200 shadow-2xs space-y-1.5 bg-rose-50/20">
-              <div className="flex items-center justify-between text-rose-800 text-xs">
-                <span className="font-bold uppercase text-[10px]">{t('cashDrawings')}</span>
-                <ArrowUpRight className="w-4 h-4 text-rose-600" />
-              </div>
-              <div className="text-2xl font-black font-mono text-rose-700">
-                {formatINR(totalDrawingsCombined)}
-              </div>
-              <p className="text-[11px] text-rose-800 font-medium">
-                {t('cashDrawingsDesc')}
-              </p>
-            </div>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 group-hover:text-emerald-800">
+                {projectBalance.accountCount === 0
+                  ? (lang === 'te' ? 'ఈ ప్రాజెక్ట్‌కు ఖాతాలు లేవు' : 'No accounts linked to this project')
+                  : t('viewPassbookBtn')} <ArrowUpRight className="w-3.5 h-3.5" />
+              </span>
+            </button>
           </div>
 
           {/* Venture Share Entitlement & Area Allocations */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="bg-white p-5 rounded-3xl border border-gray-200 space-y-3">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -1329,25 +1275,6 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                 <strong className="font-mono text-gray-900">~{Math.round(expectedAllottedYards / 200)} Standard Plots (200 Yds)</strong>
               </div>
             </div>
-
-            <div className="bg-white p-5 rounded-3xl border border-gray-200 space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-600" />
-                  <span className="font-black text-xs text-gray-950">{t('expectedProfit')}</span>
-                </div>
-                <strong className="text-base font-black font-mono text-emerald-700">
-                  ~{formatINR(expectedProfitAsPerShare)}
-                </strong>
-              </div>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                {t('expectedProfitDesc')} based on benchmark selling rates after civil works & development outlays.
-              </p>
-              <div className="pt-2 flex items-center justify-between text-xs text-gray-500">
-                <span>Projected Gross Yield:</span>
-                <strong className="font-mono text-emerald-700">+{Math.round((expectedProfitAsPerShare / (estimatedInvestment || 1)) * 100)}% ROI</strong>
-              </div>
-            </div>
           </div>
 
           {/* Venture Project Overview & Quick Shortcuts */}
@@ -1360,784 +1287,152 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-200 text-xs">
               <div>
                 <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('projectLocation')}</span>
-                <strong className="text-gray-900 block mt-0.5">{activeProject?.location || activeFirm.location}</strong>
+                <strong className="text-gray-900 block mt-0.5">{activeProject?.location || '—'}</strong>
               </div>
               <div>
                 <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('surveyNumber')}</span>
-                <strong className="text-gray-900 block mt-0.5">{activeProject?.surveyNumbers || 'Sy. 42/1A, 42/2B, 43/1'}</strong>
+                <strong className="text-gray-900 block mt-0.5">{activeProject?.surveyNumbers || '—'}</strong>
               </div>
               <div>
                 <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('lpReraNumber')}</span>
-                <strong className="text-gray-900 block mt-0.5 font-mono">{activeProject?.lpOrReraNumber || 'DTCP LP/0192/2025'}</strong>
+                <strong className="text-gray-900 block mt-0.5 font-mono">{activeProject?.lpOrReraNumber || '—'}</strong>
               </div>
               <div>
                 <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('totalVentureExtent')}</span>
-                <strong className="text-gray-900 block mt-0.5 font-mono">{activeProject?.extentValue || 5.0} {activeProject?.extentUnit || 'Acres'}</strong>
+                <strong className="text-gray-900 block mt-0.5 font-mono">{activeProject?.extentValue ? `${activeProject.extentValue} ${activeProject.extentUnit || ''}`.trim() : '—'}</strong>
               </div>
               <div>
                 <span className="text-[10px] text-gray-500 uppercase font-bold block">{t('ventureCostOutlay')}</span>
-                <strong className="text-gray-900 block mt-0.5 font-mono">{formatINR(activeProject?.totalEstimatedOutlay || 48000000)}</strong>
+                <strong className="text-gray-900 block mt-0.5 font-mono">{activeProject?.totalEstimatedOutlay ? formatINR(activeProject.totalEstimatedOutlay) : '—'}</strong>
               </div>
             </div>
 
-            {/* Quick Actions Shortcuts Bar */}
-            <div className="pt-2 flex flex-wrap items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setIsEnrollInvestmentModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-400 via-[#FFB800] to-amber-500 hover:bg-amber-400 text-gray-950 rounded-2xl font-black text-xs shadow-xs transition-all cursor-pointer border border-amber-600/30"
-              >
-                <Coins className="w-4 h-4 text-gray-950" />
-                <span>{t('enrollInvestmentBtn')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('investments')}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#111827] hover:bg-black text-white rounded-2xl font-black text-xs shadow-xs transition-all cursor-pointer"
-              >
-                <FileText className="w-4 h-4 text-amber-400" />
-                <span>{t('investmentRecordsHistory')} ({activeProjectInvestments.length})</span>
-                {pendingInvestmentApprovalsCount > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-gray-950 text-[10px] font-black">
-                    {pendingInvestmentApprovalsCount}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('expenses_approvals')}
-                className="flex items-center gap-2 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-2xl font-black text-xs shadow-xs transition-all cursor-pointer"
-              >
-                <Camera className="w-4 h-4" />
-                <span>{t('enrollExpenseBtn')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('expenses_approvals')}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs shadow-xs transition-all cursor-pointer"
-              >
-                <DollarSign className="w-4 h-4 text-amber-400" />
-                <span>{t('requestDrawBtn')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('plots')}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-2xl font-bold text-xs transition-all cursor-pointer border border-gray-300"
-              >
-                <Grid3X3 className="w-4 h-4" />
-                <span>{t('viewPlotsBtn')} ({activePlots.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('statements')}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-2xl font-bold text-xs transition-all cursor-pointer border border-gray-300"
-              >
-                <Landmark className="w-4 h-4" />
-                <span>{t('viewPassbookBtn')}</span>
-              </button>
-            </div>
           </div>
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* TAB 2: ENROLL INVESTMENT & INVESTMENT RECORDS HISTORY    */}
+      {/* TAB 3: PLOTS (RECREATED SAME AS IN ACCOUNTANT DASHBOARD) */}
       {/* ======================================================== */}
-      {activeTab === 'investments' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Top Bar for Enroll Investment: Executive Action Banner */}
-          <div className="bg-gradient-to-r from-[#111827] via-slate-900 to-gray-950 text-white p-6 rounded-3xl shadow-lg border border-amber-500/30 flex flex-col md:flex-row md:items-center justify-between gap-5 relative overflow-hidden">
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="w-8 h-8 rounded-xl bg-amber-400 text-gray-950 flex items-center justify-center font-black shadow-sm">
-                  <Coins className="w-4 h-4" />
-                </span>
-                <span className="text-[10px] uppercase font-black tracking-widest text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20">
-                  Consensus Capital Node
-                </span>
-              </div>
-              <h2 className="text-xl font-black text-white leading-tight">
-                {t('investmentsBannerTitle')}
-              </h2>
-              <p className="text-xs text-gray-300 mt-1 max-w-2xl leading-relaxed">
-                {t('investmentsBannerSubtitle')}
-              </p>
-            </div>
-
-            {/* Background decoration */}
-            <div className="absolute right-0 top-0 w-80 h-full bg-radial from-amber-500/10 to-transparent pointer-events-none" />
-          </div>
-
-          {/* 5 Executive Capital KPI Summary Tiles */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-            {/* Tile 1: Total Verified Capital Done */}
-            <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center justify-between text-gray-500 mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider">{t('actualInvestment')}</span>
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="text-lg sm:text-xl font-black font-mono text-gray-950">
-                {formatINR(totalVerifiedInvestedAmount)}
-              </div>
-              <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">
-                ✓ 100% Cleared &amp; Locked
-              </span>
-            </div>
-
-            {/* Tile 2: Committed Target Outlay */}
-            <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-2xs">
-              <div className="flex items-center justify-between text-gray-500 mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider">{t('estimatedInvestment')}</span>
-                <Landmark className="w-4 h-4 text-blue-600" />
-              </div>
-              <div className="text-lg sm:text-xl font-black font-mono text-gray-950">
-                {formatINR(estimatedInvestment || (activeProject?.totalEstimatedOutlay || 48000000))}
-              </div>
-              <span className="text-[10px] text-gray-500 font-medium block mt-0.5 truncate">
-                {currentPartner?.name ? `${currentPartner.name} Target` : 'Venture Target'}
-              </span>
-            </div>
-
-            {/* Tile 3: Cash In Hand Infusions */}
-            <div className="bg-gradient-to-br from-amber-50 to-white p-4 rounded-3xl border border-amber-200 shadow-2xs">
-              <div className="flex items-center justify-between text-amber-900 mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider">Cash Vault</span>
-                <Wallet className="w-4 h-4 text-amber-700" />
-              </div>
-              <div className="text-lg sm:text-xl font-black font-mono text-amber-950">
-                {formatINR(totalCashInvestedAmount)}
-              </div>
-              <span className="text-[10px] text-amber-800 font-bold block mt-0.5">
-                {cashInvestmentsCount} Spot Cash Records
-              </span>
-            </div>
-
-            {/* Tile 4: Bank Wire / RTGS Infusions */}
-            <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-3xl border border-blue-200 shadow-2xs">
-              <div className="flex items-center justify-between text-blue-900 mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider">Bank Wires</span>
-                <CreditCard className="w-4 h-4 text-blue-700" />
-              </div>
-              <div className="text-lg sm:text-xl font-black font-mono text-blue-950">
-                {formatINR(totalBankInvestedAmount)}
-              </div>
-              <span className="text-[10px] text-blue-800 font-bold block mt-0.5">
-                {bankInvestmentsCount} Escrow / Operations
-              </span>
-            </div>
-
-            {/* Tile 5: Pending Consortium Sign-offs */}
-            <div className={`p-4 rounded-3xl border shadow-2xs ${
-              pendingInvestmentApprovalsCount > 0
-                ? 'bg-amber-500/10 border-amber-400'
-                : 'bg-white border-gray-200'
-            }`}>
-              <div className="flex items-center justify-between text-gray-500 mb-1">
-                <span className="text-[10px] font-black uppercase tracking-wider">Consensus Status</span>
-                <Clock className="w-4 h-4 text-amber-600" />
-              </div>
-              <div className="text-lg sm:text-xl font-black font-mono text-gray-950 flex items-center gap-1.5">
-                <span>{pendingInvestmentApprovalsCount}</span>
-                {pendingInvestmentApprovalsCount > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-gray-950 font-black animate-pulse">
-                    Pending
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] text-gray-600 font-medium block mt-0.5">
-                {pendingInvestmentApprovalsCount === 0 ? 'All Signoffs Completed' : 'Awaiting MD / Consortium'}
-              </span>
-            </div>
-          </div>
-
-          {/* Under Investment Records History Section */}
-          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-gray-200 shadow-sm space-y-5">
-            {/* Header & Title */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
-              <div>
-                <h3 className="text-base font-black text-gray-950 flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                  <span>{t('investmentRecordsHistory')}</span>
-                  <span className="text-xs font-bold text-gray-500">
-                    ({filteredInvestments.length} {filteredInvestments.length === 1 ? 'Record' : 'Records'})
-                  </span>
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Real-time verifiable register of all partner contributions credited to Bank &amp; Cash Treasury.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsEnrollInvestmentModalOpen(true)}
-                disabled={!activeProject}
-                className="px-4 py-2 rounded-xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Coins className="w-4 h-4" />
-                <span>{lang === 'te' ? '+ పెట్టుబడి జోడించండి' : '+ Add Investment'}</span>
-              </button>
-            </div>
-
-            {/* Filter & Search Toolbar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              {/* Search Bar */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search by partner, UTR, voucher #, purpose..."
-                  value={investmentSearch}
-                  onChange={(e) => setInvestmentSearch(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-semibold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none"
-                />
-                {investmentSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setInvestmentSearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 font-bold text-xs"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              {/* Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                {[
-                  { id: 'all', label: `${t('filterAllInvestments')} (${activeProjectInvestments.length})` },
-                  { id: 'mine', label: `${t('filterMyInvestments')} (${myInvestmentsCount})` },
-                  { id: 'cash', label: `${t('filterCashOnly')} (${cashInvestmentsCount})` },
-                  { id: 'bank', label: `${t('filterBankOnly')} (${bankInvestmentsCount})` },
-                  { id: 'pending', label: `${t('filterInvPending')} (${pendingInvestmentApprovalsCount})` },
-                  { id: 'approved', label: t('filterInvApproved') },
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setInvestmentFilter(f.id as any)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                      investmentFilter === f.id
-                        ? 'bg-[#111827] text-white shadow-xs'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Records Cards List */}
-            <div className="space-y-3.5">
-              {filteredInvestments.map((inv) => {
-                const isCash = inv.accountType === 'cash';
-                const isApproved = inv.status === 'approved';
-                const partnerObj = partners.find((p) => p.id === inv.partnerId);
-
-                return (
-                  <div
-                    key={inv.id}
-                    className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-                      isApproved
-                        ? 'bg-white border-gray-200 hover:border-amber-300'
-                        : 'bg-amber-50/50 border-amber-300 shadow-xs'
-                    }`}
-                  >
-                    {/* Top Row: Date, Vault/Bank Badge, Reference, Status */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-gray-500 font-mono">
-                          {inv.date}
-                        </span>
-
-                        <span
-                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
-                            isCash
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                              : 'bg-blue-100 text-blue-900 border border-blue-300'
-                          }`}
-                        >
-                          {isCash ? (
-                            <>
-                              <Wallet className="w-3 h-3 text-amber-800" />
-                              <span>Cash Treasury Vault</span>
-                            </>
-                          ) : (
-                            <>
-                              <Landmark className="w-3 h-3 text-blue-800" />
-                              <span>Commercial Bank Wire</span>
-                            </>
-                          )}
-                        </span>
-
-                        <span className="text-[10px] font-mono font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-700">
-                          {inv.referenceNo || 'REF-N/A'}
-                        </span>
-                      </div>
-
-                      {/* Status Badge */}
-                      <div className="flex items-center gap-2">
-                        {isApproved ? (
-                          <span className="text-[11px] font-black px-2.5 py-1 rounded-xl bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                            <span>✓ Verified &amp; Approved</span>
-                          </span>
-                        ) : inv.status === 'rejected' ? (
-                          <span className="text-[11px] font-black px-2.5 py-1 rounded-xl bg-red-100 text-red-900 border border-red-300 flex items-center gap-1">
-                            <X className="w-3.5 h-3.5 text-red-700" />
-                            <span>✕ Rejected Claim</span>
-                          </span>
-                        ) : (
-                          <span className="text-[11px] font-black px-2.5 py-1 rounded-xl bg-amber-200 text-amber-950 border border-amber-400 flex items-center gap-1 animate-pulse">
-                            <Clock className="w-3.5 h-3.5 text-amber-800" />
-                            <span>⏳ Awaiting Consortium Sign-off</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Middle Row: Partner Details, Amount, Purpose, Account */}
-                    <div className="py-3 grid grid-cols-1 md:grid-cols-12 gap-3.5 items-start">
-                      {/* Partner Column (4 cols) */}
-                      <div className="md:col-span-4 flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white text-xs shrink-0 shadow-2xs"
-                          style={{ backgroundColor: partnerObj?.avatarColor || '#111827' }}
-                        >
-                          {(inv.partnerName || 'P')[0]?.toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <strong className="text-xs font-black text-gray-950 block truncate">
-                            {inv.partnerName}
-                          </strong>
-                          <span className="text-[11px] text-gray-500 font-medium block truncate">
-                            {partnerObj?.roleDescription || 'Syndicate Investor'}
-                            {partnerObj?.fixedEquityPercent ? ` • ${partnerObj.fixedEquityPercent}% Equity` : ''}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Purpose & Channel (5 cols) */}
-                      <div className="md:col-span-5 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs font-black text-gray-950">
-                          <Briefcase className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span className="truncate">{inv.purpose}</span>
-                        </div>
-                        <div className="text-[11px] text-gray-600 flex items-center gap-1.5">
-                          <span className="font-semibold text-gray-500">Credited To:</span>
-                          <span className="font-bold text-gray-800 truncate">{inv.accountName}</span>
-                        </div>
-                        <div className="text-[10px] text-gray-500 flex items-center gap-2">
-                          <span>Mode: <strong className="text-gray-700">{inv.paymentMode}</strong></span>
-                          {inv.witnessName && (
-                            <span>• Witness: <strong className="text-gray-700">{inv.witnessName}</strong></span>
-                          )}
-                        </div>
-                        {inv.notes && (
-                          <p className="text-[11px] text-gray-500 italic mt-0.5 line-clamp-1">
-                            &quot;{inv.notes}&quot;
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Amount & Quick Actions (3 cols) */}
-                      <div className="md:col-span-3 text-left md:text-right space-y-1.5">
-                        <span className="text-[10px] text-gray-500 uppercase font-black block">
-                          Invested Capital
-                        </span>
-                        <div className="text-xl font-black font-mono text-gray-950">
-                          {formatINR(inv.amount)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom Consensus & Actions Footer */}
-                    <div className="pt-2.5 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-                      {/* Consensus Signatures Info */}
-                      <div className="flex items-center gap-2 text-[11px] text-gray-600 flex-wrap">
-                        {isApproved ? (
-                          <>
-                            <span className="flex items-center gap-1 font-bold text-emerald-800">
-                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Authorized: {inv.approvedBy || activeFirm.managingPartnerName}</span>
-                            </span>
-                            {inv.approvedAt && (
-                              <span className="text-gray-400 font-mono text-[10px]">
-                                ({inv.approvedAt})
-                              </span>
-                            )}
-                            {inv.coSignatory && (
-                              <span className="text-gray-500 font-medium">
-                                • Consensus Co-Sign: {inv.coSignatory}
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-amber-800 font-medium flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Submitted by {inv.enrolledBy || inv.partnerName} • Requires consensus ratification</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        {/* If Pending: Quick Ratify / Reject Buttons */}
-                        {!isApproved && inv.status !== 'rejected' && activeProject?.reviewableRecordIds?.includes(inv.id) && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (onApproveIndividualInvestment) {
-                                  onApproveIndividualInvestment(
-                                    inv.id,
-                                    currentPartner?.name
-                                      ? `${currentPartner.name} (Consensus Ratifier)`
-                                      : `${activeFirm.managingPartnerName} (Managing Partner)`
-                                  );
-                                }
-                              }}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Ratify &amp; Approve</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const reason = prompt('Please specify rejection remark (optional):');
-                                if (onRejectIndividualInvestment) {
-                                  onRejectIndividualInvestment(inv.id, reason || undefined);
-                                }
-                              }}
-                              className="px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-700 font-bold text-xs transition-all cursor-pointer"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-
-                        {/* View Voucher Slip */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedInvestmentForSlip(inv)}
-                          className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs transition-all flex items-center gap-1 cursor-pointer"
-                        >
-                          <Receipt className="w-3.5 h-3.5 text-gray-600" />
-                          <span>Voucher Slip</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {filteredInvestments.length === 0 && (
-                <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-300 space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
-                    <Coins className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <strong className="text-sm font-black text-gray-950 block">
-                      {t('noInvestmentsFound')}
-                    </strong>
-                    <p className="text-xs text-gray-500 mt-1">
-                      No individual investments recorded matching your current query or category filter.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInvestmentSearch('');
-                      setInvestmentFilter('all');
-                      setIsEnrollInvestmentModalOpen(true);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <Coins className="w-4 h-4" />
-                    <span>+ Enroll New Investment</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 3: EXPENSES, APPROVALS & DRAWING REQUEST             */}
-      {/* ======================================================== */}
-      {activeTab === 'expenses_approvals' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Header Banner */}
-          <div className="bg-slate-900 text-white p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {activeTab === 'plots' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 text-white p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
             <div>
-              <h2 className="text-base font-black flex items-center gap-2 text-white">
-                <Receipt className="w-5 h-5 text-amber-400" />
-                <span>{t('expensesBannerTitle')}</span>
+              <h2 className="text-base font-black text-white flex items-center gap-2">
+                <Grid3X3 className="w-5 h-5 text-amber-400" />
+                <span>{t('plotsInventory')}</span>
               </h2>
               <p className="text-xs text-slate-300 mt-1">
-                {t('expensesBannerSubtitle')}
+                {t('plotsSubtitle')}
               </p>
             </div>
-            {pendingDeskApprovalsCount > 0 && (
-              <span className="px-3 py-1.5 bg-red-600 text-white font-black rounded-xl text-xs flex items-center gap-1.5 self-start sm:self-auto">
-                <Clock className="w-3.5 h-3.5" />
-                <span>{pendingDeskApprovalsCount} {t('filterPending')}</span>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="px-3 py-1 bg-amber-400 text-slate-950 font-black rounded-xl text-xs font-mono shadow-xs">
+                {activePlots.length} {t('totalPlots')}
               </span>
-            )}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setIsExpenseDialogOpen(true)}
-              disabled={!activeProject}
-              className="px-4 py-2.5 rounded-xl bg-[#111827] hover:bg-black text-[#FFB800] font-black text-xs shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Receipt className="w-4 h-4" />
-              <span>{lang === 'te' ? '+ ఖర్చు జోడించండి' : '+ Add Expense'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsDrawingDialogOpen(true)}
-              disabled={!activeProject}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <DollarSign className="w-4 h-4" />
-              <span>{lang === 'te' ? '+ డ్రాయింగ్ జోడించండి' : '+ Add Drawing'}</span>
-            </button>
-            {!activeProject && (
-              <span className="text-[11px] text-gray-500 font-medium">{t('noActiveProjects')}</span>
-            )}
+          {/* Full Interactive OpenPlottingModule as in Accountant Dashboard */}
+          <OpenPlottingModule
+            plots={activePlots}
+            onUpdatePlot={onUpdatePlot || (() => {})}
+            onApproveBooking={onApproveBooking}
+            layoutCalc={
+              layoutCalc || {
+                totalExtentValue: activeProject?.extentValue || 0,
+                unit: (activeProject?.extentUnit as any) || 'Acres',
+                roadWidth: 0 as any,
+                openSpacePercent: 0,
+                floorRatePerSqYard: activeProject?.floorRatePerSqYard || 0,
+              }
+            }
+            onUpdateLayoutCalc={onUpdateLayoutCalc || (() => {})}
+            projectExpenses={projectExpenses}
+            onAddExpense={onAddProjectExpense}
+            onUpdateExpense={onUpdateProjectExpense}
+            ledgerMode={ledgerMode}
+            project={activeProject}
+            firm={activeFirm}
+            firmAccounts={firmAccounts}
+            onAddAccountTransaction={onAddAccountTransaction}
+          />
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 4: PROJECT STATEMENTS (RECREATED AS IN ACCOUNTANT)   */}
+      {/* ======================================================== */}
+      {activeTab === 'statements' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 text-white p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <div>
+              <h2 className="text-base font-black text-white flex items-center gap-2">
+                <Landmark className="w-5 h-5 text-amber-400" />
+                <span>{t('statementsTitle')}</span>
+              </h2>
+              <p className="text-xs text-slate-300 mt-1">
+                {t('statementsSubtitle')}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="px-3 py-1 bg-emerald-500 text-slate-950 font-black rounded-xl text-xs font-mono shadow-xs">
+                {t('liveLedger')}
+              </span>
+            </div>
           </div>
 
-          <>
-            {/* ACTION 1: ENROLL ON-SITE FIELD EXPENSE */}
-            <EntryDialog
-              open={isExpenseDialogOpen}
-              onClose={() => setIsExpenseDialogOpen(false)}
-              titleId="fp-expense-dialog-title"
-              closeLabel={lang === 'te' ? 'మూసివేయండి' : 'Close expense dialog'}
-            >
-              <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3 pr-8">
-                <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
-                  <Camera className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 id="fp-expense-dialog-title" className="font-black text-sm text-gray-950">{t('enrollExpenseTitle')}</h3>
-                  <p className="text-[11px] text-gray-500">{t('enrollExpenseDesc')}</p>
-                </div>
-              </div>
+          {/* Full ProjectStatementModule as in Accountant Dashboard */}
+          {activeProject ? (
+            <ProjectStatementModule
+              onReviewFinancial={onReviewFinancial}
+              project={activeProject}
+              firm={activeFirm}
+              accounts={firmAccounts}
+              fieldExpenses={fieldExpenses}
+              plots={activePlots}
+              apartmentUnits={apartmentUnits}
+              partners={partners}
+              individualInvestments={individualInvestments}
+              onOpenRecordTransactionModal={() => {}}
+              onOpenEnrollExpenseModal={() => {
+                setIsExpenseDialogOpen(true);
+              }}
+              onOpenDrawingRequest={() => {
+                setIsDrawingDialogOpen(true);
+              }}
+              onOpenIndividualInvestmentModal={() => {
+                setIsEnrollInvestmentModalOpen(true);
+              }}
+            />
+          ) : (
+            <div className="bg-white p-8 rounded-3xl border border-gray-200 text-center text-gray-500">
+              {t('noActiveProjects')}
+            </div>
+          )}
+        </div>
+      )}
 
-              <form onSubmit={handleExpenseSubmit} className="space-y-3.5 text-xs">
-                {/* Payment Source Toggle: Project Bank vs Individual Personal Pocket */}
-                <div className="bg-amber-50/80 p-3 rounded-2xl border border-amber-300 space-y-2.5">
-                  <label className="block text-[10px] font-black text-amber-950 uppercase tracking-wider flex items-center justify-between">
-                    <span>{lang === 'te' ? 'చెల్లింపు మూలం (ఎవరు చెల్లించారు)' : 'Payment Source (Who Paid Wages / Outlay)'} *</span>
-                    <span className="text-[9px] font-bold text-amber-800">Site Ledger</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setExpensePaymentSource('project_bank')}
-                      className={`py-2 px-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
-                        expensePaymentSource === 'project_bank'
-                          ? 'bg-[#111827] text-white border-gray-900 shadow-sm'
-                          : 'bg-white text-gray-700 border-amber-200 hover:bg-amber-100/50'
-                      }`}
-                    >
-                      <Landmark className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{lang === 'te' ? 'ప్రాజెక్ట్ బ్యాంక్ ఖాతా' : 'Project Bank A/C'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setExpensePaymentSource('individual')}
-                      className={`py-2 px-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
-                        expensePaymentSource === 'individual'
-                          ? 'bg-[#111827] text-white border-gray-900 shadow-sm'
-                          : 'bg-white text-gray-700 border-amber-200 hover:bg-amber-100/50'
-                      }`}
-                    >
-                      <User className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{lang === 'te' ? 'వ్యక్తిగత సొంత నిధులు' : 'Individual / Personal Funds'}</span>
-                    </button>
-                  </div>
-
-                  {expensePaymentSource === 'project_bank' ? (
-                    <div>
-                      <label className="block text-[10px] font-black text-amber-950 uppercase mb-1 flex items-center justify-between">
-                        <span>{lang === 'te' ? 'డెబిట్ చేయవలసిన ప్రాజెక్ట్ బ్యాంక్' : 'Select Project Bank to Debit'} *</span>
-                        {projectAccounts.length > 0 && (
-                          <span className="font-mono text-[9px] text-amber-900 font-bold">
-                            {projectAccounts.find((a) => a.id === expenseBankAccountId)?.bankName || projectAccounts[0]?.bankName}: {formatINR(projectAccounts.find((a) => a.id === expenseBankAccountId)?.currentBalance || projectAccounts[0]?.currentBalance || 0)}
-                          </span>
-                        )}
-                      </label>
-                      <select
-                        value={expenseBankAccountId || projectAccounts[0]?.id || ''}
-                        onChange={(e) => setExpenseBankAccountId(e.target.value)}
-                        className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none focus:ring-2 focus:ring-amber-500"
-                      >
-                        {projectAccounts.length === 0 && (
-                          <option value="">Cash Treasury / Site Vault</option>
-                        )}
-                        {projectAccounts.map((acc) => (
-                          <option key={acc.id} value={acc.id}>
-                            {acc.bankName} - {acc.accountName} (••••{acc.accountNumber.slice(-4)}) — Bal: {formatINR(acc.currentBalance)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <div className="bg-white/90 p-2 rounded-xl border border-amber-200 text-[10px] text-gray-600 space-y-0.5">
-                      <div className="font-bold text-gray-900 flex items-center gap-1">
-                        <User className="w-3 h-3 text-amber-600" />
-                        <span>Paid from {currentPartner.name}&apos;s Personal Pocket</span>
-                      </div>
-                      <p className="text-[9px] text-gray-500">
-                        {lang === 'te' ? 'బ్యాంక్ నిధులు నేరుగా తగ్గవు. భాగస్వామి రీయింబర్స్‌మెంట్ లెడ్జర్‌లో నమోదు అవుతుంది.' : 'Does not drain project bank account. Reconciled in partner reimbursable equity.'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-gray-700 uppercase mb-1">
-                    {t('expenseAmount')} *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-gray-500 font-bold">₹</span>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      step="any"
-                      placeholder="e.g. 25000"
-                      value={expenseAmount}
-                      onChange={(e) => setExpenseAmount(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl font-mono font-black text-sm text-gray-950 outline-none focus:bg-white focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-700 uppercase mb-1">
-                      {t('expenseCategory')} *
-                    </label>
-                    <select
-                      value={expenseCategory}
-                      onChange={(e) => setExpenseCategory(e.target.value as any)}
-                      className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none"
-                    >
-                      <MasterOptions group="field_expense_heads" />
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-700 uppercase mb-1">
-                      {t('paymentMode')} *
-                    </label>
-                    <select
-                      value={expensePaymentMode}
-                      onChange={(e) => setExpensePaymentMode(e.target.value as any)}
-                      className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-950 outline-none"
-                    >
-                      <MasterOptions group="expense_payment_modes" />
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-gray-700 uppercase mb-1">
-                    {t('vendorName')}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Sri Balaji Earthmovers / Mason Gang Lead"
-                    value={expenseVendor}
-                    onChange={(e) => setExpenseVendor(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs text-gray-950 outline-none focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-gray-700 uppercase mb-1">
-                    {t('expenseNote')}
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="Brief description of work done on site..."
-                    value={expenseNote}
-                    onChange={(e) => setExpenseNote(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs text-gray-950 outline-none focus:bg-white"
-                  />
-                </div>
-
-                {/* Receipt and Voice Memo simulation buttons */}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSimulatedReceiptImage('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400&auto=format&fit=crop&q=80');
-                      showToast(lang === 'te' ? 'రసీదు ఫోటో జతచేయబడింది!' : 'Receipt photo attached!');
-                    }}
-                    className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                      simulatedReceiptImage ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>{simulatedReceiptImage ? t('receiptAttached') : t('uploadReceipt')}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isRecordingVoice) {
-                        setIsRecordingVoice(true);
-                        setTimeout(() => {
-                          setIsRecordingVoice(false);
-                          setHasRecordedVoice(true);
-                          setVoiceSeconds(14);
-                          showToast(lang === 'te' ? 'వాయిస్ నోట్ రికార్డ్ చేయబడింది (14 సెకన్లు)' : 'Voice note recorded (14s)');
-                        }, 2000);
-                      }
-                    }}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      hasRecordedVoice
-                        ? 'bg-amber-100 text-amber-900 border-amber-300'
-                        : isRecordingVoice
-                        ? 'bg-red-500 text-white animate-pulse'
-                        : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Mic className="w-3.5 h-3.5" />
-                    <span>{hasRecordedVoice ? t('voiceRecorded') : isRecordingVoice ? t('recordingVoice') : t('voiceNote')}</span>
-                  </button>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-[#111827] hover:bg-black text-[#FFB800] rounded-xl font-black text-xs shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>{t('submitExpenseBtn')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsExpenseDialogOpen(false)}
-                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-xs border border-gray-200 cursor-pointer"
-                >
-                  {lang === 'te' ? 'రద్దు' : 'Cancel'}
-                </button>
-              </form>
-            </EntryDialog>
+      {/* Partner expense & drawing dialogs: rendered globally so statement actions work from any tab */}
+      {activeProject && currentPartner && (
+        <EnrollExpenseModal
+          isOpen={isExpenseDialogOpen}
+          onClose={() => setIsExpenseDialogOpen(false)}
+          firm={activeFirm}
+          project={activeProject}
+          partners={[currentPartner]}
+          firmAccounts={firmAccounts}
+          onEnrollExpense={async (expense) => {
+            const result = await onSubmitExpense({
+              ...expense,
+              partnerId: currentPartner.id,
+              partnerName: currentPartner.name,
+              enrolledBy: currentPartner.name,
+            });
+            return result !== false;
+          }}
+        />
+      )}
 
             {/* ACTION 2: PLACE DRAWING / DIVIDEND REQUEST */}
             <EntryDialog
@@ -2281,312 +1576,6 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                 </button>
               </form>
             </EntryDialog>
-          </>
-
-          {/* TRACKING SECTIONS: APPROVALS QUEUE & DRAWING HISTORY */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Approvals Desk & Submitted Field Expenses List */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                <h3 className="font-black text-xs text-gray-950 uppercase tracking-wider flex items-center gap-2">
-                  <span>{t('pendingApprovalsTitle')}</span>
-                  <span className="text-[10px] text-gray-500 font-normal">({partnerExpenses.length})</span>
-                </h3>
-
-                {/* Sub-filter pills */}
-                <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-xl text-[10px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => setExpenseFilter('all')}
-                    className={`px-2 py-0.5 rounded-lg transition-all ${
-                      expenseFilter === 'all' ? 'bg-[#111827] text-white shadow-2xs' : 'text-gray-600 hover:text-black'
-                    }`}
-                  >
-                    {t('filterAll')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExpenseFilter('pending')}
-                    className={`px-2 py-0.5 rounded-lg transition-all ${
-                      expenseFilter === 'pending' ? 'bg-amber-400 text-gray-950 shadow-2xs' : 'text-gray-600 hover:text-black'
-                    }`}
-                  >
-                    {t('filterPending')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExpenseFilter('approved')}
-                    className={`px-2 py-0.5 rounded-lg transition-all ${
-                      expenseFilter === 'approved' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-gray-600 hover:text-black'
-                    }`}
-                  >
-                    {t('filterApproved')}
-                  </button>
-                </div>
-              </div>
-
-              <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto space-y-2">
-                {displayedExpenses.map((exp) => (
-                  <div key={exp.id} className="pt-2 flex items-center justify-between text-xs gap-3">
-                    <div className="min-w-0">
-                      <div className="font-bold text-gray-900 flex items-center gap-1.5 flex-wrap">
-                        <span className="truncate">{exp.category}</span>
-                        <span
-                          className={`text-[9px] px-1.5 py-0.2 rounded-md font-bold uppercase shrink-0 ${
-                            exp.status === 'approved'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : exp.status === 'rejected'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-amber-100 text-amber-900'
-                          }`}
-                        >
-                          {exp.status === 'approved' ? t('filterApproved') : t('filterPending')}
-                        </span>
-                        {exp.receiptImage && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 font-bold">
-                            Bill Attached
-                          </span>
-                        )}
-                        {exp.hasVoiceNote && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 font-bold">
-                            Voice Memo
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-gray-500 block truncate mt-0.5">
-                        {exp.date} • {exp.paymentMode || 'Field Cash'} {exp.vendorName ? `• ${exp.vendorName}` : ''}
-                      </span>
-                      {exp.note && (
-                        <p className="text-[10px] text-gray-600 italic truncate max-w-sm mt-0.5">
-                          "{exp.note}"
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <strong className="font-mono text-gray-950 text-xs block">
-                        {formatINR(exp.amount)}
-                      </strong>
-
-                      {/* Ability for partner to approve if pending and permission provided */}
-                      {exp.status === 'pending' && onApproveExpense && activeProject?.reviewableRecordIds?.includes(exp.id) && (
-                        <button
-                          type="button"
-                          onClick={() => onApproveExpense(exp.id, `${currentPartner.name} (Partner)`)}
-                          className="mt-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold inline-flex items-center gap-1 shadow-2xs cursor-pointer"
-                        >
-                          <Check className="w-2.5 h-2.5" />
-                          <span>{t('approveBtn')}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {displayedExpenses.length === 0 && (
-                  <p className="text-gray-400 text-center py-8 text-xs">{t('noExpenses')}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Drawing Requests History */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                <h3 className="font-black text-xs text-gray-950 uppercase tracking-wider flex items-center justify-between">
-                  <span>{t('recentDraws')}</span>
-                </h3>
-                <span className="text-[10px] text-gray-500 font-normal">({submittedDrawings.length})</span>
-              </div>
-
-              <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto space-y-2">
-                {submittedDrawings.map((draw) => (
-                  <div key={draw.id} className="pt-2.5 pb-2 flex flex-col gap-1.5 text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-bold text-gray-900 flex items-center gap-1.5 flex-wrap">
-                          <span className="truncate">{draw.purpose}</span>
-                          <span
-                            className={`text-[9px] px-1.5 py-0.2 rounded-md font-bold uppercase shrink-0 ${
-                              draw.status === 'cleared'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : draw.status === 'approved'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-amber-100 text-amber-900'
-                            }`}
-                          >
-                            {draw.status === 'cleared'
-                              ? 'Cleared & Disbursed'
-                              : draw.status === 'approved'
-                              ? 'Approved (Ready to Pay)'
-                              : 'Pending Signoff'}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-gray-500 flex items-center gap-1.5 flex-wrap mt-0.5">
-                          <span>For: <strong className="text-gray-800">{draw.partnerName}</strong></span>
-                          {draw.requestedByName && <span>• Requested by: <strong className="text-gray-800">{draw.requestedByName}</strong></span>}
-                          <span>•</span>
-                          <span>Mode: <strong className="text-gray-700">{draw.payoutMode}</strong></span>
-                          <span>•</span>
-                          <span>{draw.requestedAt}</span>
-                        </div>
-                      </div>
-                      <strong className="font-mono text-rose-700 text-sm shrink-0">
-                        -{formatINR(draw.amount)}
-                      </strong>
-                    </div>
-
-                    {/* From & To Account Route */}
-                    <div className="bg-gray-50 p-2 rounded-xl text-[10px] space-y-0.5 text-gray-600 border border-gray-200">
-                      <div>
-                        <span className="font-bold text-gray-700">From Account:</span>{' '}
-                        <span className="font-mono text-gray-900">{draw.sourceAccountName || 'Project Treasury Account'}</span>
-                      </div>
-                      <div>
-                        <span className="font-bold text-gray-700">Destination Beneficiary:</span>{' '}
-                        <span className="font-mono text-gray-900">{draw.destinationAccountDetails || 'Beneficiary Account On File'}</span>
-                      </div>
-                    </div>
-
-                    {/* Authorization & Payout Processing Actions */}
-                    <div className="flex items-center justify-between gap-2 pt-1">
-                      <div className="text-[10px] text-gray-500 italic">
-                        {draw.disbursedBy
-                          ? `Processed by: ${draw.disbursedBy} at ${draw.disbursedAt}`
-                          : draw.reviewedBy
-                          ? `Approved by: ${draw.reviewedBy}`
-                          : draw.status === 'cleared'
-                          ? 'Approved and posted to the project ledger'
-                          : 'Awaiting consensus authorization'}
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {draw.status === 'pending_approval' && activeProject?.reviewableRecordIds?.includes(draw.id) && (
-                          <button
-                            type="button"
-                            onClick={() => handleApproveDrawing(draw.id)}
-                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
-                          >
-                            Approve Drawing
-                          </button>
-                        )}
-                        {draw.status === 'cleared' && (
-                          <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Debited to Project Statement</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {submittedDrawings.length === 0 && (
-                  <p className="text-gray-400 text-center py-8 text-xs">{t('noDrawings')}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 3: PLOTS (RECREATED SAME AS IN ACCOUNTANT DASHBOARD) */}
-      {/* ======================================================== */}
-      {activeTab === 'plots' && (
-        <div className="space-y-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 text-white p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-            <div>
-              <h2 className="text-base font-black text-white flex items-center gap-2">
-                <Grid3X3 className="w-5 h-5 text-amber-400" />
-                <span>{t('plotsInventory')}</span>
-              </h2>
-              <p className="text-xs text-slate-300 mt-1">
-                {t('plotsSubtitle')}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <span className="px-3 py-1 bg-amber-400 text-slate-950 font-black rounded-xl text-xs font-mono shadow-xs">
-                {activePlots.length} {t('totalPlots')}
-              </span>
-            </div>
-          </div>
-
-          {/* Full Interactive OpenPlottingModule as in Accountant Dashboard */}
-          <OpenPlottingModule
-            plots={activePlots}
-            onUpdatePlot={onUpdatePlot || (() => {})}
-            onApproveBooking={onApproveBooking}
-            layoutCalc={
-              layoutCalc || {
-                totalExtentValue: activeProject?.extentValue || 0,
-                unit: (activeProject?.extentUnit as any) || 'Acres',
-                roadWidth: 0 as any,
-                openSpacePercent: 0,
-                floorRatePerSqYard: activeProject?.floorRatePerSqYard || 0,
-              }
-            }
-            onUpdateLayoutCalc={onUpdateLayoutCalc || (() => {})}
-            projectExpenses={projectExpenses}
-            onAddExpense={onAddProjectExpense}
-            onUpdateExpense={onUpdateProjectExpense}
-            ledgerMode={ledgerMode}
-            project={activeProject}
-            firm={activeFirm}
-            firmAccounts={firmAccounts}
-            onAddAccountTransaction={onAddAccountTransaction}
-          />
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 4: PROJECT STATEMENTS (RECREATED AS IN ACCOUNTANT)   */}
-      {/* ======================================================== */}
-      {activeTab === 'statements' && (
-        <div className="space-y-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 text-white p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-            <div>
-              <h2 className="text-base font-black text-white flex items-center gap-2">
-                <Landmark className="w-5 h-5 text-amber-400" />
-                <span>{t('statementsTitle')}</span>
-              </h2>
-              <p className="text-xs text-slate-300 mt-1">
-                {t('statementsSubtitle')}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <span className="px-3 py-1 bg-emerald-500 text-slate-950 font-black rounded-xl text-xs font-mono shadow-xs">
-                {t('liveLedger')}
-              </span>
-            </div>
-          </div>
-
-          {/* Full ProjectStatementModule as in Accountant Dashboard */}
-          {activeProject ? (
-            <ProjectStatementModule
-              onReviewFinancial={onReviewFinancial}
-              project={activeProject}
-              firm={activeFirm}
-              accounts={firmAccounts}
-              fieldExpenses={fieldExpenses}
-              plots={activePlots}
-              apartmentUnits={apartmentUnits}
-              partners={partners}
-              individualInvestments={individualInvestments}
-              onOpenRecordTransactionModal={() => {}}
-              onOpenEnrollExpenseModal={() => {
-                setActiveTab('expenses_approvals');
-              }}
-              onOpenIndividualInvestmentModal={() => {
-                setIsEnrollInvestmentModalOpen(true);
-              }}
-            />
-          ) : (
-            <div className="bg-white p-8 rounded-3xl border border-gray-200 text-center text-gray-500">
-              {t('noActiveProjects')}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Customer Plot Booking Modal for on-spot bookings */}
       {selectedMobilePlot && (

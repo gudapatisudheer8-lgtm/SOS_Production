@@ -76,6 +76,7 @@ interface ProjectStatementModuleProps {
   onOpenRecordTransactionModal?: () => void;
   onOpenEnrollExpenseModal?: () => void;
   onOpenIndividualInvestmentModal?: () => void;
+  onOpenDrawingRequest?: () => void;
 }
 
 export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
@@ -92,6 +93,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
   onOpenRecordTransactionModal,
   onOpenEnrollExpenseModal,
   onOpenIndividualInvestmentModal,
+  onOpenDrawingRequest,
 }) => {
   const [drawingOpen, setDrawingOpen] = useState(false);
   // Top filter states
@@ -548,7 +550,20 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
               </button>
             )}
 
-            {canDraw && (
+            {onOpenDrawingRequest && (
+              <button
+                id="btn-stmt-drawing-request"
+                data-testid="button-stmt-drawing-request"
+                type="button"
+                onClick={onOpenDrawingRequest}
+                className={`${actionBtn} bg-white hover:bg-amber-50 text-gray-950 border border-amber-400`}
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
+                <span>+ Drawing Request</span>
+              </button>
+            )}
+
+            {canDraw && !onOpenDrawingRequest && (
               <button
                 id="btn-stmt-record-drawing"
                 data-testid="button-stmt-record-drawing"

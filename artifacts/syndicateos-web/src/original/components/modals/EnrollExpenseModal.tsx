@@ -132,16 +132,16 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-lg w-full overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="enroll-expense-title" className="bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-lg w-full max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="bg-[#FFB800] p-5 flex items-center justify-between border-b border-amber-500/40">
+        <div className="bg-[#FFB800] p-5 flex items-center justify-between border-b border-amber-500/40 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-gray-950 text-amber-400 flex items-center justify-center font-black">
               <Receipt className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-black text-gray-950 text-base leading-tight">
+              <h3 id="enroll-expense-title" className="font-black text-gray-950 text-base leading-tight">
                 Enroll Project Expenses
               </h3>
               <p className="text-[11px] text-gray-900 font-semibold">
@@ -152,6 +152,8 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            disabled={saving}
+            aria-label="Close expense form"
             className="w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 flex items-center justify-center text-gray-950 font-bold transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -159,7 +161,8 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 text-xs">
+          <div data-testid="expense-form-scroll" className="p-4 sm:p-6 space-y-4 flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
           {/* Payment Source: Project Bank vs Individual Personal Pocket */}
           <div className="bg-amber-50/70 rounded-2xl p-3.5 border border-amber-300 space-y-3">
             <div>
@@ -404,11 +407,13 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
             </div>
           )}
 
-          {/* Actions */}
-          <div className="pt-2 flex items-center justify-end gap-3 border-t border-gray-100">
+          </div>
+          {/* Actions stay outside the scroll area so neither button overlaps fields. */}
+          <div className="p-4 flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 bg-white shrink-0">
             <button
               type="button"
               onClick={onClose}
+              disabled={saving}
               className="px-4 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs transition-colors cursor-pointer"
             >
               Cancel
@@ -416,7 +421,7 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95 flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <Receipt className="w-4 h-4 text-gray-950" />
               <span>{saving ? 'Saving expense…' : 'Enroll Project Expenses'}</span>
