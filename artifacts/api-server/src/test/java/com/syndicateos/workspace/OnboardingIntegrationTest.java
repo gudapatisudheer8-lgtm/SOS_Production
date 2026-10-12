@@ -290,6 +290,8 @@ class OnboardingIntegrationTest {
         ((com.fasterxml.jackson.databind.node.ObjectNode)historical.path("accounts").get(0)).put("ifscCode","legacy-ifsc");
         jdbc.update("UPDATE sos.project_setup_sections SET data=?::jsonb WHERE project_id=?::uuid",historical.toString(),id);
         ((com.fasterxml.jackson.databind.node.ObjectNode)historical.path("values")).put("name","Reviewed live project");
+        ((ObjectNode)historical.path("values")).put("notes","Editable project note");
+        ((ObjectNode)historical.path("settings")).put("autoGenerateInventory",false);
         int liveRevision=jdbc.queryForObject("SELECT revision FROM sos.projects WHERE id=?::uuid",Integer.class,id);
         command("project.setup-save",Map.of("projectId",id,"sectorId",sector,"revision",liveRevision,
             "reviewedReleaseId",release,"requestId",java.util.UUID.randomUUID().toString(),"setup",historical),accountant,200);
@@ -297,6 +299,18 @@ class OnboardingIntegrationTest {
         assertEquals(historical.path("groups"),preserved.path("groups"));
         assertEquals(historical.path("accounts"),preserved.path("accounts"));
         assertEquals(6,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid",Integer.class,id));
+        assertEquals("Editable project note",jdbc.queryForObject("SELECT details->>'notes' FROM sos.projects WHERE id=?::uuid",String.class,id));
+        JsonNode liveSettings=json.readTree(jdbc.queryForObject("SELECT data::text FROM sos.erp_project_settings WHERE project_id=?::uuid",String.class,id));
+        assertFalse(liveSettings.path("autoGenerateInventory").asBoolean(true));
+        assertEquals("Reviewed live project",liveSettings.path("projectPlan").path("values").path("name").asText());
+        // Clearing an optional field must not resurrect its previous value.
+        ((ObjectNode)historical.path("values")).put("notes","");
+        command("project.setup-save",Map.of("projectId",id,"sectorId",sector,"revision",liveRevision+1,
+            "requestId",java.util.UUID.randomUUID().toString(),"setup",historical),accountant,200);
+        assertFalse(jdbc.queryForObject("SELECT jsonb_exists(details,'notes') FROM sos.projects WHERE id=?::uuid",Boolean.class,id));
+        assertEquals(6,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=?::uuid",Integer.class,id));
+        command("project.setup-save",Map.of("projectId",id,"sectorId",sector,"revision",liveRevision+1,
+            "requestId",java.util.UUID.randomUUID().toString(),"setup",historical),accountant,409);
         String acct=jdbc.queryForObject("SELECT r.id::text FROM sos.erp_records r JOIN sos.project_cash_accounts c ON c.project_id=r.project_id WHERE r.project_id=?::uuid AND r.kind='accounts' AND r.id<>c.account_record_id",String.class,id);
         assertEquals("1000.00",accountBalance(erp,acct));
         String plot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' LIMIT 1",String.class,id);

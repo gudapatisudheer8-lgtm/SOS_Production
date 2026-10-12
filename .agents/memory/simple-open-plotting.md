@@ -41,4 +41,4 @@ For the project-form simplification request, do not remove any project fields. A
 
 **Why:** The user corrected an interpretation of their screenshot: the highlight identified existing project details appearing in Add Project, not fields they wanted deleted.
 
-**How to apply:** Keep create and edit modes distinct, retain all setup fields, and scope the selected project to the selected authorized firm.
+**How to apply:** Keep create and edit modes distinct, retain all setup fields, and scope the selected project to the selected authorized firm. The user also requested removing the top dashboard files section; keep document access inside Add/Edit Project without deleting uploaded files.

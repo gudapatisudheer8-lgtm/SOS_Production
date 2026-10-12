@@ -17,7 +17,8 @@ import {
   PartnerStockDraw,
   FirmAccount,
   FirmAccountTransaction,
-  IndividualInvestmentRecord
+  IndividualInvestmentRecord,
+  PlanUploadDocument
 } from '../../types';
 import { OpenPlottingModule } from './OpenPlottingModule';
 import { ConstructionModule } from './ConstructionModule';
@@ -26,7 +27,7 @@ import { LiquorVendSettlementModule } from './LiquorVendSettlementModule';
 import { ProjectStatementModule } from './ProjectStatementModule';
 import { AddProjectModal } from '../modals/AddProjectModal';
 import { FirmAccountsBar } from './FirmAccountsBar';
-import { ProjectPlans } from './ProjectPlans';
+import { EditProjectModal } from '../modals/EditProjectModal';
 import { AddFirmAccountModal } from '../modals/AddFirmAccountModal';
 import { FirmAccountStatementModal } from '../modals/FirmAccountStatementModal';
 import { RecordLedgerTransactionModal } from '../modals/RecordLedgerTransactionModal';
@@ -67,7 +68,8 @@ import {
   Tag,
   Printer,
   ChevronRight,
-  CheckSquare
+  CheckSquare,
+  Pencil
 } from 'lucide-react';
 import { formatINR, formatIndianCompact } from '../../utils/formatters';
 
@@ -115,6 +117,13 @@ interface AccountantDashboardProps {
   onSignOut?: () => void;
   onSubmitDrawing?: (data: any) => void | boolean | Promise<boolean>;
   onReviewFinancial?: (id: string, decision: 'approved' | 'rejected') => Promise<boolean>;
+  firms?: TenantFirm[];
+  onSelectFirm?: (firmId: string) => void;
+  projectSetupDefinition?: any;
+  projectSetupValues?: Record<string, any>;
+  projectSetupSettings?: Record<string, any>;
+  onUpdateProjectSetup?: (projectId: string, values: Record<string, any>, settings: Record<string, any>, revision: number) => Promise<boolean>;
+  onUploadProjectDocuments?: (projectId: string, documents: PlanUploadDocument[]) => Promise<boolean>;
 }
 
 export type TopBarTab =
@@ -170,7 +179,16 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   onRejectIndividualInvestment,
   onSubmitDrawing,
   onReviewFinancial,
+  firms = [],
+  onSelectFirm,
+  projectSetupDefinition,
+  projectSetupValues,
+  projectSetupSettings,
+  onUpdateProjectSetup,
+  onUploadProjectDocuments,
 }) => {
+  const [editProjectId, setEditProjectId] = useState<string | null>(null);
+  const [addProjectSession, setAddProjectSession] = useState(0);
   // Modal states
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [isAddFirmAccountModalOpen, setIsAddFirmAccountModalOpen] = useState(false);
@@ -179,6 +197,11 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   const [isEnrollExpenseModalOpen, setIsEnrollExpenseModalOpen] = useState(false);
   const [isIndividualInvestmentModalOpen, setIsIndividualInvestmentModalOpen] = useState(false);
   const [selectedVoucherForSlip, setSelectedVoucherForSlip] = useState<FieldExpenseLog | null>(null);
+
+  const openAddProject = () => {
+    setAddProjectSession((n) => n + 1);
+    setIsAddProjectModalOpen(true);
+  };
 
   // Expenses Tab specific filter states
   const [expenseSearchQuery, setExpenseSearchQuery] = useState('');
@@ -198,6 +221,13 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
     firmActiveProjects.find((p) => p.id === selectedProjectId) ||
     firmActiveProjects[0] ||
     null;
+
+  // Edit target is pinned to the project chosen when opening; closes if it leaves this firm or selection changes.
+  const editingProject: Project | null =
+    editProjectId && activeProject && activeProject.id === editProjectId ? activeProject : null;
+  useEffect(() => {
+    if (editProjectId && (!activeProject || activeProject.id !== editProjectId)) setEditProjectId(null);
+  }, [editProjectId, activeProject?.id]);
 
   // If a tab belongs to a sector that is removed from the firm, gracefully fall back to dashboard
   useEffect(() => {
@@ -422,10 +452,46 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             </div>
           </div>
 
+          {firms.length > 0 && (
+            <div className="flex items-center gap-2.5 bg-[#F4F4F6] px-4 py-2.5 rounded-2xl border border-gray-300 shadow-inner min-w-0 sm:max-w-[260px]">
+              <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+              <div className="flex flex-col min-w-0 flex-1">
+                <label htmlFor="accountant-firm-select" className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Firm:</label>
+                <select
+                  id="accountant-firm-select"
+                  data-testid="select-firm"
+                  value={firm.id}
+                  disabled={firms.length < 2 || !onSelectFirm}
+                  onChange={(e) => { setEditProjectId(null); setIsAddProjectModalOpen(false); onSelectFirm?.(e.target.value); }}
+                  className="w-full min-w-0 text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate disabled:cursor-default"
+                >
+                  {!firms.some((f) => f.id === firm.id) && <option value={firm.id}>{firm.name} ({firm.code})</option>}
+                  {firms.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name} ({f.code})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Edit selected project */}
+          <button
+            id="btn-edit-project"
+            data-testid="button-edit-project"
+            type="button"
+            disabled={!activeProject}
+            title={activeProject ? `Edit ${activeProject.name}` : 'Select a project to edit'}
+            onClick={() => activeProject && setEditProjectId(activeProject.id)}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white hover:bg-gray-50 text-gray-950 font-black text-xs shadow-sm transition-all border border-gray-300 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Pencil className="w-4 h-4" />
+            <span>Edit Project</span>
+          </button>
+
           {/* + Add Projects Button */}
           <button
             id="btn-add-project"
-            onClick={() => setIsAddProjectModalOpen(true)}
+            onClick={() => openAddProject()}
             className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md hover:shadow-lg transition-all border border-amber-500/40 shrink-0"
           >
             <PlusCircle className="w-4 h-4" />
@@ -622,7 +688,6 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       {/* ---------------------------------------------------- */}
       {/* TAB 1: DASHBOARD (ALL QUICK VIEWABLE DATA & KPIS)    */}
       {/* ---------------------------------------------------- */}
-      <ProjectPlans key={activeProject?.id} project={activeProject} />
 
       {activeTab === 'dashboard' && (
         !activeProject ? (
@@ -646,7 +711,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
               <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsAddProjectModalOpen(true)}
+                  onClick={() => openAddProject()}
                   className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -1195,7 +1260,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setIsAddProjectModalOpen(true)}
+                onClick={() => openAddProject()}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -1247,7 +1312,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setIsAddProjectModalOpen(true)}
+                onClick={() => openAddProject()}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -1292,7 +1357,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setIsAddProjectModalOpen(true)}
+                onClick={() => openAddProject()}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -1330,7 +1395,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setIsAddProjectModalOpen(true)}
+                onClick={() => openAddProject()}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -1368,7 +1433,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setIsAddProjectModalOpen(true)}
+                onClick={() => openAddProject()}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -1407,7 +1472,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setIsAddProjectModalOpen(true)}
+                onClick={() => openAddProject()}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -1943,7 +2008,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setIsAddProjectModalOpen(true)}
+                onClick={() => openAddProject()}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md transition-all border border-amber-600/30 cursor-pointer active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -1985,7 +2050,22 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       />
 
       {/* Modal: + Add Projects */}
+      {editingProject && (
+        <EditProjectModal
+          key={`${firm.id}:${editingProject.id}`}
+          project={editingProject}
+          definition={projectSetupDefinition}
+          initialValues={projectSetupValues}
+          initialSettings={projectSetupSettings}
+          onClose={() => setEditProjectId(null)}
+          onSave={onUpdateProjectSetup}
+          onUploadDocuments={onUploadProjectDocuments}
+        />
+      )}
+
+      {isAddProjectModalOpen && (
       <AddProjectModal
+        key={`add-${firm.id}-${addProjectSession}`}
         isOpen={isAddProjectModalOpen}
         onClose={() => setIsAddProjectModalOpen(false)}
         firm={firm}
@@ -1994,6 +2074,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
         firmAccounts={firmAccounts}
         onAddFirmAccount={onAddFirmAccount}
       />
+      )}
 
       {/* Modal: + Add Project Account */}
       <AddFirmAccountModal

@@ -121,6 +121,9 @@ public class ProjectSetupService {
                     if(previous.has(key)&&!previous.path(key).equals(setup.path(key))||!previous.has(key)&&!setup.path(key).isEmpty())
                         throw ApiProblem.invalid("Update existing project partners, accounts, plans and documents through their tabs, not by recreating setup.");
                 ObjectNode merged=(ObjectNode)config.parse(row.get("details"));
+                // Replace configured fields, including optional fields cleared by
+                // the accountant. Preserve unrelated historical metadata.
+                for(JsonNode field:allFields(def)) merged.remove(field.path("key").asText());
                 details.fields().forEachRemaining(e->merged.set(e.getKey(),e.getValue()));details=merged;
                 List<JsonNode> profiles=jdbc.queryForList("SELECT data FROM sos.erp_records WHERE project_id=? AND kind='partner-profiles' AND status='approved'",id)
                     .stream().map(p->config.parse(p.get("data"))).toList();
@@ -145,7 +148,9 @@ public class ProjectSetupService {
         if("READY".equals(state)) {
             var old=jdbc.queryForList("SELECT data FROM sos.erp_project_settings WHERE project_id=?",id);
             ObjectNode saved=old.isEmpty()?json.createObjectNode():(ObjectNode)config.parse(old.getFirst().get("data"));
-            if(settings.has("equitySplitMode")) saved.set("equitySplitMode",settings.path("equitySplitMode"));
+            for(JsonNode field:def.path("settingsFields")) saved.remove(field.path("key").asText());
+            settings.fields().forEachRemaining(e->saved.set(e.getKey(),e.getValue()));
+            if(saved.path("projectPlan").isObject()) ((ObjectNode)saved.path("projectPlan")).set("values",values);
             jdbc.update("INSERT INTO sos.erp_project_settings(project_id,data) VALUES (?,?::jsonb) ON CONFLICT(project_id) DO UPDATE SET data=excluded.data,revision=sos.erp_project_settings.revision+1",
                 id,saved.toString());
         }

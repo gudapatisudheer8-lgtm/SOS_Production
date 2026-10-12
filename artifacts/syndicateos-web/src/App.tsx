@@ -18,6 +18,7 @@ import { loadAll, erpSave, erpReview, command, pickConfigured, describeAccess, t
 import { investmentInput, drawingInput, bookingInput } from './adapter/financialInput';
 import { BookingReceiptApprovals } from './components/BookingReceiptApprovals';
 import { ProjectPlanSaver } from './adapter/projectPlans';
+import { ProjectEditorSaver, projectEditContext, projectEditPayload } from './adapter/projectEditing';
 import { MarketingAccessPage } from './marketing/MarketingAccessPage';
 import { expenseInput } from './adapter/expenseInput';
 
@@ -50,7 +51,11 @@ function App() {
   const [showGaps, setShowGaps] = useState(false);
   const toastTimer = useRef<number | undefined>(undefined);
   const projectPlanSaver = useRef(new ProjectPlanSaver());
-  useEffect(() => { projectPlanSaver.current.clear(); }, [currentUser]);
+  const projectEditorSaver = useRef(new ProjectEditorSaver());
+  useEffect(() => {
+    projectPlanSaver.current.clear();
+    projectEditorSaver.current.clear();
+  }, [currentUser]);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -299,6 +304,22 @@ function App() {
     if (notice) setStickyNotice(`${p.name} partners — ${notice}`);
   });
 
+  const handleUpdateProjectSetup = (projectId: string, values: Record<string, any>,
+    settings: Record<string, any>, revision: number) => run('Project details saved', async () => {
+    const context = projectEditContext(data?.workspace, erpOf(projectId), projectId);
+    if (!context || String(context.project.firmId) !== selectedFirmId || projectId !== activeProjectId) {
+      throw new Error('Select an authorized project before editing its details.');
+    }
+    await projectEditorSaver.current.save(projectEditPayload(context.project, context.definition, values, settings, revision));
+  });
+
+  const handleUploadProjectDocuments = (projectId: string, documents: import('./original/types').PlanUploadDocument[]) =>
+    run('Project documents uploaded', async () => {
+      const project = projects.find((row) => row.id === projectId && row.firmId === selectedFirmId);
+      if (!project || projectId !== activeProjectId) throw new Error('Select a project before uploading its documents.');
+      await projectEditorSaver.current.uploadDocuments(projectId, erpOf(projectId), documents);
+    });
+
   const handleAddPartnerMember = (m: SyndicatePartner) => run(`Partner ${m.name} added`, async () => {
     if (!activeProjectId) throw new Error('Select a project first.');
     const res = (erpOf(activeProjectId)?.resources || []).find((r: any) => r.kind === 'partner-profiles');
@@ -455,6 +476,12 @@ function App() {
 
   const partnerSession = currentUser.role === 'field_partner' && currentUser.firmId
     ? { firmId: currentUser.firmId, partnerId: currentUser.id } : null;
+  const selectedProjectSetup = projectEditContext(data?.workspace, erpOf(activeProjectId), activeProjectId);
+  const selectFirm = (firmId: string) => {
+    if (!firms.some((firm) => firm.id === firmId)) return;
+    setSelectedFirmId(firmId);
+    setSelectedProjectId(projects.find((project) => project.firmId === firmId)?.id || '');
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFCF7] text-slate-900 flex flex-col font-sans selection:bg-amber-100 selection:text-amber-900">
@@ -463,7 +490,7 @@ function App() {
         onRoleChange={() => unsupported('role switching; sign in with that role’s credentials.')}
         firms={firms}
         selectedFirmId={selectedFirmId}
-        onFirmChange={setSelectedFirmId}
+        onFirmChange={selectFirm}
         pendingExpensesCount={pendingExpensesCount}
         firmAccountsCount={(data?.accounts ?? []).length}
         currentUser={currentUser}
@@ -526,11 +553,19 @@ function App() {
           <AccountantDashboard
             onSubmitDrawing={handleSubmitDrawing}
             onReviewFinancial={async (id, decision) => review(id, decision, 'Financial review saved')}
+            key={currentFirm.id}
             firm={currentFirm}
+            firms={firms}
+            onSelectFirm={selectFirm}
             projects={projects.filter((p) => p.firmId === currentFirm.id)}
             selectedProjectId={activeProjectId}
             onSelectProject={setSelectedProjectId}
             onAddProject={handleAddProject}
+            projectSetupDefinition={selectedProjectSetup?.definition}
+            projectSetupValues={selectedProjectSetup?.values}
+            projectSetupSettings={selectedProjectSetup?.settings}
+            onUpdateProjectSetup={handleUpdateProjectSetup}
+            onUploadProjectDocuments={handleUploadProjectDocuments}
             plots={data.plots}
             onUpdatePlot={handleUpdatePlot}
             onApproveBooking={handleApproveBooking}

@@ -385,6 +385,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/bg_music.mp3"
 type = "audio"
 title = "SyndicateOS background music"
 description = "Generated music: Corporate motivational cinematic instrumental background music for a 60-second B2B real estate operations software product film. Warm piano pulse, restrained low percussion, confiden…"
+logical_id = "3ba50ec9-a104-4f94-a889-24a2938f02fb"
 
 [[outputs]]
 id = "08BlQ43sqgcY9xrYyl32B"
@@ -392,6 +393,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_01.mp3"
 type = "audio"
 title = "SyndicateOS narration segment 1"
 description = "Text-to-speech audio: Real estate ventures move fast. Projects, funds, site work and partner decisions all need a shared picture."
+logical_id = "05908234-0a9a-449f-bf32-706181d92db9"
 
 [[outputs]]
 id = "IK4lHTE81Gtj1abZ7Scer"
@@ -399,6 +401,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_02.mp3"
 type = "audio"
 title = "SyndicateOS narration segment 2"
 description = "Text-to-speech audio: SyndicateOS gives accountants one console for project overview, partner records, and treasury activity."
+logical_id = "b32c922f-e84e-4071-a7b0-3f37e6e6ef78"
 
 [[outputs]]
 id = "lY7jfq9nArXfiZIDEHRZz"
@@ -406,6 +409,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_03.mp3"
 type = "audio"
 title = "SyndicateOS narration segment 3"
 description = "Text-to-speech audio: Keep project accounts and site cash in view. Follow connected entries as funds move."
+logical_id = "cf40ab6d-72e3-4709-ae33-7873b7cdb3d5"
 
 [[outputs]]
 id = "yYooAQzVz_A4IxGymupqJ"
@@ -413,6 +417,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_05.mp3"
 type = "audio"
 title = "SyndicateOS narration segment 5"
 description = "Text-to-speech audio: Scan plot inventory visually by orientation and status, then focus on the details that matter."
+logical_id = "abd76858-4349-4d01-a0d9-ee203f61b440"
 
 [[outputs]]
 id = "tbV8Heh-7hZQgwNiK-uUN"
@@ -420,6 +425,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_04.mp3"
 type = "audio"
 title = "SyndicateOS narration segment 4"
 description = "Text-to-speech audio: Record site expenses and drawing requests. Review each step and see what needs attention."
+logical_id = "d53d09a1-9e8e-406a-abf1-b34c28dcea38"
 
 [[outputs]]
 id = "GmnhLY0vMTCgM6zp-mCkZ"
@@ -427,6 +433,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_08.mp3"
 type = "audio"
 title = "SyndicateOS narration segment 8"
 description = "Text-to-speech audio: SyndicateOS: project operations and partner visibility, in one connected place."
+logical_id = "083a6ab1-5e3d-4922-a907-3df633779e11"
 
 [[outputs]]
 id = "kV-iGqtBQ_BXF2dZJZS4f"
@@ -434,6 +441,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_06.mp3"
 type = "audio"
 title = "SyndicateOS narration segment 6"
 description = "Text-to-speech audio: Partners can review venture position, investment history, drawings and pending requests in one focused portal."
+logical_id = "9f3938cc-7004-4c48-a7a9-cdf603067db6"
 
 [[outputs]]
 id = "o09uOSuvpucK_rVuQLYHj"
@@ -441,3 +449,18 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_07.mp3"
 type = "audio"
 title = "SyndicateOS narration segment 7"
 description = "Text-to-speech audio: Both roles work from the same project record—less chasing, and clearer coordination for everyone responsible."
+logical_id = "8e5873b0-f496-49f4-b60a-be9beaf7c650"
+
+[[outputs]]
+id = "c_KQ4837jCvaB-HqPnb_K"
+uri = "file://generated-artifacts/ec2/sos-project-controls-20261012.tar.gz"
+type = "unspecified"
+title = "SyndicateOS — EC2 Project Controls Update"
+description = "Tested API and frontend update: firm selector, selected-project editing, fresh Add Project form, and documents inside project forms. No database reset or migration."
+logical_id = "e2edaf4d-662d-49e8-8093-6e854bfcb2f4"
+content_hash = "sha256:e3509ec5c3aad5ed83453dc4072dd08ee9312351d2f9955f0cc023076d32e31c"
+size = 26853883
+mtime_ms = 1791804370152
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/e2edaf4d-662d-49e8-8093-6e854bfcb2f4/b31f6517-88a6-4e6f-9693-9f2c01452bb1"
+storage_version_token = "1791804415021247"
+content_type = "application/octet-stream"

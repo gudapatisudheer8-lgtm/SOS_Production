@@ -72,7 +72,7 @@ export async function loadAll(role: string): Promise<LoadedData> {
     id: String(p.id), firmId: String(p.firmId), name: p.name, location: p.location || '',
     code: p.details?.projectCode || p.details?.code || '',
     sector: sectorTypeOf(p.sectorId),
-    status: p.details?.status || (p.status === 'COMPLETED' ? 'completed' : 'active_sales'),
+    status: p.details?.developmentStage || p.details?.status || (p.status === 'COMPLETED' ? 'completed' : 'active_sales'),
     startDate: p.details?.startDate || '', extentValue: num(p.details?.extentValue), extentUnit: p.details?.extentUnit || '',
     partners: (p.partners || []).map((m: any) => ({
       partnerId: String(m.identityId), name: m.displayName, phone: m.mobile || '', roleInProject: 'Partner',
@@ -214,7 +214,9 @@ export async function loadAll(role: string): Promise<LoadedData> {
     }
     for (const a of erp.audit || []) out.audit.push({ id: String(a.id), timestamp: a.timestamp, actorName: a.actor, action: a.event, deviceId: '', notes: `${p.name}`, ledgerType: 'System Governance', verified: true });
     const s = erp.settings || {};
-    if (Array.isArray(s.layoutAmenities)) p.layoutAmenities = s.layoutAmenities;
+    for (const key of ['floorPlans', 'amenities', 'plotDistribution', 'layoutAmenities', 'autoGenerateInventory'] as const) {
+      if (Object.prototype.hasOwnProperty.call(s, key)) (p as any)[key] = s[key];
+    }
     if (s.layoutCalculation) out.settings.layoutCalc = s.layoutCalculation;
     if (s.pricingMatrix) out.settings.pricingMatrix = s.pricingMatrix;
     if (s.equitySplitMode) out.settings.splitMode = s.equitySplitMode;

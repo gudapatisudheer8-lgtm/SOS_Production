@@ -216,7 +216,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   onAddFirmAccount,
 }) => {
   // Project ID established upfront for strict account isolation and mapping
-  const [projectId] = useState<string>(() => `proj-${Date.now().toString().slice(-6)}`);
+  const [projectId] = useState<string>(() => `proj-${crypto.randomUUID()}`);
 
   // Only this draft's accounts are available. Its Cash ledger is provisioned
   // by the server on creation, never borrowed from another project.
