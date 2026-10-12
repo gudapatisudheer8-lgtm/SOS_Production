@@ -454,6 +454,27 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       </HeaderSlot>
       <HeaderSlot>
         <div className="flex flex-wrap items-center gap-2 min-w-0 lg:justify-end" data-testid="header-project-treasury">
+          {firms.length > 0 && (
+            <label htmlFor="accountant-firm-select" className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[10rem] sm:max-w-[220px]">
+              <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="sr-only">Firm</span>
+              <select
+                id="accountant-firm-select"
+                data-testid="select-firm"
+                value={firm.id}
+                disabled={!onSelectFirm}
+                title={`Firm: ${firm.name}`}
+                onChange={(e) => { setEditProjectId(null); setIsAddProjectModalOpen(false); onSelectFirm?.(e.target.value); }}
+                className="w-full min-w-0 text-xs font-black text-slate-900 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate disabled:cursor-default"
+              >
+                {!firms.some((f) => f.id === firm.id) && <option value={firm.id}>{firm.name} ({firm.code})</option>}
+                {firms.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name} ({f.code})</option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <label className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[12rem] sm:max-w-[300px]">
             <FolderOpen className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span className="sr-only">Select project</span>
@@ -461,6 +482,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
               id="accountant-project-select"
               data-testid="select-project"
               value={selectedProjectId}
+              title={activeProject ? `Project: ${activeProject.name}` : 'Select project'}
               onChange={(e) => onSelectProject(e.target.value)}
               className="w-full min-w-0 text-xs font-black text-slate-900 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate"
             >
@@ -474,26 +496,6 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             </select>
           </label>
 
-          {firms.length > 0 && (
-            <label htmlFor="accountant-firm-select" className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[10rem] sm:max-w-[220px]">
-              <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="sr-only">Firm</span>
-              <select
-                id="accountant-firm-select"
-                data-testid="select-firm"
-                value={firm.id}
-                disabled={firms.length < 2 || !onSelectFirm}
-                onChange={(e) => { setEditProjectId(null); setIsAddProjectModalOpen(false); onSelectFirm?.(e.target.value); }}
-                className="w-full min-w-0 text-xs font-black text-slate-900 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate disabled:cursor-default"
-              >
-                {!firms.some((f) => f.id === firm.id) && <option value={firm.id}>{firm.name} ({firm.code})</option>}
-                {firms.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name} ({f.code})</option>
-                ))}
-              </select>
-            </label>
-          )}
-
           <div className="flex items-center gap-2 shrink-0">
             <button
               id="btn-edit-project"
@@ -502,10 +504,10 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
               disabled={!canEditProject}
               title={!activeProject ? 'Select a project to edit' : canEditProject ? `Edit ${activeProject.name}` : 'Project details are still loading'}
               onClick={() => canEditProject && activeProject && setEditProjectId(activeProject.id)}
-              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-50 text-slate-900 font-black text-xs border border-stone-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-stone-50 text-slate-900 font-black text-xs border border-stone-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Pencil className="w-3.5 h-3.5" />
-              <span>Edit Project</span>
+              <span>Edit</span>
             </button>
             <button
               id="btn-add-project"

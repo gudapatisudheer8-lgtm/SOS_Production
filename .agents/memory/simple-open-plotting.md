@@ -58,3 +58,7 @@ Keep the partner dashboard focused on project plot inventory and bank-plus-cash 
 Keep firm/project selection and project actions in the single shared sticky header for accountant and partner dashboards, rather than separate context banners.
 **Why:** the user asked to combine the accountant's top bars and move partner controls upward to free page space.
 **How to apply:** retain selectors, project actions, notifications and the profile menu with responsive wrapping; do not reintroduce duplicate context bars or hardcoded offsets for stacked headers.
+
+Firm selectors must remain openable even when only one authorized firm is available.
+**Why:** the user reported the disabled single-firm dropdown as broken compared with the project dropdown.
+**How to apply:** preserve the authorized firm list and selection callbacks; do not disable a selector solely because it has one option or broaden access to make more options appear.

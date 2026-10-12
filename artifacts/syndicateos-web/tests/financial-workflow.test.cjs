@@ -111,6 +111,19 @@ test('header context mount sits below the firm name, before the controls mount',
   }
 });
 
+test('firm selectors remain openable with one authorized firm and accountant order is firm then project', () => {
+  const accountant = fs.readFileSync(path.resolve(__dirname, '../src/original/components/accountant/AccountantDashboard.tsx'), 'utf8');
+  const partner = fs.readFileSync(path.resolve(__dirname, '../src/original/components/fieldpartner/FieldPartnerMobileView.tsx'), 'utf8');
+  const firmSelect = accountant.match(/<select\s+id="accountant-firm-select"[\s\S]*?<\/select>/)[0];
+  assert.match(firmSelect, /disabled=\{!onSelectFirm\}/);
+  assert.doesNotMatch(firmSelect, /firms\.length\s*</);
+  const partnerSelect = partner.match(/<select\s+data-testid="select-partner-firm"[\s\S]*?<\/select>/)[0];
+  assert.doesNotMatch(partnerSelect, /disabled=/);
+  assert.ok(accountant.indexOf('id="accountant-firm-select"') < accountant.indexOf('id="accountant-project-select"'));
+  assert.match(accountant, /<span>Edit<\/span>/);
+  assert.doesNotMatch(accountant, /<span>Edit Project<\/span>/);
+});
+
 test('statement headings sort dates, numeric vouchers, names and signed amounts without modifying money', () => {
   const entries = [
     { id: 'a', date: '2026-10-01', type: 'credit', amount: 50, referenceNo: 'REF-10', description: 'Investment', accountName: 'Bank', enrolledBy: 'Zoya' },

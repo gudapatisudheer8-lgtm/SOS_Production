@@ -989,7 +989,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
               <select
                 data-testid="select-partner-firm"
                 value={activeFirm.id}
-                disabled={contributedFirms.length < 2}
+                title={`Firm: ${activeFirm.name}`}
                 onChange={(e) => {
                   const newFirmId = e.target.value;
                   onSelectFirm(newFirmId);
