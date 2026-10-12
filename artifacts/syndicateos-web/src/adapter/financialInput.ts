@@ -15,7 +15,7 @@ export function drawingInput(d: Record<string, any>) {
 }
 export function bookingInput(d: Record<string, any>, inventoryId: string) {
   return {
-    inventoryId, date: String(d.bookedAt || '').slice(0, 10),
+    inventoryId, date: String(d.bookingPaymentDate || d.bookedAt || '').slice(0, 10),
     accountId: d.bookingAccountId, buyerName: d.buyerName, buyerPhone: d.buyerPhone,
     buyerRegistrationId: d.buyerRegistrationId, ratePerSqYard: d.ratePerSqYard,
     bookingStatus: d.status, paymentMilestone: d.paymentMilestone,

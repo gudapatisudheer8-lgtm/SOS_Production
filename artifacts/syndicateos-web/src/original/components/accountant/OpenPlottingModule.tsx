@@ -1,5 +1,5 @@
 import { MasterOptions, masterNumber } from '../../../adapter/config';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plot, LayoutCalculation, ProjectExpense, PlotStatus, LedgerMode, Project, PlanUploadDocument, TenantFirm, FirmAccount, FirmAccountTransaction } from '../../types';
 import { formatINR } from '../../utils/formatters';
 import {
@@ -60,6 +60,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
   const [plotFilter, setPlotFilter] = useState<'all' | 'available' | 'reserved' | 'sold'>('all');
   const [selectedPlot, setSelectedPlot] = useState<Plot | null>(null);
   const [customerBookingPlot, setCustomerBookingPlot] = useState<Plot | null>(null);
+  useEffect(() => { setCustomerBookingPlot(null); }, [project?.id]);
 
   // Fallback firm if not passed directly
   const effectiveFirm: TenantFirm = firm || {
@@ -376,7 +377,8 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
       {customerBookingPlot && (
         <CustomerPlotBookingModal
           isOpen={!!customerBookingPlot}
-          plot={plots.find((p) => p.id === customerBookingPlot.id) || customerBookingPlot}
+          plot={plots.find((p) => customerBookingPlot.__recordId
+            ? p.__recordId === customerBookingPlot.__recordId : p.id === customerBookingPlot.id) || customerBookingPlot}
           project={project}
           firm={effectiveFirm}
           floorRate={FLOOR_RATE_PER_SQYD}

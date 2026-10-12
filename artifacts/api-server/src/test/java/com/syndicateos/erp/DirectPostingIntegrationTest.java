@@ -163,6 +163,103 @@ class DirectPostingIntegrationTest {
         balance(f,"885");
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE reversal_of=?",Integer.class,id));
     }
+    private UUID paymentPlot(Fixture f) {
+        UUID plot=UUID.randomUUID();
+        jdbc.update("""
+            INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,status,created_by,request_id)
+            VALUES(?,?,?,'plots','{"plotNumber":"3","areaSqYards":150,"status":"available","ratePerSqYard":10000}'::jsonb,'{}','approved',?,?)
+            """,plot,f.project,f.firm,f.accountant.identityId(),UUID.randomUUID());
+        return plot;
+    }
+    private Map<String,Object> plotPayment(Fixture f,UUID plot,int amount) {
+        return new HashMap<>(Map.of("inventoryId",plot.toString(),"buyerName","Synthetic payment buyer","buyerPhone","9888880099",
+            "advanceReceived",amount,"ratePerSqYard",10000,"accountId",f.bank.toString(),"paymentMode","UPI","date","2026-10-13"));
+    }
+    @SuppressWarnings("unchecked")
+    private Map<String,Object> paymentSummary(Fixture f,UUID plot) {
+        return ((Map<String,Map<String,Object>>)service.read(f.accountant,f.project).get("bookingPayments")).get(plot.toString());
+    }
+    @Test void cumulativePlotReceiptsLockPriceAndPreventOverpayment() {
+        var f=fixture(); UUID plot=paymentPlot(f);
+        var input=plotPayment(f,plot,100000);
+        UUID first=save(f,"bookings",input,UUID.randomUUID(),f.accountant);
+        assertEquals("1400000.00",new BigDecimal(paymentSummary(f,plot).get("balance").toString()).setScale(2).toPlainString());
+        UUID request=UUID.randomUUID();
+        UUID second=save(f,"bookings",input,request,f.partner);
+        assertEquals(second,save(f,"bookings",input,request,f.partner));
+        balance(f,"201000");
+        var summary=paymentSummary(f,plot);
+        assertEquals(0,new BigDecimal("200000").compareTo(new BigDecimal(summary.get("collected").toString())));
+        assertEquals(0,new BigDecimal("1300000").compareTo(new BigDecimal(summary.get("balance").toString())));
+        assertEquals(0,new BigDecimal("100000").compareTo(jdbc.queryForObject("SELECT (data->>'advanceReceived')::numeric FROM sos.erp_records WHERE id=?",BigDecimal.class,first)));
+        var receipts=(List<?>)summary.get("receipts");
+        assertEquals(2,receipts.size());
+        assertEquals(0,new BigDecimal("1400000").compareTo(new BigDecimal(((Map<?,?>)receipts.getFirst()).get("balanceAfter").toString())));
+        input.put("advanceReceived",1300001);
+        assertThrows(ApiProblem.class,()->save(f,"bookings",input,UUID.randomUUID(),f.accountant));
+        input.put("advanceReceived",100000); input.put("ratePerSqYard",11000);
+        assertThrows(ApiProblem.class,()->save(f,"bookings",input,UUID.randomUUID(),f.accountant));
+        input.put("ratePerSqYard",10000); input.put("buyerName","Another buyer");
+        assertThrows(ApiProblem.class,()->save(f,"bookings",input,UUID.randomUUID(),f.accountant));
+        input.put("buyerName","Synthetic payment buyer");
+        jdbc.update("UPDATE sos.projects SET details=jsonb_set(details,'{floorRatePerSqYard}','20000') WHERE id=?",f.project);
+        jdbc.update("UPDATE sos.erp_records SET data=jsonb_set(data,'{status}','\"sold\"') WHERE id=?",plot);
+        input.put("advanceReceived",1300000);
+        save(f,"bookings",input,UUID.randomUUID(),f.accountant);
+        balance(f,"1501000");
+        assertEquals(0,new BigDecimal(paymentSummary(f,plot).get("balance").toString()).signum());
+        assertEquals("sold",jdbc.queryForObject("SELECT data->>'status' FROM sos.erp_records WHERE id=?",String.class,plot));
+        input.put("advanceReceived",1);
+        assertThrows(ApiProblem.class,()->save(f,"bookings",input,UUID.randomUUID(),f.accountant));
+        input.put("advanceReceived",0);
+        assertThrows(ApiProblem.class,()->save(f,"bookings",input,UUID.randomUUID(),f.accountant));
+    }
+    @Test void correctedAdditionalReceiptDoesNotReleaseBookingOrLoseHistory() {
+        var f=fixture(); UUID plot=paymentPlot(f);
+        var input=plotPayment(f,plot,100000);
+        UUID first=save(f,"bookings",input,UUID.randomUUID(),f.accountant);
+        UUID second=save(f,"bookings",input,UUID.randomUUID(),f.partner);
+        assertThrows(ApiProblem.class,()->refer(f,first,UUID.randomUUID(),f.accountant));
+        refer(f,second,UUID.randomUUID(),f.partner);
+        balance(f,"101000");
+        assertEquals("reserved",jdbc.queryForObject("SELECT data->>'status' FROM sos.erp_records WHERE id=?",String.class,plot));
+        assertEquals(0,new BigDecimal("1400000").compareTo(new BigDecimal(paymentSummary(f,plot).get("balance").toString())));
+        input.put("advanceReceived",110000);
+        submit(f,second,UUID.randomUUID(),input,f.partner);
+        balance(f,"211000");
+        var summary=paymentSummary(f,plot);
+        assertEquals(0,new BigDecimal("1290000").compareTo(new BigDecimal(summary.get("balance").toString())));
+        assertEquals(3,((List<?>)summary.get("receipts")).size());
+    }
+    @Test void linkedBankReceiptAlsoUsesOutstandingCap() {
+        var f=fixture(); UUID plot=paymentPlot(f);
+        UUID booking=save(f,"bookings",plotPayment(f,plot,100000),UUID.randomUUID(),f.accountant);
+        var receipt=new HashMap<String,Object>(Map.of("accountId",f.bank.toString(),"amount",100000,
+            "type","credit","category","plot_booking_advance","paymentMode","UPI","description","Later customer advance","date","2026-10-13","bookingId",booking.toString()));
+        save(f,"transactions",receipt,UUID.randomUUID(),f.accountant);
+        balance(f,"201000");
+        assertEquals(0,new BigDecimal("1300000").compareTo(new BigDecimal(paymentSummary(f,plot).get("balance").toString())));
+        receipt.put("amount",1300001);
+        assertThrows(ApiProblem.class,()->save(f,"transactions",receipt,UUID.randomUUID(),f.accountant));
+        balance(f,"201000");
+    }
+    @Test void concurrentPlotCollectionsCannotExceedRemainingBalance() throws Exception {
+        var f=fixture(); UUID plot=paymentPlot(f);
+        save(f,"bookings",plotPayment(f,plot,1400000),UUID.randomUUID(),f.accountant);
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var barrier=new java.util.concurrent.CyclicBarrier(2);
+            java.util.concurrent.Callable<Boolean> collect=()-> {
+                barrier.await();
+                try { save(f,"bookings",plotPayment(f,plot,75000),UUID.randomUUID(),f.accountant); return true; }
+                catch(ApiProblem e) { return false; }
+            };
+            var a=pool.submit(collect); var b=pool.submit(collect);
+            assertNotEquals(a.get(15,java.util.concurrent.TimeUnit.SECONDS),b.get(15,java.util.concurrent.TimeUnit.SECONDS));
+            balance(f,"1476000");
+            assertEquals(0,new BigDecimal("25000").compareTo(new BigDecimal(paymentSummary(f,plot).get("balance").toString())));
+        } finally { pool.shutdownNow(); }
+    }
     @Test void bookingPostsImmediatelyAndCorrectionReleasesInventory() {
         var f=fixture(); UUID plot=UUID.randomUUID();
         jdbc.update("""

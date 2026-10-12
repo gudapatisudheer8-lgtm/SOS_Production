@@ -144,11 +144,28 @@ export async function loadAll(role: string): Promise<LoadedData> {
       switch (r.kind) {
         case 'plots': {
           const n = plotSeq++; out.plotIds.set(n, id);
+          const savedPayments = erp.bookingPayments?.[id];
+          const bookingPayments = savedPayments ? {
+            ...savedPayments,
+            ratePerSqYard: num(savedPayments.ratePerSqYard), areaSqYards: num(savedPayments.areaSqYards),
+            totalValue: num(savedPayments.totalValue), collected: num(savedPayments.collected), balance: num(savedPayments.balance),
+            receipts: (savedPayments.receipts || []).map((receipt: any) => ({
+              ...receipt,
+              amount: num(receipt.amount), previousCollected: num(receipt.previousCollected),
+              totalCollected: num(receipt.totalCollected), balanceAfter: num(receipt.balanceAfter),
+              ratePerSqYard: num(receipt.ratePerSqYard), totalValue: num(receipt.totalValue), areaSqYards: num(receipt.areaSqYards),
+            })),
+          } : undefined;
           const pending = recs.find((receipt) => receipt.kind === 'bookings' && receipt.status === 'pending'
             && String(receipt.data?.inventoryId) === id);
           const receipt = pending?.data || {};
           out.plots.push({
             ...d, ...base, id: n, __recordId: id, status: d.status || 'available',
+            ...(bookingPayments ? {
+              bookingPayments, ratePerSqYard: bookingPayments.ratePerSqYard,
+              advanceReceived: bookingPayments.collected,
+              buyerName: bookingPayments.buyerName, buyerPhone: bookingPayments.buyerPhone,
+            } : {}),
             ...(pending ? {
               pendingBookingId: String(pending.id),
               buyerName: receipt.buyerName, buyerPhone: receipt.buyerPhone,
@@ -285,9 +302,9 @@ export async function command<T = any>(action: string, body: Record<string, any>
   return api<T>(`/commands/${action}`, { body: { data: body } });
 }
 
-export async function erpSave(erp: any, projectId: string, kind: string, data: Record<string, any>, existing?: RecordMeta) {
+export async function erpSave(erp: any, projectId: string, kind: string, data: Record<string, any>, existing?: RecordMeta, requestId?: string) {
   return command('erp.save', {
-    projectId, kind, requestId: newRequestId(), data: filterFields(erp, kind, data),
+    projectId, kind, requestId: requestId || newRequestId(), data: filterFields(erp, kind, data),
     ...(existing ? { recordId: existing.id, revision: existing.revision } : {}),
   });
 }

@@ -641,6 +641,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     }
     return firmProjects[0];
   }, [firmProjects, selectedProjectId]);
+  useEffect(() => { setSelectedMobilePlot(null); }, [activeProject?.id, activeFirm?.id]);
 
   // Plots filtered by active project
   const activePlots = useMemo(() => {
@@ -1565,7 +1566,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
       {selectedMobilePlot && (
         <CustomerPlotBookingModal
           isOpen={!!selectedMobilePlot}
-          plot={activePlots.find((p) => p.id === selectedMobilePlot.id) || selectedMobilePlot}
+          plot={activePlots.find((p) => selectedMobilePlot.__recordId
+            ? p.__recordId === selectedMobilePlot.__recordId : p.id === selectedMobilePlot.id) || selectedMobilePlot}
           project={activeProject}
           firm={activeFirm}
           floorRate={activeProject?.floorRatePerSqYard || 0}

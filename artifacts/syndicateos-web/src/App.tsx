@@ -377,15 +377,19 @@ function App() {
 
   // ---------- Inventory ----------
   const handleUpdatePlot = (plot: Plot) => {
-    const id = data?.plotIds.get(plot.id); const meta = id ? metaOf(id) : undefined;
+    const id = plot.__recordId || data?.plotIds.get(plot.id); const meta = id ? metaOf(id) : undefined;
     if (!meta) return unsupported('plot is not a saved backend record.');
+    if (plot.bookingPaymentRequestId && meta.projectId !== activeProjectId)
+      return unsupported('the selected project changed. Reopen the plot in the current project before collecting money.');
     const prev = data?.plots.find((x) => x.id === plot.id);
     if (prev?.pendingBookingId) return unsupported('this plot has a historical unposted booking receipt. Correct & resubmit it from the project statement before changing its booking.');
     if (plot.marketingRequest && plot.marketingRequest.status !== prev?.marketingRequest?.status) {
       return unsupported('marketing booking requests are not reviewed. Holds are placed automatically by the server; record actual received money as a booking instead.');
     }
-    if ((prev?.status === 'available' || prev?.status === 'blocked') && plot.status === 'reserved' && plot.buyerName) {
-      return run(`Booking for plot ${plot.plotNumber} recorded`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'bookings', bookingInput(plot, meta.id)));
+    if (plot.bookingPaymentRequestId ||
+        ((prev?.status === 'available' || prev?.status === 'blocked') && plot.status === 'reserved' && plot.buyerName)) {
+      return run(`Payment for plot ${plot.plotNumber} recorded`, () => erpSave(
+        erpOf(meta.projectId), meta.projectId, 'bookings', bookingInput(plot, meta.id), undefined, plot.bookingPaymentRequestId));
     }
     return run(`Plot ${plot.plotNumber} saved`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'plots', plot, meta));
   };

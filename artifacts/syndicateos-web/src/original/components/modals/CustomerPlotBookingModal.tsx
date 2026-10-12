@@ -1,28 +1,22 @@
 import { MasterOptions } from '../../../adapter/config';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { BookingReceiptView } from './BookingReceiptView';
+import { bookingBusinessDate, createRequestIdKeeper, findCommittedReceipt, paymentPosition, validatePayment, toPaise, fromPaise, receiptAnnotation } from './bookingPayments';
 import { Plot, Project, TenantFirm, FirmAccount, FirmAccountTransaction } from '../../types';
 import { formatINR } from '../../utils/formatters';
 import {
   Compass,
   CheckCircle2,
-  Printer,
-  Copy,
-  Check,
   User,
-  Phone,
-  CreditCard,
-  Building,
-  ShieldCheck,
   X,
-  FileText,
-  Calendar,
   DollarSign,
   AlertTriangle,
   Landmark,
   Lock,
   Clock,
-  Send,
-  AlertCircle
+  AlertCircle,
+  History,
+  Loader2
 } from 'lucide-react';
 
 interface CustomerPlotBookingModalProps {
@@ -59,9 +53,31 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
 
   const [buyerName, setBuyerName] = useState(plot.buyerName || plot.marketingRequest?.buyerName || '');
   const [buyerPhone, setBuyerPhone] = useState(plot.buyerPhone || plot.marketingRequest?.buyerPhone || '');
-  const [buyerAadhaar, setBuyerAadhaar] = useState(plot.buyerAadhaar || '');
-  const [ratePerSqYard, setRatePerSqYard] = useState(plot.ratePerSqYard || plot.marketingRequest?.proposedRatePerSqYard || floorRate);
-  const [advanceReceived, setAdvanceReceived] = useState(plot.advanceReceived || 0);
+  const summary = plot.bookingPayments;
+  const isFirstBooking = !summary && (plot.status === 'available' || plot.status === 'blocked');
+  const [ratePerSqYard, setRatePerSqYard] = useState(
+    summary?.locked ? summary.ratePerSqYard : plot.ratePerSqYard || plot.blockedRate || plot.marketingRequest?.proposedRatePerSqYard || floorRate
+  );
+  // Next payment always starts empty: the user enters only the amount received in THIS payment.
+  const [amountInput, setAmountInput] = useState('');
+  const [paymentDate, setPaymentDate] = useState(bookingBusinessDate);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [awaitingRequestId, setAwaitingRequestId] = useState<string | null>(null);
+  const [historyReceiptId, setHistoryReceiptId] = useState<string | null>(null);
+  const requestIds = useRef(createRequestIdKeeper());
+  const [lastAttemptRequestId, setLastAttemptRequestId] = useState<string | null>(null);
+  // A commit can succeed while the follow-up refresh fails. Recognize its saved
+  // receipt on the next refresh rather than issuing a second payment request.
+  useEffect(() => {
+    const saved = findCommittedReceipt(summary, lastAttemptRequestId);
+    if (!saved?.posted) return;
+    setAwaitingRequestId(lastAttemptRequestId);
+    setAmountInput('');
+    setSubmitError(null);
+    setLastAttemptRequestId(null);
+    requestIds.current.reset();
+  }, [summary, lastAttemptRequestId]);
   const [paymentMode, setPaymentMode] = useState<Plot['paymentMode']>(plot.paymentMode);
   const [paymentRefNumber, setPaymentRefNumber] = useState(plot.paymentRefNumber || '');
   const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
@@ -82,8 +98,6 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
     plot.paymentMilestone || 'Token Advance'
   );
   const [notes, setNotes] = useState(plot.notes || '');
-  const [showReceiptView, setShowReceiptView] = useState(false);
-  const [copiedReceipt, setCopiedReceipt] = useState(false);
   const selectedAccount = availableAccounts.find((a) => a.id === selectedAccountId);
 
 
@@ -125,17 +139,55 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
 
   if (!isOpen) return null;
 
-  const totalPlotValue = plot.areaSqYards * ratePerSqYard;
-  const balancePayable = Math.max(0, totalPlotValue - (advanceReceived || 0));
-  const isBelowFloor = ratePerSqYard < floorRate;
+  const rateLocked = !!summary?.locked;
+  const effectiveRate = rateLocked ? summary!.ratePerSqYard : ratePerSqYard;
+  const position = paymentPosition(summary, plot.areaSqYards, effectiveRate, isFirstBooking ? 0 : plot.advanceReceived || 0);
+  const totalPlotValue = position.totalValue;
+  const maxPayable = position.balance;
+  const historyError = summary?.reconciliationRequired ||
+    (!isFirstBooking && !summary ? 'Saved booking payments could not be verified. Refresh and reopen this plot before collecting money.' : '');
+  const fullyPaid = !historyError && toPaise(maxPayable) <= 0 && toPaise(totalPlotValue) > 0;
+  const validation = validatePayment(amountInput, maxPayable);
+  const enteredPaise = toPaise(Number(amountInput) || 0);
+  const balanceAfterEntry = fromPaise(Math.max(0, toPaise(maxPayable) - (validation.ok ? enteredPaise : 0)));
+  const isBelowFloor = !rateLocked && ratePerSqYard < floorRate;
+  const receipts = summary?.receipts || [];
+  const committedReceipt = findCommittedReceipt(summary, awaitingRequestId);
+  const historyReceipt = receipts.find((r) => r.id === historyReceiptId);
+  const showReceiptView = !!awaitingRequestId;
+  const receiptContext = {
+    firmName: firm.tradeName || firm.name,
+    projectName: project?.name,
+    lpOrReraNumber: project?.lpOrReraNumber || undefined,
+    plotNumber: plot.plotNumber,
+    facing: plot.facing,
+  };
 
   const handleFastToken = (amount: number) => {
-    setAdvanceReceived(amount);
+    const capped = Math.min(toPaise(amount), toPaise(maxPayable));
+    if (capped > 0) setAmountInput(fromPaise(capped).toFixed(2));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (plot.pendingBookingId) return;
+    if (plot.pendingBookingId || submitting) return;
+    if (findCommittedReceipt(summary, lastAttemptRequestId)?.posted) {
+      setAwaitingRequestId(lastAttemptRequestId);
+      setLastAttemptRequestId(null);
+      setAmountInput('');
+      requestIds.current.reset();
+      return;
+    }
+    if (historyError) { setSubmitError(historyError); return; }
+    setSubmitError(null);
+    if (!validation.ok) {
+      setSubmitError(validation.error);
+      return;
+    }
+    if (!paymentDate) {
+      setSubmitError('Select the payment date.');
+      return;
+    }
     if (!paymentMode || !selectedAccountId) {
       alert('Select the payment mode and the project account before submitting this receipt.');
       return;
@@ -145,14 +197,24 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
       return;
     }
 
+    const lockedBuyer = rateLocked && summary ? { name: summary.buyerName, phone: summary.buyerPhone } : null;
+    const finalBuyerName = lockedBuyer?.name || buyerName.trim();
+    const finalBuyerPhone = lockedBuyer?.phone || buyerPhone.trim();
+    const finalRate = rateLocked ? summary!.ratePerSqYard : Number(ratePerSqYard) || floorRate;
+    const fingerprint = JSON.stringify([plot.__recordId || plot.id, validation.amount, paymentDate, paymentMode, selectedAccountId, paymentRefNumber.trim(), finalRate, finalBuyerName, finalBuyerPhone, status, paymentMilestone, notes.trim()]);
+    const requestId = requestIds.current.idFor(fingerprint);
+    setLastAttemptRequestId(requestId);
+
     const updatedPlot: Plot = {
       ...plot,
-      ratePerSqYard: Number(ratePerSqYard) || floorRate,
+      ratePerSqYard: finalRate,
       status,
-      buyerName: buyerName.trim(),
-      buyerPhone: buyerPhone.trim(),
-      buyerAadhaar: buyerAadhaar.trim(),
-      advanceReceived: Number(advanceReceived) || 0,
+      buyerName: finalBuyerName,
+      buyerPhone: finalBuyerPhone,
+      // New positive payment for THIS receipt only; the server keeps cumulative totals.
+      advanceReceived: validation.amount,
+      bookingPaymentDate: paymentDate,
+      bookingPaymentRequestId: requestId,
       paymentMode,
       paymentRefNumber: paymentRefNumber.trim(),
       bookingAccountId: selectedAccountId,
@@ -162,8 +224,22 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
     };
 
     // The booking record carries the advance; the backend posts it to the ledger. No client-side receipt is simulated.
-    const savedOk = await onConfirmBooking(updatedPlot);
-    if (savedOk !== false) setShowReceiptView(true);
+    setSubmitting(true);
+    try {
+      const savedOk = await onConfirmBooking(updatedPlot);
+      if (savedOk === false) {
+        setSubmitError('The payment was not saved. Check the details and retry; retrying the same payment will not record it twice.');
+        return;
+      }
+      requestIds.current.reset();
+      setAmountInput('');
+      setAwaitingRequestId(requestId);
+      setLastAttemptRequestId(null);
+    } catch (err) {
+      setSubmitError(`The payment could not be saved${err instanceof Error && err.message ? `: ${err.message}` : ''}. Retry safely; the same payment keeps its request reference.`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleRelease = () => {
@@ -205,35 +281,6 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
 
   const facingInfo = getFacingBadge(plot.facing);
 
-  const copyReceiptToClipboard = () => {
-    const text = `
---------------------------------------------------
-*${firm.name}*
-${project?.name || 'Venture Layout'} - Fast Booking Voucher
---------------------------------------------------
-Plot Number     : ${plot.plotNumber}
-Facing          : ${plot.facing}
-Plot Extent     : ${plot.areaSqYards} Sq. Yards (${plot.areaSqYards * 9} Sq. Ft)
-Rate per Sq.Yd  : ₹${ratePerSqYard.toLocaleString('en-IN')}
-Total Value     : ₹${totalPlotValue.toLocaleString('en-IN')}
---------------------------------------------------
-Customer Name   : ${buyerName}
-Customer Phone  : ${buyerPhone || 'N/A'}
-Token Paid      : ₹${Number(advanceReceived).toLocaleString('en-IN')} (${paymentMode})
-Payment Ref     : ${paymentRefNumber || 'Cash Receipt / On-Site Spot Token'}
-Booking Status  : ${status.toUpperCase()} (${paymentMilestone})
-Balance Payable : ₹${balancePayable.toLocaleString('en-IN')}
-Date of Booking : ${new Date().toLocaleDateString('en-IN')}
-LP / RERA No.   : ${project?.lpOrReraNumber || firm.reraNumber || 'DTCP Sanctioned'}
---------------------------------------------------
-Thank you for booking with ${firm.name}.
-`.trim();
-
-    navigator.clipboard.writeText(text);
-    setCopiedReceipt(true);
-    setTimeout(() => setCopiedReceipt(false), 3000);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-2xl w-full my-auto overflow-hidden flex flex-col max-h-[92vh]">
@@ -246,7 +293,7 @@ Thank you for booking with ${firm.name}.
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-black text-white">
-                  {plot.plotNumber} - Fast Customer Booking
+                  {plot.plotNumber} - {isFirstBooking ? 'Fast Customer Booking' : 'Customer Plot Collections'}
                 </h3>
                 <span
                   className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
@@ -257,7 +304,7 @@ Thank you for booking with ${firm.name}.
                       : 'bg-red-500/20 text-red-300 border border-red-500/30'
                   }`}
                 >
-                  {showReceiptView ? 'Booking submitted' : plot.status}
+                  {showReceiptView ? 'Payment saved' : plot.status}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -357,138 +404,103 @@ Thank you for booking with ${firm.name}.
           )}
 
           {/* RECEIPT VIEW TOGGLE OR FORM */}
+          {/* PAYMENT POSITION */}
+          {!isFirstBooking && (
+            <div className="grid grid-cols-3 gap-2 text-xs" data-testid="panel-payment-position">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                <span className="text-[10px] font-bold uppercase text-gray-500 block">Agreed total</span>
+                <strong className="font-mono text-sm text-gray-950" data-testid="text-total-value">{formatINR(totalPlotValue)}</strong>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <span className="text-[10px] font-bold uppercase text-emerald-800 block">Collected</span>
+                <strong className="font-mono text-sm text-emerald-950" data-testid="text-collected">{formatINR(position.collected)}</strong>
+              </div>
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-3">
+                <span className="text-[10px] font-bold uppercase text-blue-900 block">Outstanding</span>
+                <strong className="font-mono text-sm text-blue-950" data-testid="text-outstanding">{formatINR(maxPayable)}</strong>
+              </div>
+              <div className="col-span-3 flex flex-wrap items-center gap-2 text-[11px]">
+                {rateLocked && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 font-bold text-slate-800">
+                    <Lock className="w-3 h-3" /> Agreed price locked at {formatINR(summary!.ratePerSqYard)}/Sq.Yd
+                  </span>
+                )}
+                {fullyPaid && (
+                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 font-bold text-emerald-900" data-testid="status-fully-paid">
+                    Fully paid - plot status remains {plot.status}; mark sold/registered separately
+                  </span>
+                )}
+                {!summary && (
+                  <span className="text-gray-500">Totals are from the earlier booking record until the first itemised receipt is saved.</span>
+                )}
+              </div>
+            </div>
+          )}
+
           {showReceiptView ? (
-            /* OFFICIAL BOOKING RECEIPT SLIP */
-            <div className="space-y-4 animate-fade-in">
-              <div className="bg-white p-5 rounded-2xl border-2 border-dashed border-amber-300 shadow-sm space-y-4 font-sans text-xs">
-                <div className="flex justify-between items-start border-b border-gray-200 pb-3">
-                  <div>
-                    <span className="text-[10px] uppercase font-black tracking-wider text-amber-600 block">
-                      Official Booking Token Voucher
-                    </span>
-                    <h4 className="text-base font-black text-gray-950">{firm.name}</h4>
-                    <p className="text-[11px] text-gray-500">
-                      Venture: {project?.name || 'Sanctioned Plotted Layout'} | LP: {project?.lpOrReraNumber || firm.reraNumber || 'DTCP Approved'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-black text-slate-900 bg-amber-100 px-3 py-1 rounded-lg border border-amber-300 font-mono">
-                      {plot.plotNumber}
-                    </span>
-                    <span className="block text-[10px] text-gray-400 mt-1">
-                      Date: {new Date().toLocaleDateString('en-IN')}
-                    </span>
-                  </div>
+            <div className="space-y-3 animate-fade-in">
+              {committedReceipt ? (
+                <BookingReceiptView receipt={committedReceipt} context={receiptContext} />
+              ) : (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-xs text-amber-950 space-y-2" data-testid="status-receipt-loading" role="status">
+                  <div className="flex items-center gap-2 font-black"><Loader2 className="w-4 h-4 animate-spin" /> Payment saved. Loading the official receipt from the books...</div>
+                  <p>The shareable receipt appears only after the server confirms it. Keep this window open; it updates automatically when the refreshed record arrives.</p>
+                  <div className="h-3 w-2/3 rounded bg-amber-200/70 animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-amber-200/70 animate-pulse" />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                    <span className="text-[10px] text-gray-500 block uppercase font-bold">Allottee / Customer</span>
-                    <strong className="text-sm text-gray-900 font-bold block">{buyerName}</strong>
-                    <span className="text-gray-600 font-mono text-[11px] block">📞 {buyerPhone || 'Phone not provided'}</span>
-                    {buyerAadhaar && <span className="text-gray-500 text-[10px] block">ID: {buyerAadhaar}</span>}
-                  </div>
-
-                  <div className="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-200">
-                    <span className="text-[10px] text-emerald-800 block uppercase font-bold">Token Amount Received</span>
-                    <strong className="text-base text-emerald-950 font-black font-mono block">
-                      {formatINR(Number(advanceReceived))}
-                    </strong>
-                    <span className="text-[11px] text-emerald-700 font-semibold block">
-                      Mode: {paymentMode} {paymentRefNumber && `(${paymentRefNumber})`}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-xl overflow-hidden text-xs">
-                  <table className="w-full text-left">
-                    <tbody>
-                      <tr className="border-b border-gray-100 bg-gray-50/80">
-                        <td className="p-2 text-gray-600 font-medium">Plot Facing &amp; Extent:</td>
-                        <td className="p-2 font-bold text-gray-900 text-right">
-                          {plot.facing} • {plot.areaSqYards} Sq. Yards
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="p-2 text-gray-600 font-medium">Agreed Rate per Sq.Yard:</td>
-                        <td className="p-2 font-bold text-gray-900 text-right font-mono">
-                          {formatINR(ratePerSqYard)}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-100 bg-amber-50/40">
-                        <td className="p-2 text-gray-900 font-bold">Total Consideration Value:</td>
-                        <td className="p-2 font-black text-gray-950 text-right font-mono text-sm">
-                          {formatINR(totalPlotValue)}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="p-2 text-emerald-700 font-bold">Advance Token Paid:</td>
-                        <td className="p-2 font-black text-emerald-700 text-right font-mono">
-                          - {formatINR(Number(advanceReceived))}
-                        </td>
-                      </tr>
-                      <tr className="bg-gray-50 font-bold">
-                        <td className="p-2 text-gray-900">Balance Payable at Registration:</td>
-                        <td className="p-2 font-black text-blue-900 text-right font-mono text-sm">
-                          {formatINR(balancePayable)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="pt-3 border-t border-gray-200 flex justify-between items-center text-[10px] text-gray-500">
-                  <div>
-                    <span>Authorised Signature:</span>
-                    <div className="mt-4 font-mono font-bold text-gray-800">For {firm.tradeName || firm.name}</div>
-                  </div>
-                  <div className="text-right">
-                    <span>Customer Acceptance:</span>
-                    <div className="mt-4 font-mono font-bold text-gray-800">{buyerName}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons for Receipt */}
-              <div className="flex flex-wrap items-center justify-between gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setShowReceiptView(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl text-xs"
-                >
-                  ← Edit Booking Form
+              )}
+              <div className="flex justify-between gap-2">
+                <button type="button" data-testid="button-back-to-collections" onClick={() => setAwaitingRequestId(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl text-xs">
+                  Back to collections
                 </button>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={copyReceiptToClipboard}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-xs shadow-xs"
-                  >
-                    {copiedReceipt ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedReceipt ? 'Copied to Clipboard!' : 'Share / Copy Token Slip'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black rounded-xl text-xs shadow-xs border border-amber-600/30"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Print Receipt</span>
-                  </button>
-                </div>
+                <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 font-bold rounded-xl text-xs">Close</button>
               </div>
+            </div>
+          ) : historyReceipt ? (
+            <div className="space-y-3 animate-fade-in">
+              <BookingReceiptView receipt={historyReceipt} context={receiptContext} historical />
+              <button type="button" data-testid="button-close-history-receipt" onClick={() => setHistoryReceiptId(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl text-xs">
+                Back to collections
+              </button>
             </div>
           ) : (
             /* FAST BOOKING FORM */
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            {plot.pendingBookingId && (
-              <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                <strong>Historical unposted receipt.</strong> This {formatINR(advanceReceived)} receipt was saved before entries posted automatically and is not in the books. Its author can Correct &amp; Resubmit it from Project Statements to record it.
+            {receipts.length > 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2" data-testid="panel-payment-history">
+                <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                  <History className="w-4 h-4 text-amber-600" />
+                  <h4 className="font-black text-gray-900 text-xs uppercase tracking-wide">Payment history ({receipts.length})</h4>
+                </div>
+                <ul className="divide-y divide-gray-100">
+                  {receipts.map((r) => {
+                    const note = receiptAnnotation(r);
+                    return (
+                      <li key={r.id} className="flex items-center justify-between gap-3 py-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-gray-900">
+                            <span className="font-mono">{r.receiptNumber}</span> <span className="text-gray-500 font-normal">{r.date} | {r.paymentMode}</span>
+                          </div>
+                          <div className="text-[11px] text-gray-500">Paid to date {formatINR(r.totalCollected)} | Remaining {formatINR(r.balanceAfter)}</div>
+                          {note && <div className="text-[10px] font-bold uppercase text-rose-700">{r.state}</div>}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`font-mono font-black ${note && r.state !== 'recorded' ? 'text-gray-400 line-through' : 'text-emerald-800'}`}>{formatINR(r.amount)}</span>
+                          <button type="button" data-testid={`button-view-receipt-${r.id}`} onClick={() => setHistoryReceiptId(r.id)} className="px-2.5 py-1 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 font-bold text-[11px]">View</button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
-              <fieldset disabled={!!plot.pendingBookingId} className="space-y-4">
+            {plot.pendingBookingId && (
+              <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <strong>Historical unposted receipt.</strong> This {formatINR(plot.advanceReceived || 0)} receipt was saved before entries posted automatically and is not in the books. Its author can Correct &amp; Resubmit it from Project Statements to record it.
+              </div>
+            )}
+              {historyError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{historyError}</div>}
+              <fieldset disabled={!!plot.pendingBookingId || !!historyError} className="space-y-4">
               {/* CUSTOMER IDENTITY */}
               <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
@@ -508,6 +520,7 @@ Thank you for booking with ${firm.name}.
                       required
                       placeholder="e.g. M. Srinivasulu Naidu"
                       value={buyerName}
+                      readOnly={rateLocked}
                       onChange={(e) => setBuyerName(e.target.value)}
                       className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950 focus:bg-white focus:border-amber-500 outline-none"
                     />
@@ -522,24 +535,13 @@ Thank you for booking with ${firm.name}.
                       required
                       placeholder="e.g. 98480 12345"
                       value={buyerPhone}
+                      readOnly={rateLocked}
                       onChange={(e) => setBuyerPhone(e.target.value)}
                       className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-mono font-bold text-gray-950 focus:bg-white focus:border-amber-500 outline-none"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                    Aadhaar / PAN Number (For SRO Registration Allotment)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 5421 8890 1234 or ABCDE1234F"
-                    value={buyerAadhaar}
-                    onChange={(e) => setBuyerAadhaar(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:bg-white focus:border-amber-500 outline-none"
-                  />
-                </div>
               </div>
 
               {/* FINANCIAL PRICING & TOKEN ADVANCE */}
@@ -548,7 +550,7 @@ Thank you for booking with ${firm.name}.
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-amber-700" />
                     <h4 className="font-black text-amber-950 text-xs uppercase tracking-wide">
-                      Pricing &amp; Spot Token Advance
+                      {isFirstBooking ? 'Pricing & Spot Token Advance' : 'Record Next Payment'}
                     </h4>
                   </div>
                   <span className="text-xs font-black text-gray-900 font-mono">
@@ -559,13 +561,16 @@ Thank you for booking with ${firm.name}.
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-700 uppercase mb-1">
-                      Rate per Sq.Yard (Floor: {formatINR(floorRate)})
+                      Agreed Rate per Sq.Yard {rateLocked ? '(locked)' : `(Floor: ${formatINR(floorRate)})`}
                     </label>
                     <input
                       type="number"
                       min={floorRate}
                       step="0.01"
-                      value={ratePerSqYard}
+                      data-testid="input-rate"
+                      readOnly={rateLocked}
+                      title={rateLocked ? 'Agreed price is locked after the first saved receipt.' : undefined}
+                      value={effectiveRate}
                       onChange={(e) => setRatePerSqYard(Number(e.target.value) || 0)}
                       className={`w-full px-3 py-2 rounded-xl text-xs font-mono font-bold outline-none border ${
                         isBelowFloor ? 'border-red-500 bg-red-50 text-red-700' : 'border-amber-300 bg-white text-gray-950'
@@ -581,15 +586,38 @@ Thank you for booking with ${firm.name}.
 
                   <div>
                     <label className="block text-[10px] font-bold text-gray-700 uppercase mb-1">
-                      Spot Advance / Token Amount (₹)
+                      Amount received THIS payment (Rs.)
                     </label>
                     <input
                       type="number"
-                      min="0"
+                      inputMode="decimal"
+                      min="0.01"
+                      max={maxPayable > 0 ? maxPayable : undefined}
                       step="0.01"
-                      value={advanceReceived}
-                      onChange={(e) => setAdvanceReceived(Number(e.target.value) || 0)}
-                      className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-mono font-black text-emerald-800 outline-none"
+                      placeholder={fullyPaid ? 'Nothing outstanding' : 'Enter amount'}
+                      disabled={toPaise(maxPayable) <= 0}
+                      data-testid="input-payment-amount"
+                      value={amountInput}
+                      onChange={(e) => { setAmountInput(e.target.value); setSubmitError(null); }}
+                      className={`w-full px-3 py-2 bg-white border rounded-xl text-xs font-mono font-black text-emerald-800 outline-none disabled:bg-gray-100 ${amountInput && !validation.ok ? 'border-red-500' : 'border-emerald-300'}`}
+                    />
+                    <span className="text-[10px] text-gray-600 block mt-1" data-testid="text-max-payable">
+                      Max payable: <strong className="font-mono">{formatINR(maxPayable)}</strong>
+                    </span>
+                    {amountInput && !validation.ok && (
+                      <span className="text-[10px] text-red-600 font-bold block mt-0.5" data-testid="error-payment-amount">{validation.error}</span>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-700 uppercase mb-1">Payment date</label>
+                    <input
+                      type="date"
+                      required
+                      data-testid="input-payment-date"
+                      value={paymentDate}
+                      max={new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-mono text-gray-900 outline-none"
                     />
                   </div>
                 </div>
@@ -600,13 +628,13 @@ Thank you for booking with ${firm.name}.
                     Quick Token Selection:
                   </span>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {[50000, 100000, 200000, 500000].map((amt) => (
+                    {[50000, 100000, 200000, 500000].filter((amt) => toPaise(amt) < toPaise(maxPayable)).map((amt) => (
                       <button
                         key={amt}
                         type="button"
                         onClick={() => handleFastToken(amt)}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                          advanceReceived === amt
+                          Number(amountInput) === amt
                             ? 'bg-emerald-600 text-white shadow-2xs'
                             : 'bg-white hover:bg-emerald-50 text-gray-700 border border-gray-300'
                         }`}
@@ -616,14 +644,15 @@ Thank you for booking with ${firm.name}.
                     ))}
                     <button
                       type="button"
-                      onClick={() => handleFastToken(totalPlotValue)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                        advanceReceived === totalPlotValue
+                      disabled={toPaise(maxPayable) <= 0}
+                      onClick={() => handleFastToken(maxPayable)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40 ${
+                        toPaise(Number(amountInput) || 0) === toPaise(maxPayable)
                           ? 'bg-emerald-700 text-white shadow-2xs'
                           : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300'
                       }`}
                     >
-                      100% Full Payment
+                      Full balance ({formatINR(maxPayable)})
                     </button>
                   </div>
                 </div>
@@ -703,9 +732,9 @@ Thank you for booking with ${firm.name}.
                 {/* BALANCE RECAP */}
                 <div className="bg-white p-3 rounded-xl border border-amber-200/80 flex items-center justify-between text-xs">
                   <div>
-                    <span className="text-[10px] text-gray-500 font-bold uppercase block">Balance Due:</span>
-                    <strong className="text-sm font-black text-blue-950 font-mono">
-                      {formatINR(balancePayable)}
+                    <span className="text-[10px] text-gray-500 font-bold uppercase block">Outstanding after this payment:</span>
+                    <strong className="text-sm font-black text-blue-950 font-mono" data-testid="text-balance-after">
+                      {formatINR(balanceAfterEntry)}
                     </strong>
                   </div>
                   <div className="text-right">
@@ -719,15 +748,17 @@ Thank you for booking with ${firm.name}.
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                    Booking Status
+                    Booking Status (read-only)
                   </label>
                   <select
                     value={status}
+                    disabled
                     onChange={(e) => setStatus(e.target.value as any)}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none"
                   >
                     <MasterOptions group="plot_statuses" />
                   </select>
+                  <p className="mt-1 text-[10px] text-gray-500">Recording a payment does not automatically mark the plot sold or registered.</p>
                 </div>
 
                 <div>
@@ -758,8 +789,12 @@ Thank you for booking with ${firm.name}.
                 />
               </div>
 
-              {/* SUBMIT BUTTON ROW */}
               </fieldset>
+              {submitError && (
+                <div role="alert" data-testid="error-submit" className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-[11px] font-bold text-rose-900">
+                  <AlertCircle className="w-4 h-4 shrink-0" /> {submitError}
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-200">
                 {plot.status !== 'available' && !plot.pendingBookingId && (
                   <button
@@ -783,10 +818,13 @@ Thank you for booking with ${firm.name}.
                     <span className="text-xs font-bold text-amber-800">Correct &amp; resubmit from Project Statements</span>
                   ) : <button
                     type="submit"
-                    className="px-6 py-2.5 bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black rounded-xl text-xs shadow-md border border-amber-600/30 flex items-center gap-2 active:scale-95 transition-all"
+                    data-testid="button-submit-payment"
+                    disabled={submitting || !!historyError || toPaise(maxPayable) <= 0}
+                    aria-busy={submitting}
+                    className="px-6 py-2.5 bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black rounded-xl text-xs shadow-md border border-amber-600/30 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Confirm Booking &amp; Generate Token Slip</span>
+                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    <span>{submitting ? 'Saving payment...' : toPaise(maxPayable) <= 0 ? 'Nothing outstanding' : isFirstBooking ? 'Confirm Booking & Record Payment' : 'Record This Payment'}</span>
                   </button>}
                 </div>
               </div>

@@ -79,10 +79,12 @@ public class ErpService {
                 FROM sos.erp_audit a JOIN sos.identities i ON i.id=a.actor_id
                 WHERE a.project_id=? ORDER BY a.created_at DESC LIMIT 500
                 """,project);
-            return Map.of("projectId",project,"resources",resources,"records",records,"balances",balances,
+            Map<String,Object> result=new LinkedHashMap<>(Map.of("projectId",project,"resources",resources,"records",records,"balances",balances,
                 "partners",partners,"audit",audit,"settings",settings,"projectSetup",projectPolicy(release),
                 "statement",new FinancialStatementService(jdbc,json).read(project,actor,writable,release),
-                "reviewableRecordIds",List.of());
+                "reviewableRecordIds",List.of()));
+            result.put("bookingPayments",new BookingPayments(jdbc,json).read(project));
+            return result;
         });
     }
     private JsonNode projectPolicy(UUID release) {
@@ -207,7 +209,7 @@ public class ErpService {
               AND (data->>'bookingId'=? OR data->>'expenseId'=?)
             """,Integer.class,project,id,id.toString(),id.toString())>0)
             throw ApiProblem.invalid("Correct the linked receipt or reimbursement first. This entry has dependent records.");
-        if("bookings".equals(kind)) {
+        if("bookings".equals(kind) && !parse(original.get("data")).hasNonNull("_bookingRootId")) {
             UUID inventory=(UUID)original.get("inventory_id");
             var item=record(project,inventory);
             ObjectNode d=(ObjectNode)parse(item.get("data"));
@@ -386,7 +388,10 @@ public class ErpService {
         if(inventory!=null) {
             var item=record(project,inventory);
             if(!Set.of("plots","units").contains(item.get("kind"))) throw ApiProblem.invalid("Choose valid project inventory.");
-            if(!bookable(parse(item.get("data")))) throw ApiProblem.conflict();
+            boolean subsequentPlotPayment="bookings".equals(kind) && "plots".equals(item.get("kind"))
+                && Set.of("reserved","sold").contains(parse(item.get("data")).path("status").asText())
+                && new BookingPayments(jdbc,json).active(project,inventory)!=null;
+            if(!bookable(parse(item.get("data"))) && !subsequentPlotPayment) throw ApiProblem.conflict();
             if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_inventory_reservations WHERE inventory_id=? AND state='active' AND booking_id<>?",Integer.class,inventory,id)>0)
                 throw new ApiProblem(409,"INVENTORY_RESERVED","This inventory is already reserved by a pending booking.");
         }
@@ -411,6 +416,14 @@ public class ErpService {
             var booking=record(project,Values.id(data,"bookingId"));
             if(!"bookings".equals(booking.get("kind"))||!"approved".equals(booking.get("status"))||!"credit".equals(data.path("type").asText()))
                 throw ApiProblem.invalid("Customer receipts require a recorded booking in this project.");
+            var payments=new BookingPayments(jdbc,json);
+            var agreement=payments.active(project,(UUID)booking.get("inventory_id"));
+            if(agreement==null && "plots".equals(record(project,(UUID)booking.get("inventory_id")).get("kind")))
+                throw ApiProblem.invalid("The active sale agreement could not be verified. Reconcile this booking before collecting more money.");
+            if(agreement!=null) {
+                payments.cap(agreement,amount);
+                payments.stamp(data,agreement,amount);
+            }
         }
         if("bookings".equals(kind)&&decimal(data.path("advanceReceived"),false).signum()>0 && account==null)
             throw ApiProblem.invalid("Choose the exact receiving project account for this customer advance.");
@@ -451,14 +464,27 @@ public class ErpService {
             var item=record(project,inventory);
             JsonNode inventoryData=parse(item.get("data"));
             if("plots".equals(item.get("kind"))) {
+                var payments=new BookingPayments(jdbc,json);
+                var agreement=payments.active(project,inventory);
                 BigDecimal proposed=data.hasNonNull("ratePerSqYard")?decimal(data.path("ratePerSqYard"),true):decimal(inventoryData.path("ratePerSqYard"),true);
                 JsonNode details=parse(jdbc.queryForObject("SELECT details::text FROM sos.projects WHERE id=?",String.class,project));
-                if(details.hasNonNull("floorRatePerSqYard")&&proposed.compareTo(details.path("floorRatePerSqYard").decimalValue())<0)
+                if(agreement==null && details.hasNonNull("floorRatePerSqYard")&&proposed.compareTo(details.path("floorRatePerSqYard").decimalValue())<0)
                     throw ApiProblem.invalid("This rate is below the protected project floor. Correct the rate or update the project's floor rate before recording the booking.");
+                if(agreement!=null) {
+                    payments.cap(agreement,amount);
+                    if(proposed.compareTo(new BigDecimal(agreement.get("ratePerSqYard").toString()))!=0
+                        || !data.path("buyerName").asText().equals(agreement.get("buyerName"))
+                        || !data.path("buyerPhone").asText().equals(agreement.get("buyerPhone")))
+                        throw ApiProblem.invalid("The buyer and agreed rate are locked. Record a new payment without changing the sale agreement.");
+                    data.put("_bookingRootId",agreement.get("bookingId").toString());
+                }
                 data.put("ratePerSqYard",proposed);
-                BigDecimal total=proposed.multiply(decimal(inventoryData.path("areaSqYards"),true));
+                BigDecimal area=agreement==null?decimal(inventoryData.path("areaSqYards"),true):new BigDecimal(agreement.get("areaSqYards").toString());
+                BigDecimal total=proposed.multiply(area);
+                data.put("_lockedAreaSqYards",area);
                 data.put("totalValue",total);
                 if(decimal(data.path("advanceReceived"),false).compareTo(total)>0) throw ApiProblem.invalid("The token exceeds the agreed sale value.");
+                payments.stamp(data,agreement,amount);
             }
         }
         if(Set.of("plots","units").contains(kind)) {
@@ -560,6 +586,10 @@ public class ErpService {
             if(inventory==null) throw ApiProblem.invalid("Choose an inventory record.");
             var item=record(project,inventory);
             ObjectNode updated=(ObjectNode)parse(item.get("data"));
+            if(data.hasNonNull("_bookingRootId")) {
+                // Additional receipts never replace a buyer, reset a sale or reserve it again.
+                amount=decimal(data.path("advanceReceived"),true);
+            } else {
             if(!bookable(updated)) throw ApiProblem.conflict();
             jdbc.update("UPDATE sos.erp_records SET inventory_before=?::jsonb WHERE id=?",updated.toString(),id);
             updated.put("status","plots".equals(item.get("kind"))?"reserved":"booked");
@@ -569,6 +599,7 @@ public class ErpService {
             if(data.has("date")) updated.set("bookedAt",data.path("date"));
             jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",updated.toString(),inventory);
             amount=decimal(data.path("advanceReceived"),false);
+            }
         }
         if(amount.signum()==0) return;
         if("reimbursements".equals(kind)) {

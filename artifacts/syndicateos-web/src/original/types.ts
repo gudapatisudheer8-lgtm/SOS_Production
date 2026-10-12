@@ -216,6 +216,7 @@ export interface MarketingBookingRequest {
 }
 
 export interface Plot {
+  __recordId?: string;
   pendingBookingId?: string;
   bookingAccountId?: string;
   id: number;
@@ -246,6 +247,48 @@ export interface Plot {
   blockedForBuyer?: string;
   blockedAt?: string;
   blockedRate?: number;
+  /** Authoritative server summary of booking payments (append-only receipts). */
+  bookingPayments?: BookingPaymentSummary;
+  /** Transient submission-only fields. */
+  bookingPaymentRequestId?: string;
+  bookingPaymentDate?: string;
+}
+
+export interface BookingPaymentReceipt {
+  id: string;
+  requestId: string;
+  receiptNumber: string;
+  date: string;
+  amount: number;
+  previousCollected: number;
+  totalCollected: number;
+  balanceAfter: number;
+  ratePerSqYard: number;
+  totalValue: number;
+  areaSqYards: number;
+  buyerName: string;
+  buyerPhone: string;
+  paymentMode: string;
+  paymentRefNumber: string;
+  accountName: string;
+  recordedBy: string;
+  state: 'recorded' | 'reversed' | 'replaced' | 'unposted' | (string & {});
+  posted: boolean;
+}
+
+export interface BookingPaymentSummary {
+  reconciliationRequired?: string;
+  inventoryId: string;
+  bookingId?: string;
+  locked: boolean;
+  ratePerSqYard: number;
+  areaSqYards: number;
+  totalValue: number;
+  collected: number;
+  balance: number;
+  buyerName: string;
+  buyerPhone: string;
+  receipts: BookingPaymentReceipt[];
 }
 
 export interface LayoutCalculation {

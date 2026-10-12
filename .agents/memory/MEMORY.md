@@ -10,4 +10,5 @@
 - [EC2 update handoffs](ec2-update-handoffs.md) — use current package names and inline checksum verification; keep fail-fast checks inside a subshell.
 - [Marketing access](marketing-access.md) — personal project invitations, mandatory initial credential change, and credentials independent of accountant/partner login.
 - [Financial projections](financial-projections.md) — shared posted-ledger views prevent double counting; read-only snapshots require non-locking access checks.
+- [Payment retry recovery](payment-retry-recovery.md) — a failed refresh can follow a successful payment; recover its receipt before allowing a new request.
 - [Blueprint review](blueprint-review.md) — original plan → reviewed AI/manual geometry → illustrative 3D; no invented measurements or changes to bookings/money.
