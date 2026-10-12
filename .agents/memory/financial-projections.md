@@ -27,3 +27,7 @@ Use recorded inventory areas and catalog rates for gross-sales projections; do n
 The first actual plot advance must lock the agreed per-square-yard rate and sale value. Each later payment is a separate receipt that increases cumulative posted collections and reduces the remaining balance; reject overpayments and show saved history per plot.
 **Why:** the user reported that reopening a booked plot did not show receipts and another advance left the same balance; they explicitly want locked pricing, cumulative payments and complete customer-shareable receipts.
 **How to apply:** derive collections from linked posted events net of corrections, not a mutable advance field. Persist historical receipt snapshots, keep payment completion separate from Sold/Registered status, and never infer additional received money from a plot edit.
+
+Keep the plot booking/payment enhancement within the existing Fast Customer Booking form only.
+**Why:** the user explicitly said, "please don't add anywhere else other than in this form."
+**How to apply:** place locked pricing, cumulative balances, payment history, additional collection and receipt viewing/sharing inside that existing modal. Do not add separate pages, dashboard tabs or payment forms elsewhere; backend bookkeeping may still support the existing form.
