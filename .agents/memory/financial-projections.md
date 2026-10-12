@@ -23,3 +23,7 @@ Use recorded inventory areas and catalog rates for gross-sales projections; do n
 **Why:** The user stressed that financial numbers must reflect their actual source records. An assumed margin in a financial dashboard can look like a real calculated value.
 
 **How to apply:** Keep projected sales separate from posted cash. Combined project-account balances and their breakdown use posted cash entries only, including opening capital, receipts, expenses and drawings.
+
+The first actual plot advance must lock the agreed per-square-yard rate and sale value. Each later payment is a separate receipt that increases cumulative posted collections and reduces the remaining balance; reject overpayments and show saved history per plot.
+**Why:** the user reported that reopening a booked plot did not show receipts and another advance left the same balance; they explicitly want locked pricing, cumulative payments and complete customer-shareable receipts.
+**How to apply:** derive collections from linked posted events net of corrections, not a mutable advance field. Persist historical receipt snapshots, keep payment completion separate from Sold/Registered status, and never infer additional received money from a plot edit.
