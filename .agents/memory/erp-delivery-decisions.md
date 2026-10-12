@@ -30,6 +30,6 @@ Dashboard delivery requires verifying the firm's assigned release and rendered i
 **Why:** additive configuration updates deliberately preserve existing firm assignments for compatibility; a healthy deployment can still display the old dashboard. Incorrect release names in rollout instructions caused unnecessary user effort.
 **How to apply:** use actual published release labels rather than planning terminology, keep activation owner-controlled, and distinguish successful installation from verified dashboard activation.
 
-The user now requests removing all approval processes throughout the application, replacing them with push notifications and a notification bell. This supersedes the earlier independent-approval requirement.
+The user now requests removing all approval processes throughout the application, replacing them with a notification bell plus browser and mobile push notifications. This supersedes the earlier independent-approval requirement.
 **Why:** the user wants to simplify the application and explicitly said approvals must be removed everywhere.
 **How to apply:** treat this as the requested target, not as an already implemented policy. Preserve financial integrity and audit identities while drafting the change; obtain an explicit decision before posting or discarding existing pending records.

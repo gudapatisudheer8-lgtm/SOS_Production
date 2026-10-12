@@ -17,7 +17,7 @@ The user expects the automatic Cash account to be visible in Add Project's banki
 
 **Why:** The user explicitly requested this so cash transactions contribute to the complete ledger of the respective project.
 
-**How to apply:** Show the planned Cash account clearly as created on save, without fabricating a saved account ID. Provision it automatically without invented bank details or opening money. Route project cash receipts/payments to that project's cash account; distinguish partner-personal spending from project cash and preserve existing approvals and posting history.
+**How to apply:** Show the planned Cash account clearly as created on save, without fabricating a saved account ID. Provision it automatically without invented bank details or opening money. Route project cash receipts/payments to that project's cash account; distinguish partner-personal spending from project cash and preserve posting history. Follow the newer approval-removal target in ERP delivery decisions.
 
 The user requires plots, roads, utilities and other allocated spaces together to stay within the declared venture area, with synchronized automatic calculations and visible free/unallocated area.
 
@@ -36,3 +36,9 @@ Approach-road widths and plot frontage road widths are independent measurements.
 **Why:** A saved approach width does not establish the width of every internal road, and facing-based visual sectors do not identify actual road segments.
 
 **How to apply:** Use the selected project's saved approach measurement and each plot's own saved width. Keep schematic road segments unspecified until their measurements are explicitly recorded.
+
+For the project-form simplification request, do not remove any project fields. Add Project must open an empty new-project form; editing the selected existing project is a separate action.
+
+**Why:** The user corrected an interpretation of their screenshot: the highlight identified existing project details appearing in Add Project, not fields they wanted deleted.
+
+**How to apply:** Keep create and edit modes distinct, retain all setup fields, and scope the selected project to the selected authorized firm.
