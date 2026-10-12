@@ -27,6 +27,7 @@ import type {
   CompanyLookupResult,
   CredentialInput,
   GetBusinessMasters200,
+  GetProjectNotifications200,
   HealthStatus,
   LoginInput,
   LoginResult,
@@ -65,6 +66,148 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetProjectNotificationsUrl = () => {
+
+
+
+
+  return `/api/notifications`
+}
+
+/**
+ * Project activity visible only through current active firm/project membership. No approvals are required.
+ */
+export const getProjectNotifications = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetProjectNotifications200> => {
+
+  return customFetch<GetProjectNotifications200>(getGetProjectNotificationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectNotificationsQueryKey = () => {
+    return [
+    `/api/notifications`
+    ] as const;
+    }
+
+
+export const getGetProjectNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof getProjectNotifications>>, TError = ErrorType<ApiFailureResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectNotificationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectNotifications>>> = ({ signal }) => getProjectNotifications({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectNotifications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectNotificationsQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectNotifications>>>
+export type GetProjectNotificationsQueryError = ErrorType<ApiFailureResponse>
+
+
+
+export function useGetProjectNotifications<TData = Awaited<ReturnType<typeof getProjectNotifications>>, TError = ErrorType<ApiFailureResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectNotificationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getMarkProjectNotificationReadUrl = (notificationId: string,) => {
+
+
+
+
+  return `/api/notifications/${notificationId}/read`
+}
+
+export const markProjectNotificationRead = async (notificationId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getMarkProjectNotificationReadUrl(notificationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkProjectNotificationReadMutationKey = () => ['markProjectNotificationRead'] as const;
+
+export const getMarkProjectNotificationReadMutationOptions = <TError = ErrorType<ApiFailureResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markProjectNotificationRead>>, TError,MarkProjectNotificationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markProjectNotificationRead>>, TError,MarkProjectNotificationReadMutationVariables, TContext> => {
+
+const mutationKey = getMarkProjectNotificationReadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markProjectNotificationRead>>, MarkProjectNotificationReadMutationVariables> = (props) => {
+          const {notificationId} = props ?? {};
+
+          return  markProjectNotificationRead(notificationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkProjectNotificationReadMutationResult = NonNullable<Awaited<ReturnType<typeof markProjectNotificationRead>>>
+
+    export type MarkProjectNotificationReadMutationError = ErrorType<ApiFailureResponse>
+    export type MarkProjectNotificationReadMutationVariables = {notificationId: string}
+
+    export const useMarkProjectNotificationRead = <TError = ErrorType<ApiFailureResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markProjectNotificationRead>>, TError,MarkProjectNotificationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markProjectNotificationRead>>,
+        TError,
+        MarkProjectNotificationReadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkProjectNotificationReadMutationOptions(options));
+    }
 
 export const getGetBusinessMastersUrl = () => {
 
@@ -760,6 +903,16 @@ export const getExecuteCommandUrl = (action: string,) => {
  * master.save is owner-only and requires revision when updating an existing choice.
  * partner.update and partner.status are accountant-only, require project membership
  * revision and affect only that project, never another firm's identity name.
+ * erp.save posts valid financial entries immediately; erp.review is disabled.
+ * erp.refer-back takes projectId, recordId, revision, requestId and a required reason.
+ * It appends a balanced reversal and returns the original record for correction,
+ * or refers an unposted historical record without moving money.
+ * erp.resubmit takes projectId, recordId, revision, requestId and corrected data.
+ * Only the original author may resubmit. It creates a new posted replacement;
+ * original entries and reversals remain immutable. Failed corrections roll back.
+ * Project statement entries expose postingState, revision, canReferBack,
+ * canResubmit, correctionReason, correctionFields and correctionData. Approver
+ * names and approval status are not part of the statement contract.
  */
 export const executeCommand = async (action: string,
     commandInput: CommandInput, options?: Parameters<typeof customFetch>[1]): Promise<CommandResult> => {

@@ -68,8 +68,8 @@ class ExpenseEnrollmentIntegrationTest {
         var expenseData=new HashMap<String,Object>(Map.of("amount",40000,"category","Labor Wages","date","2026-10-10",
             "note","No-partner exception test","paymentSource","project_bank","paymentMode","RTGS / NEFT","accountId",bank.toString()));
         UUID own=save(actor,project,expenseData);
-        assertTrue(((List<?>)service.read(actor,project).get("reviewableRecordIds")).contains(own.toString()));
-        review(actor,project,own,1);
+        assertTrue(((List<?>)service.read(actor,project).get("reviewableRecordIds")).isEmpty());
+        assertThrows(ApiProblem.class,()->review(actor,project,own,1));
         assertEquals(0,balance(bank).compareTo(new BigDecimal("10000")));
         UUID partner=UUID.randomUUID();
         jdbc.update("INSERT INTO sos.identities(id,mobile,display_name,credential_hash) VALUES(?,'+919666669001','Approval partner','not-a-login-hash')",partner);
@@ -79,7 +79,7 @@ class ExpenseEnrollmentIntegrationTest {
         UUID blocked=save(actor,project,expenseData);
         assertFalse(((List<?>)service.read(actor,project).get("reviewableRecordIds")).contains(blocked.toString()));
         assertThrows(ApiProblem.class,()->review(actor,project,blocked,1));
-        assertEquals(0,balance(bank).compareTo(new BigDecimal("10000")));
+        assertEquals(0,balance(bank).compareTo(new BigDecimal("9999")));
     }
     private void review(SessionAccount actor,UUID project,UUID record,int revision) {
         service.execute(actor,"erp.review",node(Map.of("projectId",project.toString(),"recordId",record.toString(),
@@ -92,12 +92,10 @@ class ExpenseEnrollmentIntegrationTest {
         assertEquals(0,new BigDecimal(expected).compareTo(balance(account)));
     }
     private void clear(SessionAccount first,SessionAccount second,UUID project,UUID id) {
-        review(first,project,id,1);
-        if("pending".equals(jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,id)))
-            review(second,project,id,2);
         assertEquals("approved",jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,id));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_approvals WHERE record_id=?",Integer.class,id));
     }
-    @Test void accountantExpenseIsPendingAndOnlyIndependentFundedApprovalDebits() {
+    @Test void accountantExpensePostsImmediatelyAndFundsAreCheckedAtSave() {
         UUID firm=UUID.randomUUID(),project=UUID.randomUUID(),bank=UUID.randomUUID(),funding=UUID.randomUUID();
         List<SessionAccount> actors=new ArrayList<>();
         for(int i=0;i<3;i++) {
@@ -131,32 +129,27 @@ class ExpenseEnrollmentIntegrationTest {
         var input=new HashMap<String,Object>(Map.of("amount",40000,"category","Labor Wages","date","2026-10-10",
             "note","Spot tractor payment","paymentSource","project_bank","paymentMode","RTGS / NEFT","accountId",bank.toString()));
         UUID expense=save(recorder,project,input);
-        assertEquals("pending",jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,expense));
+        assertEquals("approved",jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,expense));
         assertNull(jdbc.queryForObject("SELECT partner_id FROM sos.erp_records WHERE id=?",UUID.class,expense));
-        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,expense));
-        assertEquals(0,balance(bank).compareTo(new BigDecimal("100000")));
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,expense));
+        assertEquals(0,balance(bank).compareTo(new BigDecimal("60000")));
         var records=(List<?>)service.read(recorder,project).get("records");
         assertTrue(records.stream().anyMatch(r -> ((Map<?,?>)r).get("id").equals(expense)
             && ((Map<?,?>)r).get("createdByName").equals(recorder.displayName())));
         assertThrows(ApiProblem.class,()->review(recorder,project,expense,1));
-        review(actors.get(1),project,expense,1);
-        assertEquals("pending",jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,expense));
-        review(actors.get(2),project,expense,2);
+        assertThrows(ApiProblem.class,()->review(actors.get(1),project,expense,1));
+        assertThrows(ApiProblem.class,()->review(actors.get(2),project,expense,1));
         assertEquals("approved",jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,expense));
         assertEquals(0,balance(bank).compareTo(new BigDecimal("60000")));
         assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,expense));
         UUID repeated=expense;
         assertThrows(ApiProblem.class,()->review(actors.get(2),project,repeated,3));
         input.put("amount",80000);
-        UUID insufficient=save(recorder,project,input);
-        review(actors.get(1),project,insufficient,1);
-        assertThrows(ApiProblem.class,()->review(actors.get(2),project,insufficient,2));
-        assertEquals("pending",jdbc.queryForObject("SELECT status FROM sos.erp_records WHERE id=?",String.class,insufficient));
+        assertThrows(ApiProblem.class,()->save(recorder,project,input));
         assertEquals(0,balance(bank).compareTo(new BigDecimal("60000")));
         input.put("paymentMode","Cash");
-        UUID cashExpense=save(recorder,project,input);
+        assertThrows(ApiProblem.class,()->save(recorder,project,input));
         UUID cashAccount=jdbc.queryForObject("SELECT account_record_id FROM sos.project_cash_accounts WHERE project_id=?",UUID.class,project);
-        assertEquals(cashAccount,jdbc.queryForObject("SELECT account_id FROM sos.erp_records WHERE id=?",UUID.class,cashExpense));
         assertEquals(0,balance(bank).compareTo(new BigDecimal("60000")));
         UUID payer=UUID.randomUUID();
         jdbc.update("INSERT INTO sos.identities(id,mobile,display_name,credential_hash,must_change_credential) VALUES(?,'+919777772009','Expense test partner','test-only',false)",payer);
@@ -171,21 +164,21 @@ class ExpenseEnrollmentIntegrationTest {
             assertEquals(mode.getValue(),jdbc.queryForObject("SELECT data->>'paymentMode' FROM sos.erp_records WHERE id=?",String.class,personal));
             assertNull(jdbc.queryForObject("SELECT account_id FROM sos.erp_records WHERE id=?",UUID.class,personal));
             assertEquals(payer,jdbc.queryForObject("SELECT partner_id FROM sos.erp_records WHERE id=?",UUID.class,personal));
-            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,personal));
+            assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,personal));
         }
         var partner=new SessionAccount(payer,"PARTNER","Expense test partner","+919777772009",false,firm,"EXP-UNIT");
-        // A named spender is not the submitter: creator alone determines self-approval.
+        // Attribution does not grant author-only correction permissions.
         for(UUID attributedExpense:attributedExpenses) {
-            assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(attributedExpense.toString()));
+            assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).isEmpty());
             assertFalse(((List<?>)service.read(recorder,project).get("reviewableRecordIds")).contains(attributedExpense.toString()));
             assertThrows(ApiProblem.class,()->review(recorder,project,attributedExpense,1));
-            review(partner,project,attributedExpense,1);
+            assertThrows(ApiProblem.class,()->review(partner,project,attributedExpense,1));
             assertFalse(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(attributedExpense.toString()));
         }
         UUID bankInvestment=saveKind(partner,project,"investments",new HashMap<>(Map.of(
             "partnerId",payer.toString(),"accountId",bank.toString(),"amount","10000.25",
             "date","2026-10-10","purpose","Partner capital","paymentMode","Bank Wire (RTGS / NEFT)")));
-        assertMoney("60000",bank);
+        assertMoney("70000.25",bank);
         assertFalse(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(bankInvestment.toString()));
         assertThrows(ApiProblem.class,()->review(partner,project,bankInvestment,1));
         clear(recorder,actors.get(1),project,bankInvestment);
@@ -193,7 +186,7 @@ class ExpenseEnrollmentIntegrationTest {
         UUID cashInvestment=saveKind(recorder,project,"investments",new HashMap<>(Map.of(
             "partnerId",payer.toString(),"accountId",cashAccount.toString(),"amount","5000.50",
             "date","2026-10-10","purpose","Partner capital","paymentMode","Cash - Site Cash Vault Deposit")));
-        assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(cashInvestment.toString()));
+        assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).isEmpty());
         assertThrows(ApiProblem.class,()->review(recorder,project,cashInvestment,1));
         clear(partner,actors.get(1),project,cashInvestment);
         assertMoney("5000.50",cashAccount);
@@ -233,9 +226,9 @@ class ExpenseEnrollmentIntegrationTest {
         booking.put("advanceReceived","100000");
         booking.put("ratePerSqYard",10000);
         UUID cashReceipt=saveKind(recorder,project,"bookings",booking);
-        assertMoney("3700.15",cashAccount); // Pending receipts never inflate cleared cash.
-        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,cashReceipt));
-        assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).contains(cashReceipt.toString()));
+        assertMoney("103700.15",cashAccount); // Actual receipts post immediately.
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,cashReceipt));
+        assertTrue(((List<?>)service.read(partner,project).get("reviewableRecordIds")).isEmpty());
         assertFalse(((List<?>)service.read(recorder,project).get("reviewableRecordIds")).contains(cashReceipt.toString()));
         assertThrows(ApiProblem.class,()->review(recorder,project,cashReceipt,1));
         clear(partner,actors.get(1),project,cashReceipt);
@@ -247,10 +240,14 @@ class ExpenseEnrollmentIntegrationTest {
         var accountantView=service.read(recorder,project);
         var partnerView=service.read(partner,project);
         assertEquals(accountantView.get("balances"),partnerView.get("balances"));
-        assertEquals(accountantView.get("statement"),partnerView.get("statement"));
+        // Money projection is shared; allowed correction actions depend on the signed-in actor.
+        var accountantEntries=(List<Map<String,Object>>)accountantView.get("statement");
+        var partnerEntries=(List<Map<String,Object>>)partnerView.get("statement");
+        assertEquals(accountantEntries.stream().map(e->List.of(e.get("id"),e.get("amount"),e.get("affectsCash"))).toList(),
+            partnerEntries.stream().map(e->List.of(e.get("id"),e.get("amount"),e.get("affectsCash"))).toList());
         var totals=((List<Map<String,Object>>)partnerView.get("partners")).getFirst();
         assertEquals("15000.75",totals.get("invested")); assertEquals("3000.15",totals.get("drawings"));
-        assertEquals("0",new BigDecimal(totals.get("expenses").toString()).stripTrailingZeros().toPlainString());
+        assertEquals("160000",new BigDecimal(totals.get("expenses").toString()).stripTrailingZeros().toPlainString());
         var statement=(List<Map<String,Object>>)partnerView.get("statement");
         assertEquals(statement.size(),statement.stream().map(e->e.get("id")).distinct().count());
     }

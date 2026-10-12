@@ -6,7 +6,7 @@ import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-/** Trusted capabilities are code; editable form labels, fields and approval policies are immutable release data. */
+/** Trusted capabilities are code; editable form labels/fields are immutable release data. Saves post directly. */
 @Service
 public class ErpConfiguration {
     public static final Set<String> KINDS=Set.of("accounts","transactions","investments","expenses","budgets",
@@ -15,16 +15,24 @@ public class ErpConfiguration {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     public ErpConfiguration(JdbcTemplate jdbc,ObjectMapper json) { this.jdbc=jdbc; this.json=json; }
+    /** Historical releases retain evidence, but live forms never expose approval inputs. */
+    public static JsonNode liveFields(String kind,JsonNode fields) {
+        if(!FINANCIAL.contains(kind)) return fields;
+        var clean=com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode();
+        Set<String> obsolete=Set.of("approvalWorkflow","approvalStatus","approvedBy","approvedAt","approvedByPartners",
+            "approverName","approverId","reviewDecision","reviewedBy","reviewedAt","requiresManagingPartnerSignoff","status");
+        for(JsonNode field:fields) if(!obsolete.contains(field.path("key").asText())) clean.add(field);
+        return clean;
+    }
     public ArrayNode read(UUID release) {
         ArrayNode result=json.createArrayNode();
         for(var r:jdbc.queryForList("SELECT * FROM sos.erp_resources WHERE release_id=? ORDER BY kind",release)) {
             var item=result.addObject().put("kind",r.get("kind").toString()).put("title",r.get("title").toString())
-                .put("financial",(Boolean)r.get("financial")).put("approvalCount",(Integer)r.get("approval_count"));
+                .put("financial",(Boolean)r.get("financial"));
             try {
-                item.set("fields",json.readTree(r.get("fields").toString()));
-                for(String key:List.of("submit","manage","review"))
+                item.set("fields",liveFields(r.get("kind").toString(),json.readTree(r.get("fields").toString())));
+                for(String key:List.of("submit","manage"))
                     item.set(key+"Roles",json.valueToTree(((java.sql.Array)r.get(key+"_roles")).getArray()));
-                if(r.get("approval_threshold")!=null) item.put("approvalThreshold",(java.math.BigDecimal)r.get("approval_threshold"));
             } catch(Exception e) { throw new IllegalStateException("Invalid ERP resource configuration",e); }
         }
         return result;
@@ -39,9 +47,7 @@ public class ErpConfiguration {
             if(!KINDS.contains(kind)||!kinds.add(kind)) errors.add("Unknown or duplicated ERP resource.");
             if(r.path("title").asText().isBlank()||r.path("title").asText().length()>120) errors.add("Each ERP resource needs a bounded title.");
             if(r.path("financial").asBoolean()!=FINANCIAL.contains(kind)) errors.add("Financial resources must retain their trusted posting handler.");
-            if(r.path("approvalCount").asInt()<1||r.path("approvalCount").asInt()>10) errors.add("Approval count must be 1–10.");
-            if(r.has("approvalThreshold")&&(!r.path("approvalThreshold").isNumber()||r.path("approvalThreshold").decimalValue().signum()<0)) errors.add("Invalid approval threshold.");
-            for(String permission:List.of("submit","manage","review")) {
+            for(String permission:List.of("submit","manage")) {
                 JsonNode roles=r.path(permission+"Roles");
                 if(!roles.isArray()||roles.size()>2) errors.add("Supply explicit resource roles.");
                 Set<String> found=new HashSet<>();
@@ -73,9 +79,9 @@ public class ErpConfiguration {
         for(JsonNode r:resources) jdbc.update("""
             INSERT INTO sos.erp_resources(release_id,kind,title,fields,submit_roles,manage_roles,review_roles,financial,approval_count,approval_threshold)
             VALUES (?,?,?,?::jsonb,string_to_array(?,','),string_to_array(?,','),string_to_array(?,','),?,?,?)
-            """,release,r.path("kind").asText(),r.path("title").asText(),r.path("fields").toString(),
-            roles(r.path("submitRoles")),roles(r.path("manageRoles")),roles(r.path("reviewRoles")),
-            FINANCIAL.contains(r.path("kind").asText()),r.path("approvalCount").asInt(),r.has("approvalThreshold")?r.path("approvalThreshold").decimalValue():null);
+            """,release,r.path("kind").asText(),r.path("title").asText(),liveFields(r.path("kind").asText(),r.path("fields")).toString(),
+            roles(r.path("submitRoles")),roles(r.path("manageRoles")),"",
+            FINANCIAL.contains(r.path("kind").asText()),1,null);
     }
     private String roles(JsonNode roles) { List<String> values=new ArrayList<>(); roles.forEach(v->values.add(v.asText())); return String.join(",",values); }
 }

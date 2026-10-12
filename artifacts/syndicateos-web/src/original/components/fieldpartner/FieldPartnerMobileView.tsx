@@ -54,7 +54,7 @@ import {
   KeyRound
 } from 'lucide-react';
 import { OpenPlottingModule } from '../accountant/OpenPlottingModule';
-import { ProjectStatementModule } from '../accountant/ProjectStatementModule';
+import { ProjectStatementModule, type UnifiedProjectTransaction } from '../accountant/ProjectStatementModule';
 import { CustomerPlotBookingModal } from '../modals/CustomerPlotBookingModal';
 import { IndividualInvestmentModal, IndividualInvestmentData } from '../modals/IndividualInvestmentModal';
 import { EntryDialog } from './EntryDialog';
@@ -118,7 +118,8 @@ export interface FieldPartnerMobileViewProps {
   onAddStockDraw?: (draw: PartnerStockDraw) => void | boolean | Promise<boolean>;
   onApproveExpense?: (expenseId: string, signoff?: string) => void;
   onRejectExpense?: (expenseId: string) => void;
-  onReviewFinancial?: (id: string, decision: 'approved' | 'rejected') => Promise<boolean>;
+  onReferBackFinancial?: (entry: UnifiedProjectTransaction, reason: string, requestId: string) => Promise<boolean>;
+  onResubmitFinancial?: (entry: UnifiedProjectTransaction, data: Record<string, any>, requestId: string) => Promise<boolean>;
   ledgerMode?: LedgerMode;
   onUpdatePartner?: (partner: SyndicatePartner) => void | boolean | Promise<boolean>;
   individualInvestments?: IndividualInvestmentRecord[];
@@ -144,26 +145,26 @@ const translations = {
     // Top Bar 5 Tabs
     tabDashboard: 'Dashboard',
     tabInvestments: 'Enroll Investment & History',
-    tabExpensesApprovals: 'Expenses, Approvals & Drawing Request',
+    tabExpensesApprovals: 'Expenses & Drawing Request',
     tabPlots: 'Plots',
     tabStatements: 'Project Statements',
 
     // Investment Tab Specific
     enrollInvestmentBtn: '+ Enroll Investment',
     investmentsBannerTitle: 'Syndicate Capital Enrollment & Investment Records Desk',
-    investmentsBannerSubtitle: 'Record individual partner investments in Cash or Bank, review consensus sign-offs, and inspect historical audit receipts.',
+    investmentsBannerSubtitle: 'Record individual partner investments in Cash or Bank, and inspect historical audit receipts.',
     investmentRecordsHistory: 'Investment Records History',
     filterAllInvestments: 'All Records',
     filterMyInvestments: 'My Contributions',
     filterCashOnly: 'Cash Only',
     filterBankOnly: 'Bank Accounts',
-    filterInvPending: 'Pending Sign-off',
-    filterInvApproved: 'Verified & Cleared',
+    filterInvPending: 'Not posted (historical)',
+    filterInvApproved: 'Recorded',
     noInvestmentsFound: 'No investment records matching current filters',
     investedAmount: 'Invested Amount',
     depositAccount: 'Target Vault / Bank',
     paymentChannel: 'Payment Channel',
-    consensusSignoff: 'Consensus Sign-off',
+    consensusSignoff: 'Posting',
 
     // Dashboard - Net Share & KPIs
     netShareBalance: 'My Net Share Balance',
@@ -201,8 +202,8 @@ const translations = {
     viewPassbookBtn: 'Open Project Statements',
 
     // Expenses, Approvals & Drawing Request
-    expensesBannerTitle: 'Expenses, Approvals & Drawing Request Desk',
-    expensesBannerSubtitle: 'Enroll on-site project expenditures, review approval statuses, and request capital/dividend draws.',
+    expensesBannerTitle: 'Expenses & Drawing Request Desk',
+    expensesBannerSubtitle: 'Enroll on-site project expenditures, see what is recorded, and request capital/dividend draws.',
     enrollExpenseTitle: 'Enroll Project Expenses',
     enrollExpenseDesc: 'Instant spot entry with photo receipt attachment and voice narration note',
     expenseAmount: 'Expense Amount (₹)',
@@ -215,12 +216,12 @@ const translations = {
     voiceNote: 'Record Voice Memo',
     voiceRecorded: 'Voice Memo (14s ✓)',
     recordingVoice: 'Recording voice...',
-    submitExpenseBtn: 'Submit Expense for Approval',
-    pendingApprovalsTitle: 'Approvals Desk & Submitted Claims',
+    submitExpenseBtn: 'Record Expense',
+    pendingApprovalsTitle: 'Recorded Claims',
     filterAll: 'All Records',
-    filterPending: 'Pending Approval',
-    filterApproved: 'Approved & Cleared',
-    approveBtn: 'Approve Voucher',
+    filterPending: 'Not posted (historical)',
+    filterApproved: 'Recorded',
+    approveBtn: 'Voucher',
     noExpenses: 'No expense records found',
 
     // Drawing Request
@@ -234,8 +235,8 @@ const translations = {
     availableBalance: 'Available Net Balance',
     priorDraws: 'Prior Cumulative Draws',
     recentDraws: 'Drawing Requests History',
-    statusPending: 'Awaiting Clearance',
-    statusApproved: 'Approved / Disbursed',
+    statusPending: 'Not posted (historical)',
+    statusApproved: 'Recorded',
     noDrawings: 'No drawing requests submitted yet',
 
     // Plots Tab
@@ -274,7 +275,7 @@ const translations = {
     // Top Bar 5 Tabs
     tabDashboard: 'డాష్‌బోర్డ్',
     tabInvestments: 'పెట్టుబడి నమోదు & రికార్డులు',
-    tabExpensesApprovals: 'ఖర్చులు, ఆమోదాలు & డ్రాయింగ్ అభ్యర్థన',
+    tabExpensesApprovals: 'ఖర్చులు & డ్రాయింగ్ అభ్యర్థన',
     tabPlots: 'ప్లాట్లు',
     tabStatements: 'ప్రాజెక్ట్ స్టేట్‌మెంట్స్',
 
@@ -287,13 +288,13 @@ const translations = {
     filterMyInvestments: 'నా పెట్టుబడులు',
     filterCashOnly: 'నగదు మాత్రమే',
     filterBankOnly: 'బ్యాంక్ బదిలీలు',
-    filterInvPending: 'ఆమోదం కోసం వేచి ఉంది',
-    filterInvApproved: 'ఆమోదించబడింది',
+    filterInvPending: 'నమోదు కాని పాత రికార్డులు',
+    filterInvApproved: 'నమోదైంది',
     noInvestmentsFound: 'ఎటువంటి పెట్టుబడి రికార్డులు కనుగొనబడలేదు',
     investedAmount: 'పెట్టుబడి మొత్తం',
     depositAccount: 'ఖాతా / నగదు ఖజానా',
     paymentChannel: 'చెల్లింపు పద్ధతి',
-    consensusSignoff: 'సిండికేట్ ఆమోదం',
+    consensusSignoff: 'పోస్టింగ్',
 
     // Dashboard - Net Share & KPIs
     netShareBalance: 'నా నికర వాటా బ్యాలెన్స్',
@@ -331,7 +332,7 @@ const translations = {
     viewPassbookBtn: 'ప్రాజెక్ట్ స్టేట్‌మెంట్స్ చూడండి',
 
     // Expenses, Approvals & Drawing Request
-    expensesBannerTitle: 'ఖర్చులు, ఆమోదాలు & డ్రాయింగ్ అభ్యర్థన డెస్క్',
+    expensesBannerTitle: 'ఖర్చులు & డ్రాయింగ్ అభ్యర్థన డెస్క్',
     expensesBannerSubtitle: 'సైట్ ఖర్చులను నమోదు చేయండి, ఆమోదాల స్థితిని పరిశీలించండి మరియు డ్రాయింగ్ అభ్యర్థనలు పంపండి.',
     enrollExpenseTitle: 'ప్రాజెక్ట్ ఖర్చు నమోదు చేయండి',
     enrollExpenseDesc: 'ఫోటో రసీదు మరియు వాయిస్ నోట్‌తో తక్షణ ఖర్చు నమోదు',
@@ -345,12 +346,12 @@ const translations = {
     voiceNote: 'వాయిస్ నోట్ రికార్డ్ చేయండి',
     voiceRecorded: 'వాయిస్ నోట్ (14 సెకన్లు ✓)',
     recordingVoice: 'వాయిస్ రికార్డ్ అవుతోంది...',
-    submitExpenseBtn: 'ఆమోదం కొరకు సమర్పించండి',
-    pendingApprovalsTitle: 'సమర్పించిన ఖర్చులు & ఆమోదాల స్థితి',
+    submitExpenseBtn: 'ఖర్చు నమోదు చేయండి',
+    pendingApprovalsTitle: 'నమోదైన ఖర్చులు',
     filterAll: 'అన్ని రికార్డులు',
-    filterPending: 'ఆమోదం పెండింగ్‌లో ఉంది',
-    filterApproved: 'ఆమోదించబడింది',
-    approveBtn: 'ఆమోదించండి',
+    filterPending: 'నమోదు కాని పాత రికార్డులు',
+    filterApproved: 'నమోదైంది',
+    approveBtn: 'రసీదు',
     noExpenses: 'ఖర్చుల రికార్డులు ఏవీ లేవు',
 
     // Drawing Request
@@ -364,8 +365,8 @@ const translations = {
     availableBalance: 'అందుబాటులో ఉన్న నికర బ్యాలెన్స్',
     priorDraws: 'గతంలో తీసుకున్న మొత్తం డ్రాయింగ్స్',
     recentDraws: 'డ్రాయింగ్ అభ్యర్థనల చరిత్ర',
-    statusPending: 'ఆమోదం కొరకు వేచి ఉంది',
-    statusApproved: 'ఆమోదించబడింది / చెల్లించబడింది',
+    statusPending: 'నమోదు కాని పాత రికార్డు',
+    statusApproved: 'నమోదైంది',
     noDrawings: 'ఇంకా డ్రాయింగ్ అభ్యర్థనలు ఏవీ లేవు',
 
     // Plots Tab
@@ -421,7 +422,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
   onAddStockDraw,
   onApproveExpense,
   onRejectExpense,
-  onReviewFinancial,
+  onReferBackFinancial,
+  onResubmitFinancial,
   ledgerMode = 'internal_syndicate',
   onUpdatePartner,
   individualInvestments = [],
@@ -903,7 +905,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     setSimulatedReceiptImage(null);
     setHasRecordedVoice(false);
     setIsExpenseDialogOpen(false);
-    showToast(lang === 'te' ? 'ఫీల్డ్ ఖర్చు రసీదు ఆమోదం కొరకు సమర్పించబడింది!' : 'Field expense voucher submitted for approval!');
+    showToast(lang === 'te' ? 'ఫీల్డ్ ఖర్చు రసీదు నమోదు చేయబడింది.' : 'Field expense voucher recorded.');
   };
 
   const handleDrawingSubmit = async (e: React.FormEvent) => {
@@ -945,10 +947,6 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
     setIsDrawingDialogOpen(false);
   };
 
-  const handleApproveDrawing = (drawId: string) => {
-    if (!currentPartner || !onReviewDrawing) return;
-    onReviewDrawing(drawId, 'approved');
-  };
 
   // Sign-in is handled only by the production auth gate (server-verified). No local credential path exists here.
   if (!session || !currentPartner) {
@@ -1125,8 +1123,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             </span>
             {activePlots.some((p) => p.pendingBookingId) && (
               <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white"
-                aria-label={`${activePlots.filter((p) => p.pendingBookingId).length} booking receipts pending approval`}>
-                {activePlots.filter((p) => p.pendingBookingId).length} Pending approval
+                aria-label={`${activePlots.filter((p) => p.pendingBookingId).length} historical unposted booking receipts`}>
+                {activePlots.filter((p) => p.pendingBookingId).length} Unposted
               </span>
             )}
           </button>
@@ -1187,6 +1185,19 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
               </div>
             </div>
 
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mt-5 pt-4 border-t border-amber-200/80" data-testid="grid-partner-share-summary">
+              {([
+                ['estimated', t('estimatedInvestment'), estimatedInvestment, 'text-gray-950'],
+                ['actual', t('actualInvestment'), actualInvestmentDone, 'text-emerald-800'],
+                ['drawings', t('cashDrawings'), totalDrawingsCombined, 'text-rose-700'],
+                ['profit', t('expectedProfit'), expectedProfitAsPerShare, 'text-amber-900'],
+              ] as const).map(([key, label, value, cls]) => (
+                <div key={key} className="bg-white/80 rounded-2xl border border-amber-200 px-3 py-2.5 min-w-0" data-testid={`text-partner-summary-${key}`}>
+                  <span className="text-[10px] font-bold uppercase text-gray-500 block leading-tight">{label}</span>
+                  <strong className={`text-sm sm:text-base font-black font-mono block mt-1 truncate ${cls}`}>{formatINR(value)}</strong>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Two live venture cards: plot inventory and project account balance */}
@@ -1385,7 +1396,8 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
           {/* Full ProjectStatementModule as in Accountant Dashboard */}
           {activeProject ? (
             <ProjectStatementModule
-              onReviewFinancial={onReviewFinancial}
+              onReferBackFinancial={onReferBackFinancial}
+              onResubmitFinancial={onResubmitFinancial}
               project={activeProject}
               firm={activeFirm}
               accounts={firmAccounts}
@@ -1593,7 +1605,7 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
             if (!onUpdatePlot) return false;
             const ok = await onUpdatePlot(updatedPlot);
             if (ok === false) return false;
-            showToast(`Plot #${updatedPlot.plotNumber} booking submitted for approval`);
+            showToast(`Plot #${updatedPlot.plotNumber} booking recorded`);
             return true;
           }}
           onReleasePlot={(plotId) => {
@@ -1729,26 +1741,11 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
                 )}
               </div>
 
-              {/* Signatures & Consensus Stamp */}
-              <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-4 text-center">
-                <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-200">
-                  <span className="text-[10px] text-gray-500 block uppercase font-bold">Managing Partner Auth</span>
-                  <strong className="text-xs text-gray-950 block mt-1">
-                    {selectedInvestmentForSlip.approvedBy || activeFirm.managingPartnerName}
-                  </strong>
-                  <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
-                    {selectedInvestmentForSlip.status === 'approved' ? 'Digitally Verified' : 'Pending Ratification'}
-                  </span>
-                </div>
-                <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-200">
-                  <span className="text-[10px] text-gray-500 block uppercase font-bold">Consensus Co-Signatory</span>
-                  <strong className="text-xs text-gray-950 block mt-1">
-                    {selectedInvestmentForSlip.coSignatory || 'Consortium Committee'}
-                  </strong>
-                  <span className="text-[9px] text-blue-700 font-mono block mt-0.5">
-                    Consensus Auth PIN: Verified
-                  </span>
-                </div>
+              <div className="pt-2 border-t border-gray-200 text-center p-2.5 bg-gray-50 rounded-xl">
+                <span className="text-[10px] text-gray-500 block uppercase font-bold">Posting</span>
+                <strong className="text-xs text-gray-950 block mt-1">
+                  {selectedInvestmentForSlip.status === 'approved' ? 'Recorded' : selectedInvestmentForSlip.status === 'pending' ? 'Not posted (historical)' : 'Referred back'}
+                </strong>
               </div>
 
               {/* Actions */}

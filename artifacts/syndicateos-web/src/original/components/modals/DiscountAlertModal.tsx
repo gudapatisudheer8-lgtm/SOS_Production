@@ -37,7 +37,7 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
       setError('Enter the justification for the rate concession.');
       return;
     }
-    const approvedSignature = `Concession requested by signed-in user: ${signNotes.trim()} (pending server approval)`;
+    const approvedSignature = `Concession requested by signed-in user: ${signNotes.trim()} (recorded with booking)`;
     onConfirmDiscountSale(approvedSignature);
     onClose();
   };
@@ -76,7 +76,7 @@ export const DiscountAlertModal: React.FC<DiscountAlertModalProps> = ({
                 <strong className="font-bold block text-sm text-red-700 mb-1">
                   Sub-Floor Price Warning for {unitLabel}
                 </strong>
-                Selling below project floor price diminishes the syndicate profit pool and requires approval through the server approval workflow. Your signed-in identity is recorded; no PIN is entered here.
+                Selling below project floor price diminishes the syndicate profit pool and is recorded with your justification and your signed-in identity; no PIN is entered here.
               </div>
             </div>
           </div>

@@ -36,7 +36,9 @@ public class ErpService {
     private Map<String,Object> resource(UUID release,String kind) {
         var rows=jdbc.queryForList("SELECT * FROM sos.erp_resources WHERE release_id=? AND kind=?",release,kind);
         if(rows.isEmpty()) throw ApiProblem.invalid("This record type is not configured for your sector.");
-        return rows.getFirst();
+        var row=rows.getFirst();
+        row.put("fields",ErpConfiguration.liveFields(kind,parse(row.get("fields"))).toString());
+        return row;
     }
     public Map<String,Object> read(SessionAccount actor,UUID project) {
         var snapshot=new TransactionTemplate(Objects.requireNonNull(tx.getTransactionManager()));
@@ -46,13 +48,11 @@ public class ErpService {
             var scope=access.project(actor,project,"erp.read",false);
             UUID release=(UUID)scope.get("release_id");
             boolean writable=Boolean.TRUE.equals(scope.get("assignment_enabled")) && "ACTIVE".equals(scope.get("status"));
-            boolean projectHasPartners=hasProjectPartners(project);
             List<Map<String,Object>> resources=new ArrayList<>();
             for(var r:jdbc.queryForList("SELECT * FROM sos.erp_resources WHERE release_id=? ORDER BY kind",release))
-                resources.add(Map.of("kind",r.get("kind"),"title",r.get("title"),"fields",parse(r.get("fields")),
+                resources.add(Map.of("kind",r.get("kind"),"title",r.get("title"),"fields",ErpConfiguration.liveFields(r.get("kind").toString(),parse(r.get("fields"))),
                     "canCreate",writable&&role(r,"submit_roles",actor.role()),"canManage",writable&&role(r,"manage_roles",actor.role()),
-                    "canReview",writable&&role(r,"review_roles",actor.role()),
-                    "canReviewOwn",!projectHasPartners&&Boolean.TRUE.equals(r.get("allow_self_approval_without_partners"))));
+                    "canReview",false,"canReviewOwn",false));
             List<Map<String,Object>> records=new ArrayList<>();
             for(var r:jdbc.queryForList("SELECT e.*,i.display_name AS creator_name FROM sos.erp_records e JOIN sos.identities i ON i.id=e.created_by WHERE e.project_id=? AND e.status<>'deleted' ORDER BY e.created_at DESC",project)) {
                 ObjectNode recordData=(ObjectNode)parse(r.get("data"));
@@ -65,8 +65,7 @@ public class ErpService {
                     "SELECT count(*) FROM sos.erp_inventory_reservations WHERE inventory_id=? AND state='active'",Integer.class,r.get("id"))>0)
                     recordData.put("status","plots".equals(r.get("kind"))?"reserved":"booked");
                 records.add(Map.of("id",r.get("id"),"kind",r.get("kind"),"status",r.get("status"),"revision",r.get("revision"),
-                    "createdBy",r.get("created_by"),"createdByName",r.get("creator_name"),"createdAt",r.get("created_at").toString(),"data",recordData,
-                    "votes",jdbc.queryForList("SELECT actor_id::text FROM sos.erp_approvals WHERE record_id=? AND decision='approved'",String.class,r.get("id"))));
+                    "createdBy",r.get("created_by"),"createdByName",r.get("creator_name"),"createdAt",r.get("created_at").toString(),"data",recordData));
             }
             var balances=jdbc.queryForList("""
                 SELECT a.id AS "accountId",coalesce(sum(p.debit-p.credit),0)::text AS balance
@@ -82,12 +81,8 @@ public class ErpService {
                 """,project);
             return Map.of("projectId",project,"resources",resources,"records",records,"balances",balances,
                 "partners",partners,"audit",audit,"settings",settings,"projectSetup",projectPolicy(release),
-                "statement",new FinancialStatementService(jdbc,json).read(project),
-                "reviewableRecordIds",records.stream().filter(r->"pending".equals(r.get("status"))
-                    && !((List<?>)r.get("votes")).contains(actor.identityId().toString())
-                    && resources.stream().anyMatch(res->res.get("kind").equals(r.get("kind"))&&Boolean.TRUE.equals(res.get("canReview"))
-                        && (Boolean.TRUE.equals(res.get("canReviewOwn")) || !actor.identityId().equals(r.get("createdBy")))))
-                    .map(r->r.get("id").toString()).toList());
+                "statement",new FinancialStatementService(jdbc,json).read(project,actor,writable,release),
+                "reviewableRecordIds",List.of());
         });
     }
     private JsonNode projectPolicy(UUID release) {
@@ -136,12 +131,15 @@ public class ErpService {
         actor.business();
         return tx.execute(status -> {
             UUID project=Values.id(input,"projectId");
-            String permission=switch(action) { case "erp.save","erp.bulk-save"->"erp.submit"; case "erp.review"->"erp.review"; default->"erp.manage"; };
+            if("erp.review".equals(action)) throw ApiProblem.invalid("Approvals have been removed. Use Refer Back to correct an entry.");
+            String permission=switch(action) { case "erp.save","erp.bulk-save","erp.refer-back","erp.resubmit"->"erp.submit"; default->"erp.manage"; };
             var scope=access.project(actor,project,permission,true);
             UUID release=(UUID)scope.get("release_id");
             if("erp.settings".equals(action)) return updateSettings(actor,project,input);
             if("erp.inventory-stage".equals(action)) return inventoryStage(actor,project,release,input);
             if("erp.save".equals(action)) return save(actor,project,release,input);
+            if("erp.refer-back".equals(action)) return referBack(actor,project,release,input);
+            if("erp.resubmit".equals(action)) return resubmit(actor,project,release,input);
             if("erp.bulk-save".equals(action)) {
                 String kind=Values.text(input,"kind",40);
                 if(!Set.of("plots","units").contains(kind)||!"ACCOUNTANT".equals(actor.role())) throw ApiProblem.denied();
@@ -172,8 +170,7 @@ public class ErpService {
                 audit(actor,project,(UUID)record.get("id"),"RECORD_REMOVED");
                 return ok(record.get("id"));
             }
-            if(!"erp.review".equals(action)) throw new ApiProblem(404,"UNKNOWN_COMMAND","Unknown ERP command.");
-            return review(actor,project,definition,record,input);
+            throw new ApiProblem(404,"UNKNOWN_COMMAND","Unknown ERP command.");
         });
     }
     private Map<String,Object> record(UUID project,UUID id) {
@@ -182,6 +179,125 @@ public class ErpService {
         return rows.getFirst();
     }
     private boolean posted(UUID id) { return jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE record_id=?",Integer.class,id)>0; }
+    private static final Set<String> CORRECTABLE=Set.of("expenses","investments","drawings","bookings","transactions","reimbursements","settlements","stock-draws");
+    private void notifyActivity(SessionAccount actor,UUID project,UUID record,String title,String message) {
+        jdbc.update("INSERT INTO sos.project_notifications(id,project_id,record_id,actor_id,title,message) VALUES(?,?,?,?,?,?)",
+            UUID.randomUUID(),project,record,actor.identityId(),title,message);
+    }
+    private Map<String,Object> referBack(SessionAccount actor,UUID project,UUID release,JsonNode input) {
+        UUID id=Values.id(input,"recordId"),request=Values.id(input,"requestId");
+        String reason=Values.text(input,"reason",1000);
+        var original=record(project,id);
+        if(request.equals(original.get("refer_request_id")) && actor.identityId().equals(original.get("refer_actor_id"))) {
+            if(!reason.equals(original.get("correction_reason"))) throw ApiProblem.conflict();
+            return ok(id);
+        }
+        if((Integer)original.get("revision")!=Values.revision(input)) throw ApiProblem.conflict();
+        if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=? AND created_by=? AND request_id=?",
+            Integer.class,project,actor.identityId(),request)>0) throw ApiProblem.conflict();
+        String kind=original.get("kind").toString();
+        if(!CORRECTABLE.contains(kind) || original.get("reversal_of")!=null ||
+            !Set.of("approved","pending").contains(original.get("status"))) throw ApiProblem.invalid("This entry cannot be referred back.");
+        var definition=resource(release,kind);
+        if(!role(definition,"submit_roles",actor.role())) throw ApiProblem.denied();
+        // Posted downstream receipts/reimbursements cannot be orphaned by correction.
+        if(jdbc.queryForObject("""
+            SELECT count(*) FROM sos.erp_records WHERE project_id=? AND id<>?
+              AND status IN ('approved','pending')
+              AND (data->>'bookingId'=? OR data->>'expenseId'=?)
+            """,Integer.class,project,id,id.toString(),id.toString())>0)
+            throw ApiProblem.invalid("Correct the linked receipt or reimbursement first. This entry has dependent records.");
+        if("bookings".equals(kind)) {
+            UUID inventory=(UUID)original.get("inventory_id");
+            var item=record(project,inventory);
+            ObjectNode d=(ObjectNode)parse(item.get("data"));
+            boolean originalPosted="approved".equals(original.get("status"));
+            if(originalPosted) {
+                String expected="plots".equals(item.get("kind"))?"reserved":"booked";
+                if(!expected.equals(d.path("status").asText()) ||
+                    jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=? AND inventory_id=? AND kind='bookings' AND status='approved' AND id<>?",
+                        Integer.class,project,inventory,id)>0)
+                    throw ApiProblem.invalid("A sold/registered booking or inventory with another live booking cannot be referred back.");
+                if(original.get("inventory_before")!=null) d=(ObjectNode)parse(original.get("inventory_before"));
+                else {
+                    d.put("status","available");
+                    for(String key:List.of("buyerName","buyerPhone","buyerRegistrationId","advanceReceived","paymentMode","paymentRefNumber",
+                        "paymentMilestone","currentMilestone","bookingAccountId","bookedAt"))
+                        d.remove(key);
+                }
+                jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",d.toString(),inventory);
+            }
+            jdbc.update("UPDATE sos.erp_inventory_reservations SET state='released' WHERE booking_id=?",id);
+        }
+        var legs=jdbc.queryForList("SELECT account_id,ledger_code,debit,credit FROM sos.erp_postings WHERE record_id=? ORDER BY id",id);
+        // Reversing a receipt already spent may not make a project account negative.
+        for(var delta:jdbc.queryForList("""
+            SELECT account_id,sum(debit-credit) AS delta FROM sos.erp_postings
+            WHERE record_id=? AND account_id IS NOT NULL GROUP BY account_id
+            """,id)) {
+            BigDecimal balance=jdbc.queryForObject("SELECT coalesce(sum(debit-credit),0) FROM sos.erp_postings WHERE account_id=?",BigDecimal.class,delta.get("account_id"));
+            if(balance.subtract((BigDecimal)delta.get("delta")).signum()<0)
+                throw ApiProblem.invalid("Refer Back would make the project account negative. Correct the later spending first.");
+        }
+        if(!legs.isEmpty()) {
+            UUID reversal=UUID.randomUUID();
+            BigDecimal accountDelta=legs.stream().filter(l->l.get("account_id")!=null)
+                .map(l->((BigDecimal)l.get("debit")).subtract((BigDecimal)l.get("credit"))).reduce(BigDecimal.ZERO,BigDecimal::add);
+            ObjectNode reversalData=json.createObjectNode().put("description","Reversal: "+reason)
+                .put("date",LocalDate.now().toString()).put("type",accountDelta.signum()>0?"debit":"credit")
+                .put("referenceNo",id.toString()).put("category","correction_reversal");
+            jdbc.update("""
+                INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,amount,account_id,status,created_by,request_id,reversal_of)
+                VALUES(?,?,?,'transactions',?::jsonb,?::jsonb,?,?,'approved',?,?,?)
+                """,reversal,project,actor.firmId(),reversalData.toString(),reversalData.toString(),original.get("amount"),
+                original.get("account_id"),actor.identityId(),request,id);
+            for(var leg:legs) {
+                BigDecimal debit=(BigDecimal)leg.get("debit"),credit=(BigDecimal)leg.get("credit");
+                if(debit.signum()>0) post(reversal,project,(UUID)leg.get("account_id"),leg.get("ledger_code").toString(),debit,false);
+                else if(credit.signum()>0) post(reversal,project,(UUID)leg.get("account_id"),leg.get("ledger_code").toString(),credit,true);
+            }
+            audit(actor,project,reversal,"ENTRY_REVERSED");
+        }
+        jdbc.update("""
+            UPDATE sos.erp_records SET status='referred_back',correction_reason=?,refer_request_id=?,refer_actor_id=?,revision=revision+1
+            WHERE id=?
+            """,reason,request,actor.identityId(),id);
+        audit(actor,project,id,"REFERRED_BACK");
+        notifyActivity(actor,project,id,"Entry referred back",actor.displayName()+" referred back "+kind+": "+reason+". The original author can correct and resubmit.");
+        return ok(id);
+    }
+    private Map<String,Object> resubmit(SessionAccount actor,UUID project,UUID release,JsonNode input) {
+        UUID id=Values.id(input,"recordId"),request=Values.id(input,"requestId");
+        var original=record(project,id);
+        if(!actor.identityId().equals(original.get("created_by"))) throw ApiProblem.denied();
+        if(original.get("replacement_id")!=null) {
+            var replacement=record(project,(UUID)original.get("replacement_id"));
+            if(request.equals(replacement.get("request_id")) && parse(replacement.get("request_data")).equals(input.path("data")))
+                return ok(replacement.get("id"));
+            throw ApiProblem.conflict();
+        }
+        if((Integer)original.get("revision")!=Values.revision(input) ||
+            !CORRECTABLE.contains(original.get("kind")) || original.get("reversal_of")!=null)
+            throw ApiProblem.conflict();
+        if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=? AND created_by=? AND request_id=?",
+            Integer.class,project,actor.identityId(),request)>0) throw ApiProblem.conflict();
+        if("pending".equals(original.get("status"))) {
+            ObjectNode referral=json.createObjectNode().put("recordId",id.toString()).put("requestId",UUID.nameUUIDFromBytes(("legacy:"+request).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString())
+                .put("revision",(Integer)original.get("revision")).put("reason","Correcting a historical unposted entry");
+            referBack(actor,project,release,referral);
+        } else if(!"referred_back".equals(original.get("status"))) throw ApiProblem.invalid("Refer this entry back before editing.");
+        ObjectNode command=json.createObjectNode().put("kind",original.get("kind").toString()).put("requestId",request.toString());
+        command.set("data",input.path("data"));
+        var result=save(actor,project,release,command);
+        UUID replacement=UUID.fromString(((Map<?,?>)result.get("entity")).get("id").toString());
+        if(replacement.equals(id)) throw ApiProblem.conflict();
+        var newRecord=record(project,replacement);
+        if(newRecord.get("correction_of")!=null) throw ApiProblem.conflict();
+        jdbc.update("UPDATE sos.erp_records SET correction_of=? WHERE id=?",id,replacement);
+        jdbc.update("UPDATE sos.erp_records SET status='superseded',replacement_id=?,revision=revision+1 WHERE id=?",replacement,id);
+        audit(actor,project,replacement,"CORRECTION_RESUBMITTED");
+        return result;
+    }
     private Map<String,Object> save(SessionAccount actor,UUID project,UUID release,JsonNode input) {
         String kind=Values.text(input,"kind",40);
         var def=resource(release,kind);
@@ -221,6 +337,8 @@ public class ErpService {
         Map<String,Object> previous=null;
         if(input.hasNonNull("recordId")) {
             previous=record(project,id);
+            if(Boolean.TRUE.equals(def.get("financial")) || "bookings".equals(kind))
+                throw ApiProblem.invalid("Use Refer Back and Correct & Resubmit on the project statement. Financial entries cannot be overwritten.");
             if(!kind.equals(previous.get("kind")) || !role(def,"manage_roles",actor.role()) || posted(id) && !"accounts".equals(kind)
                 || Boolean.TRUE.equals(def.get("financial")) && "approved".equals(previous.get("status"))) throw ApiProblem.denied();
             if(((Integer)previous.get("revision"))!=Values.revision(input)) throw ApiProblem.conflict();
@@ -268,7 +386,7 @@ public class ErpService {
         if(inventory!=null) {
             var item=record(project,inventory);
             if(!Set.of("plots","units").contains(item.get("kind"))) throw ApiProblem.invalid("Choose valid project inventory.");
-            if(!"available".equals(parse(item.get("data")).path("status").asText())) throw ApiProblem.conflict();
+            if(!bookable(parse(item.get("data")))) throw ApiProblem.conflict();
             if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_inventory_reservations WHERE inventory_id=? AND state='active' AND booking_id<>?",Integer.class,inventory,id)>0)
                 throw new ApiProblem(409,"INVENTORY_RESERVED","This inventory is already reserved by a pending booking.");
         }
@@ -292,7 +410,7 @@ public class ErpService {
         if("transactions".equals(kind)&&data.hasNonNull("bookingId")&&!data.path("bookingId").asText().isBlank()) {
             var booking=record(project,Values.id(data,"bookingId"));
             if(!"bookings".equals(booking.get("kind"))||!"approved".equals(booking.get("status"))||!"credit".equals(data.path("type").asText()))
-                throw ApiProblem.invalid("Customer receipts require an approved booking in this project.");
+                throw ApiProblem.invalid("Customer receipts require a recorded booking in this project.");
         }
         if("bookings".equals(kind)&&decimal(data.path("advanceReceived"),false).signum()>0 && account==null)
             throw ApiProblem.invalid("Choose the exact receiving project account for this customer advance.");
@@ -306,7 +424,7 @@ public class ErpService {
             var expense=record(project,Values.id(data,"expenseId"));
             if(!"expenses".equals(expense.get("kind"))||!"approved".equals(expense.get("status"))
                 ||!"individual".equals(parse(expense.get("data")).path("paymentSource").asText()))
-                throw ApiProblem.invalid("Choose an approved individual-paid expense in this project.");
+                throw ApiProblem.invalid("Choose a recorded individual-paid expense in this project.");
             BigDecimal committed=jdbc.queryForObject("SELECT coalesce(sum(amount),0) FROM sos.erp_records WHERE project_id=? AND kind='reimbursements' AND status IN ('pending','approved') AND data->>'expenseId'=? AND id<>?",
                 BigDecimal.class,project,expense.get("id").toString(),id);
             if(committed.add(amount).compareTo((BigDecimal)expense.get("amount"))>0) throw ApiProblem.invalid("Reimbursement exceeds the unsettled individual expense.");
@@ -336,7 +454,7 @@ public class ErpService {
                 BigDecimal proposed=data.hasNonNull("ratePerSqYard")?decimal(data.path("ratePerSqYard"),true):decimal(inventoryData.path("ratePerSqYard"),true);
                 JsonNode details=parse(jdbc.queryForObject("SELECT details::text FROM sos.projects WHERE id=?",String.class,project));
                 if(details.hasNonNull("floorRatePerSqYard")&&proposed.compareTo(details.path("floorRatePerSqYard").decimalValue())<0)
-                    throw ApiProblem.invalid("This rate is below the protected project floor. A price exception must be approved before booking.");
+                    throw ApiProblem.invalid("This rate is below the protected project floor. Correct the rate or update the project's floor rate before recording the booking.");
                 data.put("ratePerSqYard",proposed);
                 BigDecimal total=proposed.multiply(decimal(inventoryData.path("areaSqYards"),true));
                 data.put("totalValue",total);
@@ -354,15 +472,15 @@ public class ErpService {
                 Integer.class,project,kind,numberKey,data.path(numberKey).asText(),id)>0) throw ApiProblem.invalid("This inventory number already exists in the project.");
             if(previous==null && !"available".equals(data.path("status").asText("available"))) throw ApiProblem.invalid("Create available inventory, then use the booking workflow.");
             if(previous!=null && !parse(previous.get("data")).path("status").asText("available").equals(data.path("status").asText("available")))
-                throw ApiProblem.invalid("Inventory status is changed through approved bookings, not direct edits.");
+                throw ApiProblem.invalid("Inventory status is changed through recorded bookings, not direct edits.");
         }
-        String state=Boolean.TRUE.equals(def.get("financial")) || "bookings".equals(kind) ? "pending":"approved";
+        // "approved" is the legacy storage code for an active/posted record, not a vote.
+        String state="approved";
         if(previous==null) jdbc.update("""
             INSERT INTO sos.erp_records(id,project_id,firm_id,kind,data,request_data,amount,partner_id,account_id,inventory_id,status,created_by,request_id)
             VALUES (?,?,?,?,?::jsonb,?::jsonb,?,?,?,?,?,?,?)
             """,id,project,actor.firmId(),kind,data.toString(),input.path("data").toString(),amount,partner,account,inventory,state,actor.identityId(),request);
         else {
-            jdbc.update("DELETE FROM sos.erp_approvals WHERE record_id=?",id);
             jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,request_data=?::jsonb,amount=?,partner_id=?,account_id=?,inventory_id=?,status=?,revision=revision+1,request_id=? WHERE id=?",
                 data.toString(),input.path("data").toString(),amount,partner,account,inventory,state,request,id);
         }
@@ -371,8 +489,13 @@ public class ErpService {
             if(opening.signum()>0) { post(id,project,id,"bank",opening,true); post(id,project,null,"opening-capital",opening,false); }
         }
         if("bookings".equals(kind)) {
-            jdbc.update("INSERT INTO sos.erp_inventory_reservations(project_id,inventory_id,booking_id,state) VALUES (?,?,?,'active') ON CONFLICT(booking_id) DO UPDATE SET inventory_id=excluded.inventory_id,state='active'",
+            jdbc.update("INSERT INTO sos.erp_inventory_reservations(project_id,inventory_id,booking_id,state) VALUES (?,?,?,'cleared') ON CONFLICT(booking_id) DO UPDATE SET inventory_id=excluded.inventory_id,state='cleared'",
                 project,inventory,id);
+        }
+        if(Boolean.TRUE.equals(def.get("financial")) || "bookings".equals(kind)) {
+            applyPosting(project,record(project,id));
+            audit(actor,project,id,"ENTRY_POSTED");
+            notifyActivity(actor,project,id,"Entry recorded",kind+" recorded by "+actor.displayName()+". Project balances are updated.");
         }
         audit(actor,project,id,previous==null?"RECORD_CREATED":"RECORD_UPDATED");
         return ok(id);
@@ -427,42 +550,6 @@ public class ErpService {
         if(!data.hasNonNull(key)||data.path(key).asText().isBlank()) return null;
         return Values.id(data,key);
     }
-    private boolean hasProjectPartners(UUID project) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("""
-            SELECT EXISTS(
-              SELECT 1 FROM sos.project_memberships pm
-              JOIN sos.projects p ON p.id=pm.project_id
-              JOIN sos.firm_memberships fm ON fm.firm_id=p.firm_id AND fm.identity_id=pm.identity_id
-              WHERE pm.project_id=? AND pm.enabled AND fm.enabled AND fm.role_code='PARTNER'
-            )
-            """,Boolean.class,project));
-    }
-    private Map<String,Object> review(SessionAccount actor,UUID project,Map<String,Object> definition,Map<String,Object> row,JsonNode input) {
-        if(!role(definition,"review_roles",actor.role()) || !"pending".equals(row.get("status"))) throw ApiProblem.denied();
-        boolean noPartnerException=!hasProjectPartners(project)&&Boolean.TRUE.equals(definition.get("allow_self_approval_without_partners"));
-        if(Boolean.TRUE.equals(definition.get("financial")) && !noPartnerException && actor.identityId().equals(row.get("created_by")))
-            throw ApiProblem.invalid("You cannot approve your own submission.");
-        String decision=Values.text(input,"decision",16);
-        if(!Set.of("approved","rejected").contains(decision)) throw ApiProblem.invalid("Choose approved or rejected.");
-        String reason=input.path("reason").asText(""); if(reason.length()>1000) throw ApiProblem.invalid("Reason is too long.");
-        if("rejected".equals(decision)&&reason.isBlank()) throw ApiProblem.invalid("Provide a rejection reason.");
-        UUID id=(UUID)row.get("id");
-        if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_approvals WHERE record_id=? AND actor_id=?",Integer.class,id,actor.identityId())>0)
-            throw ApiProblem.conflict();
-        jdbc.update("INSERT INTO sos.erp_approvals(record_id,actor_id,decision,reason) VALUES (?,?,?,?)",id,actor.identityId(),decision,reason);
-        int needed=(Integer)definition.get("approval_count");
-        BigDecimal threshold=(BigDecimal)definition.get("approval_threshold");
-        if(threshold!=null && ((BigDecimal)row.get("amount")).compareTo(threshold)<=0) needed=1;
-        if(noPartnerException) needed=(Integer)definition.get("no_partner_approval_count");
-        int approvals=jdbc.queryForObject("SELECT count(*) FROM sos.erp_approvals WHERE record_id=? AND decision='approved'",Integer.class,id);
-        String state="rejected".equals(decision)?"rejected":approvals>=needed?"approved":"pending";
-        if("approved".equals(state)) applyPosting(project,row);
-        if("bookings".equals(row.get("kind"))&&!"pending".equals(state))
-            jdbc.update("UPDATE sos.erp_inventory_reservations SET state=? WHERE booking_id=?","approved".equals(state)?"cleared":"released",id);
-        jdbc.update("UPDATE sos.erp_records SET status=?,revision=revision+1 WHERE id=?",state,id);
-        audit(actor,project,id,"REVIEW_"+decision.toUpperCase(Locale.ROOT));
-        return Map.of("status","ok","entity",Map.of("id",id,"status",state,"approvals",approvals,"requiredApprovals",needed));
-    }
     private void applyPosting(UUID project,Map<String,Object> row) {
         UUID id=(UUID)row.get("id"),account=(UUID)row.get("account_id");
         String kind=(String)row.get("kind");
@@ -473,7 +560,8 @@ public class ErpService {
             if(inventory==null) throw ApiProblem.invalid("Choose an inventory record.");
             var item=record(project,inventory);
             ObjectNode updated=(ObjectNode)parse(item.get("data"));
-            if(!"available".equals(updated.path("status").asText("available"))) throw ApiProblem.conflict();
+            if(!bookable(updated)) throw ApiProblem.conflict();
+            jdbc.update("UPDATE sos.erp_records SET inventory_before=?::jsonb WHERE id=?",updated.toString(),id);
             updated.put("status","plots".equals(item.get("kind"))?"reserved":"booked");
             for(String key:List.of("buyerName","buyerPhone","buyerRegistrationId","ratePerSqYard","advanceReceived","paymentMode","paymentRefNumber","paymentMilestone"))
                 if(data.has(key)) updated.set(key,data.path(key));
@@ -546,6 +634,11 @@ public class ErpService {
         audit(actor,project,null,"SETTINGS_UPDATED");
         return ok(project);
     }
+    private boolean bookable(JsonNode inventory) {
+        return "available".equals(inventory.path("status").asText("available"))
+            || "blocked".equals(inventory.path("status").asText())
+                && "accepted_blocked".equals(inventory.path("marketingRequest").path("status").asText());
+    }
     private Map<String,Object> inventoryStage(SessionAccount actor,UUID project,UUID release,JsonNode input) {
         if(!"ACCOUNTANT".equals(actor.role())) throw ApiProblem.denied();
         UUID id=Values.id(input,"recordId");
@@ -553,7 +646,7 @@ public class ErpService {
         if(!Set.of("plots","units").contains(record.get("kind"))||(Integer)record.get("revision")!=Values.revision(input))
             throw ApiProblem.conflict();
         if(jdbc.queryForObject("SELECT count(*) FROM sos.erp_records WHERE project_id=? AND inventory_id=? AND kind='bookings' AND status='approved'",Integer.class,project,id)==0)
-            throw ApiProblem.invalid("Approve a customer booking first.");
+            throw ApiProblem.invalid("Record a customer booking first.");
         ObjectNode data=(ObjectNode)parse(record.get("data"));
         String current=data.path("status").asText();
         String next=input.path("status").asText(current);

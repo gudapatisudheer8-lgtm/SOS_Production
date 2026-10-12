@@ -121,7 +121,8 @@ class MarketingAccessIntegrationTest {
         assertThrows(ApiProblem.class,()->service.submit(permanentSession,node(retry)));
         retry.put("requestId",UUID.randomUUID().toString());
         assertThrows(ApiProblem.class,()->service.submit(permanentSession,node(retry)));
-        service.review(actor,(UUID)submitted.get("id"),node(Map.of("accept",true)));
+        assertEquals("accepted_blocked",submitted.get("status"));
+        assertThrows(ApiProblem.class,()->service.review(actor,(UUID)submitted.get("id"),node(Map.of("accept",true))));
         assertEquals("blocked",jdbc.queryForObject("SELECT data->>'status' FROM sos.erp_records WHERE id=?",String.class,available));
         assertEquals(postingCount,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings",Integer.class));
         assertThrows(ApiProblem.class,()->service.review(actor,(UUID)submitted.get("id"),node(Map.of("accept",true))));

@@ -31,7 +31,7 @@ public class CommandService {
     public Map<String,Object> execute(SessionAccount actor,String action,JsonNode input) {
         actor.business();
         if (input==null || !input.isObject() || input.toString().length()>(Set.of("erp.bulk-save","project.setup-save","project.setup-create").contains(action)?2_000_000:131072)) throw ApiProblem.invalid("Supply a bounded command data object.");
-        if(Set.of("erp.save","erp.bulk-save","erp.review","erp.delete","erp.settings","erp.inventory-stage").contains(action)) return erp.execute(actor,action,input);
+        if(Set.of("erp.save","erp.bulk-save","erp.review","erp.delete","erp.settings","erp.inventory-stage","erp.refer-back","erp.resubmit").contains(action)) return erp.execute(actor,action,input);
         if(Set.of("project.setup-save","project.setup-finalize","project.setup-create").contains(action)) return setup.execute(actor,action,input);
         return tx.execute(status -> switch(action) {
             case "firm.create" -> createFirm(actor,input);

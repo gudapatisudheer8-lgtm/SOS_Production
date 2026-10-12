@@ -111,7 +111,14 @@ export async function loadAll(role: string): Promise<LoadedData> {
     const base = { firmId: p.firmId, projectId: p.id };
     const balance = new Map<string, number>((erp.balances || []).map((b: any) => [String(b.accountId), Number(b.balance)]));
     const recs: any[] = erp.records || [];
-    p.financialStatement = (erp.statement || []).map((entry: any) => ({ ...entry, amount: num(entry.amount) }));
+    // Statement entries carry postingState/affectsCash; no approver or approval status.
+    p.financialStatement = (erp.statement || []).map((entry: any) => {
+      const { approverName: _a, status: _s, ...rest } = entry || {};
+      return { ...rest, id: String(entry.id), amount: num(entry.amount), affectsCash: entry.affectsCash === true,
+        canReferBack: entry.canReferBack === true, canResubmit: entry.canResubmit === true,
+        correctionFields: Array.isArray(entry.correctionFields) ? entry.correctionFields : [],
+        correctionData: entry.correctionData && typeof entry.correctionData === 'object' ? entry.correctionData : {} };
+    });
     p.financialForms = Object.fromEntries((erp.resources || []).map((r: any) => [r.kind, r.fields]));
     p.canRecordDrawings = !!(erp.resources || []).find((r: any) => r.kind === 'drawings')?.canCreate;
     p.reviewableRecordIds = erp.reviewableRecordIds || [];
@@ -141,7 +148,7 @@ export async function loadAll(role: string): Promise<LoadedData> {
             && String(receipt.data?.inventoryId) === id);
           const receipt = pending?.data || {};
           out.plots.push({
-            ...d, ...base, id: n, status: d.status || 'available',
+            ...d, ...base, id: n, __recordId: id, status: d.status || 'available',
             ...(pending ? {
               pendingBookingId: String(pending.id),
               buyerName: receipt.buyerName, buyerPhone: receipt.buyerPhone,
@@ -285,6 +292,17 @@ export async function erpSave(erp: any, projectId: string, kind: string, data: R
   });
 }
 
+export async function referBackFinancial(input: { projectId: string; recordId: string; revision: number; requestId: string; reason: string }) {
+  if (!input.reason?.trim()) throw new Error('A reason is required to refer an entry back.');
+  return command('erp.refer-back', input);
+}
+
+export async function resubmitFinancial(input: { projectId: string; recordId: string; revision: number; requestId: string; data: Record<string, any> }) {
+  return command('erp.resubmit', input);
+}
+
+/** @deprecated Approval review is disabled; kept only so old imports fail loudly instead of posting. */
 export async function erpReview(meta: RecordMeta, decision: 'approved' | 'rejected', reason?: string) {
-  return command('erp.review', { projectId: meta.projectId, recordId: meta.id, revision: meta.revision, decision, ...(reason ? { reason } : {}) });
+  void meta; void decision; void reason;
+  throw new Error('Approval review is no longer part of the workflow. Use Refer Back or Correct & Resubmit.');
 }

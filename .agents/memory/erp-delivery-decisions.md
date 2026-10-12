@@ -30,6 +30,14 @@ Dashboard delivery requires verifying the firm's assigned release and rendered i
 **Why:** additive configuration updates deliberately preserve existing firm assignments for compatibility; a healthy deployment can still display the old dashboard. Incorrect release names in rollout instructions caused unnecessary user effort.
 **How to apply:** use actual published release labels rather than planning terminology, keep activation owner-controlled, and distinguish successful installation from verified dashboard activation.
 
-The user now requests removing all approval processes throughout the application, replacing them with a notification bell plus browser and mobile push notifications. This supersedes the earlier independent-approval requirement.
+The user requests no approval processes throughout the application, replacing them with a notification bell plus browser and mobile push notifications. This supersedes the earlier independent-approval requirement.
 **Why:** the user wants to simplify the application and explicitly said approvals must be removed everywhere.
-**How to apply:** treat this as the requested target, not as an already implemented policy. Preserve financial integrity and audit identities while drafting the change; obtain an explicit decision before posting or discarding existing pending records.
+**How to apply:** valid financial submissions post immediately. Notifications are informational, never a prerequisite for posting. Statutory permits and reviewed blueprint geometry are not financial sign-offs. Background push delivery must be verified separately from a polling bell or foreground browser notifications.
+
+Use Refer Back → Correct & Resubmit for financial mistakes, on the Project Statement screen. Refer Back appends a balanced reversal; the original author resubmits a new linked entry. Preserve originals and reasons.
+**Why:** the user requested same-screen corrections instead of approvals; overwriting a cleared amount would lose audit history and silently corrupt balances.
+**How to apply:** enforce project access, revisions, idempotency, sufficient funds and linked booking/reimbursement checks. Never edit or delete original posted journal legs.
+
+Do not automatically post historical pending money when retiring approvals. Keep it unposted until the author explicitly corrects and resubmits.
+**Why:** the old-pending-records clarification was dismissed; automatically moving unconfirmed money would change customer balances without an explicit instruction. This conservative handling was explained to the user.
+**How to apply:** allow author-only correction of legacy unposted records; never migrate their amounts into account balances automatically.

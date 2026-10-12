@@ -14,9 +14,11 @@ import { Building2, Smartphone } from 'lucide-react';
 import { api, getToken, clearSession, toAppUser, newRequestId, normalizeClientMobile } from './adapter/api';
 import { useConfig, sectorUiCode, masterNumber } from './adapter/config';
 import { MasterEditor } from './adapter/MasterEditor';
-import { loadAll, erpSave, erpReview, command, pickConfigured, describeAccess, type LoadedData } from './adapter/erp';
+import { loadAll, erpSave, command, pickConfigured, describeAccess, referBackFinancial, resubmitFinancial, type LoadedData } from './adapter/erp';
+import { referBackInput, resubmitInput } from './adapter/financialCorrections';
+import type { UnifiedProjectTransaction } from './original/components/accountant/ProjectStatementModule';
+import { NOTIFICATIONS_REFRESH_EVENT } from './original/components/NotificationBell';
 import { investmentInput, drawingInput, bookingInput } from './adapter/financialInput';
-import { BookingReceiptApprovals } from './components/BookingReceiptApprovals';
 import { ProjectPlanSaver } from './adapter/projectPlans';
 import { ProjectEditorSaver, projectEditContext, projectEditPayload } from './adapter/projectEditing';
 import { projectFormSeed, projectFormPayload } from './adapter/projectFormEditing';
@@ -30,7 +32,7 @@ const EMPTY_MATRIX: ApartmentPricingMatrix = { baseSqFtRate: 0, eastPremium: 0, 
 const BLOCKED_ACTIONS = [
   'Owner sign-in into accountant / partner consoles (owner has no ERP scope)',
   'Feature flags: WhatsApp, Tally export, voice notes, audit lock, dual ledger',
-  'Separate drawing disbursement (ledger posts on approval)',
+  'Separate drawing disbursement (drawings post when recorded)',
 ];
 
 function App() {
@@ -164,6 +166,7 @@ function App() {
       // while clearly withholding a successful refresh claim.
       return true;
     }
+    window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT));
     showToast(`✓ ${label}`);
     return true;
   }, [currentUser, reload, showToast]);
@@ -178,7 +181,6 @@ function App() {
     || projects.find((p) => p.firmId === selectedFirmId)?.id || '';
   const metaOf = (id: string) => data?.meta.get(id);
 
-  const pendingExpensesCount = useMemo(() => (data?.fieldExpenses ?? []).filter((e) => e.status === 'pending').length, [data]);
 
   // ---------- Owner ----------
   const sectorCodeOf = (sectorId: any, fallback?: string) =>
@@ -385,17 +387,12 @@ function App() {
     const id = data?.plotIds.get(plot.id); const meta = id ? metaOf(id) : undefined;
     if (!meta) return unsupported('plot is not a saved backend record.');
     const prev = data?.plots.find((x) => x.id === plot.id);
-    if (prev?.pendingBookingId) return unsupported('this plot has a receipt awaiting approval. Review the existing receipt before changing its booking.');
-    const proposal = plot.marketingRequest;
-    if (prev?.marketingRequest?.status === 'pending' && proposal?.id === prev.marketingRequest.id
-      && (proposal.status === 'accepted_blocked' || proposal.status === 'rejected')) {
-      return run(`Marketing request for plot ${plot.plotNumber} reviewed`, () => api(
-        `/marketing/proposals/${encodeURIComponent(proposal.id)}/review`,
-        { method: 'POST', body: { accept: proposal.status === 'accepted_blocked' } },
-      ));
+    if (prev?.pendingBookingId) return unsupported('this plot has a historical unposted booking receipt. Correct & resubmit it from the project statement before changing its booking.');
+    if (plot.marketingRequest && plot.marketingRequest.status !== prev?.marketingRequest?.status) {
+      return unsupported('marketing booking requests are not reviewed. Holds are placed automatically by the server; record actual received money as a booking instead.');
     }
-    if (prev?.status === 'available' && plot.status !== 'available' && plot.buyerName) {
-      return run(`Booking for plot ${plot.plotNumber} submitted`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'bookings', bookingInput(plot, meta.id)));
+    if ((prev?.status === 'available' || prev?.status === 'blocked') && plot.status === 'reserved' && plot.buyerName) {
+      return run(`Booking for plot ${plot.plotNumber} recorded`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'bookings', bookingInput(plot, meta.id)));
     }
     return run(`Plot ${plot.plotNumber} saved`, () => erpSave(erpOf(meta.projectId), meta.projectId, 'plots', plot, meta));
   };
@@ -432,51 +429,51 @@ function App() {
   // ---------- Treasury ----------
   const handleAddFirmAccount = (a: FirmAccount) => {
     const pid = a.linkedProjectId && a.linkedProjectId !== 'all' ? a.linkedProjectId : activeProjectId;
-    return run(`Account ${a.accountName} submitted`, () => erpSave(erpOf(pid), pid, 'accounts', a));
+    return run(`Account ${a.accountName} recorded`, () => erpSave(erpOf(pid), pid, 'accounts', a));
   };
   const handleAddAccountTransaction = (accountId: string, tx: FirmAccountTransaction) => {
     const meta = metaOf(accountId);
     if (!meta) return unsupported('account is not a saved backend record.');
-    return run('Ledger transaction submitted', () => erpSave(erpOf(meta.projectId), meta.projectId, 'transactions', { ...tx, accountId }));
+    return run('Ledger transaction recorded', () => erpSave(erpOf(meta.projectId), meta.projectId, 'transactions', { ...tx, accountId }));
   };
 
   // ---------- Expenses ----------
   const handleSubmitFieldExpense = (e: FieldExpenseLog, bankAccountId?: string) => {
     const pid = e.projectId || activeProjectId;
-    return run('Expense submitted for approval', () => erpSave(erpOf(pid), pid, 'expenses', expenseInput(e, bankAccountId)));
+    return run('Expense recorded', () => erpSave(erpOf(pid), pid, 'expenses', expenseInput(e, bankAccountId)));
   };
-  const review = (id: string, decision: 'approved' | 'rejected', label: string, reason?: string) => {
-    if (decision === 'rejected' && !reason?.trim()) {
-      reason = window.prompt('Enter the reason for rejecting this entry:')?.trim();
-      if (!reason) return Promise.resolve(false);
-    }
-    const meta = metaOf(id);
-    if (!meta) return unsupported('record is not a saved backend record.');
-    return run(label, () => erpReview(meta, decision, reason));
+  // No approvals: entries post when saved. Mistakes are fixed by Refer Back
+  // (reversal appended server-side) or Correct & Resubmit (posted replacement).
+  const projectOfEntry = (entry: UnifiedProjectTransaction) =>
+    projects.find((p) => p.firmId === selectedFirmId && p.financialStatement?.some((t) => t.id === entry.id))?.id || activeProjectId;
+  const handleReferBackFinancial = (entry: UnifiedProjectTransaction, reason: string, requestId: string) => {
+    if (!reason.trim()) { showToast('Enter a reason to refer this entry back.'); return Promise.resolve(false); }
+    if (!Number.isInteger(entry.revision)) return Promise.resolve(unsupported('this entry has no revision; reload and try again.'));
+    return run(entry.affectsCash ? 'Entry referred back; reversal recorded' : 'Entry referred back',
+      () => referBackFinancial(referBackInput(projectOfEntry(entry), entry.id, entry.revision as number, requestId, reason)));
   };
-  const handleApproveExpense = (id: string) => review(id, 'approved', 'Expense approval recorded');
-  const handleApproveBooking = (id: string) => review(id, 'approved', 'Booking receipt approval recorded');
-  const handleRejectExpense = (id: string) => review(id, 'rejected', 'Expense rejected');
+  const handleResubmitFinancial = (entry: UnifiedProjectTransaction, payload: Record<string, any>, requestId: string) => {
+    if (!Number.isInteger(entry.revision)) return Promise.resolve(unsupported('this entry has no revision; reload and try again.'));
+    return run('Corrected entry recorded',
+      () => resubmitFinancial(resubmitInput(projectOfEntry(entry), entry.id, entry.revision as number, requestId, payload)));
+  };
 
   // ---------- Investments ----------
-  const handleRecordIndividualInvestment = (d: IndividualInvestmentData) => run('Investment submitted', () => {
+  const handleRecordIndividualInvestment = (d: IndividualInvestmentData) => run('Investment recorded', () => {
     const meta = metaOf(d.accountId);
     const pid = meta?.projectId || activeProjectId;
     return erpSave(erpOf(pid), pid, 'investments', investmentInput(d));
   });
-  const handleApproveIndividualInvestment = (id: string) => review(id, 'approved', 'Investment approval recorded');
-  const handleRejectIndividualInvestment = (id: string, reason?: string) => review(id, 'rejected', 'Investment rejected', reason);
 
   // ---------- Drawings ----------
   const handleSubmitDrawing = (d: DrawingRequest) => {
     const pid = d.projectId || activeProjectId;
-    return run('Drawing request submitted', () => erpSave(erpOf(pid), pid, 'drawings', drawingInput(d)));
+    return run('Drawing recorded', () => erpSave(erpOf(pid), pid, 'drawings', drawingInput(d)));
   };
-  const handleReviewDrawing = (id: string, decision: 'approved' | 'rejected') => review(id, decision, decision === 'approved' ? 'Drawing approval recorded' : 'Drawing rejected');
 
   // ---------- Liquor ----------
-  const handleAddLiquorSettlement = (s: LiquorDailySettlement) => run('Counter settlement submitted', () => erpSave(erpOf(activeProjectId), activeProjectId, 'settlements', s));
-  const handleAddStockDraw = (d: PartnerStockDraw) => run('Stock draw submitted', () => erpSave(erpOf(activeProjectId), activeProjectId, 'stock-draws', d));
+  const handleAddLiquorSettlement = (s: LiquorDailySettlement) => run('Counter settlement recorded', () => erpSave(erpOf(activeProjectId), activeProjectId, 'settlements', s));
+  const handleAddStockDraw = (d: PartnerStockDraw) => run('Stock draw recorded', () => erpSave(erpOf(activeProjectId), activeProjectId, 'stock-draws', d));
 
   if (booting) {
     return <div className="min-h-screen bg-[#FDFCF7]" />;
@@ -517,7 +514,7 @@ function App() {
         firms={firms}
         selectedFirmId={selectedFirmId}
         onFirmChange={selectFirm}
-        pendingExpensesCount={pendingExpensesCount}
+        pendingExpensesCount={0}
         firmAccountsCount={(data?.accounts ?? []).length}
         currentUser={currentUser}
         onSignOut={handleSignOut}
@@ -546,12 +543,6 @@ function App() {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
-        {data && currentRole !== 'super_admin' && (
-          <BookingReceiptApprovals
-            snapshot={data.erpByProject[activeProjectId]}
-            onReview={async (id, decision) => review(id, decision, 'Booking receipt review recorded')}
-          />
-        )}
         {!data && !loadError ? (
           <div className="bg-white rounded-3xl p-10 border border-amber-300 text-center max-w-lg mx-auto my-12 shadow-xl space-y-4 animate-pulse">
             <div className="w-12 h-12 rounded-2xl bg-[#FFB800] text-gray-950 flex items-center justify-center mx-auto shadow-md">
@@ -578,7 +569,8 @@ function App() {
         {data && currentRole === 'accountant' && (currentFirm ? (
           <AccountantDashboard
             onSubmitDrawing={handleSubmitDrawing}
-            onReviewFinancial={async (id, decision) => review(id, decision, 'Financial review saved')}
+            onReferBackFinancial={handleReferBackFinancial}
+            onResubmitFinancial={handleResubmitFinancial}
             key={currentFirm.id}
             firm={currentFirm}
             firms={firms}
@@ -602,7 +594,6 @@ function App() {
             projectPlotRecords={(erpOf(activeProjectId)?.records || []).filter((record: any) => record.kind === 'plots')}
             plots={data.plots}
             onUpdatePlot={handleUpdatePlot}
-            onApproveBooking={handleApproveBooking}
             layoutCalc={data.settings.layoutCalc ?? EMPTY_LAYOUT}
             onUpdateLayoutCalc={handleUpdateLayoutCalc}
             projectExpenses={data.projectExpenses}
@@ -618,8 +609,6 @@ function App() {
             splitMode={data.settings.splitMode ?? 'fixed'}
             onToggleSplitMode={handleToggleSplitMode}
             fieldExpenses={data.fieldExpenses}
-            onApproveExpense={handleApproveExpense}
-            onRejectExpense={handleRejectExpense}
             onEnrollExpense={handleSubmitFieldExpense}
             ledgerMode={ledgerMode}
             onToggleLedgerMode={handleToggleLedgerMode}
@@ -633,8 +622,6 @@ function App() {
             onAddAccountTransaction={handleAddAccountTransaction}
             individualInvestments={data.investments}
             onRecordIndividualInvestment={handleRecordIndividualInvestment}
-            onApproveIndividualInvestment={handleApproveIndividualInvestment}
-            onRejectIndividualInvestment={handleRejectIndividualInvestment}
           />
         ) : (
           <div className="bg-white rounded-3xl p-10 border border-red-200 text-center max-w-lg mx-auto my-12 shadow-xl space-y-4">
@@ -648,7 +635,8 @@ function App() {
 
         {data && currentRole === 'field_partner' && (currentFirm ? (
           <FieldPartnerMobileView
-            onReviewFinancial={async (id, decision) => review(id, decision, 'Financial review saved')}
+            onReferBackFinancial={handleReferBackFinancial}
+            onResubmitFinancial={handleResubmitFinancial}
             firm={currentFirm}
             firms={firms}
             currentUser={currentUser}
@@ -663,13 +651,11 @@ function App() {
             onSubmitExpense={handleSubmitFieldExpense}
             drawingRequests={data.drawings}
             onSubmitDrawing={handleSubmitDrawing}
-            onReviewDrawing={handleReviewDrawing}
             onBlockedAction={unsupported}
             session={partnerSession}
             onLogin={() => undefined}
             onLogout={handleSignOut}
             onUpdatePlot={handleUpdatePlot}
-            onApproveBooking={handleApproveBooking}
             projects={projects}
             selectedProjectId={activeProjectId}
             onSelectProject={setSelectedProjectId}
@@ -682,14 +668,10 @@ function App() {
             partnerStockDraws={data.stockDraws}
             onAddAccountTransaction={handleAddAccountTransaction}
             onAddStockDraw={handleAddStockDraw}
-            onApproveExpense={handleApproveExpense}
-            onRejectExpense={handleRejectExpense}
             ledgerMode={ledgerMode}
             onUpdatePartner={handleUpdatePartner}
             individualInvestments={data.investments}
             onRecordIndividualInvestment={handleRecordIndividualInvestment}
-            onApproveIndividualInvestment={handleApproveIndividualInvestment}
-            onRejectIndividualInvestment={handleRejectIndividualInvestment}
           />
         ) : (
           <div className="bg-white rounded-3xl p-10 border border-amber-300 text-center max-w-lg mx-auto my-12 shadow-xl space-y-4">

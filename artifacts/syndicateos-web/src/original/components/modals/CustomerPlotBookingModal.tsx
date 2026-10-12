@@ -61,7 +61,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
   const [buyerPhone, setBuyerPhone] = useState(plot.buyerPhone || plot.marketingRequest?.buyerPhone || '');
   const [buyerAadhaar, setBuyerAadhaar] = useState(plot.buyerAadhaar || '');
   const [ratePerSqYard, setRatePerSqYard] = useState(plot.ratePerSqYard || plot.marketingRequest?.proposedRatePerSqYard || floorRate);
-  const [advanceReceived, setAdvanceReceived] = useState(plot.advanceReceived || plot.marketingRequest?.proposedAdvanceAmount || 0);
+  const [advanceReceived, setAdvanceReceived] = useState(plot.advanceReceived || 0);
   const [paymentMode, setPaymentMode] = useState<Plot['paymentMode']>(plot.paymentMode);
   const [paymentRefNumber, setPaymentRefNumber] = useState(plot.paymentRefNumber || '');
   const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
@@ -84,60 +84,8 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
   const [notes, setNotes] = useState(plot.notes || '');
   const [showReceiptView, setShowReceiptView] = useState(false);
   const [copiedReceipt, setCopiedReceipt] = useState(false);
-  const [approving, setApproving] = useState(false);
-  const canApproveReceipt = !!plot.pendingBookingId && !!onApproveBooking
-    && !!project?.reviewableRecordIds?.includes(plot.pendingBookingId);
-
-  const handleApproveReceipt = async () => {
-    if (!canApproveReceipt || approving || !plot.pendingBookingId || !onApproveBooking) return;
-    setApproving(true);
-    try {
-      const ok = await onApproveBooking(plot.pendingBookingId);
-      if (ok !== false) onClose();
-    } finally { setApproving(false); }
-  };
-
   const selectedAccount = availableAccounts.find((a) => a.id === selectedAccountId);
 
-  // Marketing Rate Proposal Acceptance: Sets status to 'blocked' awaiting token deposit
-  const handleAcceptRateProposal = () => {
-    if (!plot.marketingRequest) return;
-    const req = plot.marketingRequest;
-    const updatedPlot: Plot = {
-      ...plot,
-      status: 'blocked',
-      ratePerSqYard: req.proposedRatePerSqYard,
-      buyerName: req.buyerName,
-      buyerPhone: req.buyerPhone,
-      blockedByAgent: req.agentName,
-      blockedForBuyer: req.buyerName,
-      blockedRate: req.proposedRatePerSqYard,
-      blockedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      notes: `Rate of ₹${req.proposedRatePerSqYard.toLocaleString('en-IN')}/Sq.Yd accepted. Blocked awaiting token deposit. Proposed by ${req.agentName}.`,
-      marketingRequest: {
-        ...req,
-        status: 'accepted_blocked',
-        reviewedBy: firm.managingPartnerName || 'Managing Partner / Accountant',
-        reviewedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      },
-    };
-    void Promise.resolve(onConfirmBooking(updatedPlot)).then((ok) => { if (ok !== false) onClose(); });
-  };
-
-  const handleRejectRateProposal = () => {
-    const updatedPlot: Plot = {
-      ...plot,
-      marketingRequest: plot.marketingRequest
-        ? {
-            ...plot.marketingRequest,
-            status: 'rejected',
-            reviewedBy: firm.managingPartnerName || 'Managing Partner / Accountant',
-            reviewedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-          }
-        : undefined,
-    };
-    void Promise.resolve(onConfirmBooking(updatedPlot)).then((ok) => { if (ok !== false) onClose(); });
-  };
 
   const handleReleaseBlock = () => {
     if (confirm(`Release block on ${plot.plotNumber} back to Available inventory?`)) {
@@ -357,74 +305,15 @@ Thank you for booking with ${firm.name}.
             </div>
           </div>
 
-          {/* PENDING MARKETING BOOKING & RATE PROPOSAL REVIEW CARD */}
+          {/* Historical marketing request: activity only, never a hold or cash */}
           {plot.marketingRequest && plot.marketingRequest.status === 'pending' && (
-            <div className="bg-gradient-to-r from-amber-500/15 via-amber-50 to-amber-500/10 border-2 border-amber-400 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
-                  <span className="text-xs font-black uppercase text-amber-950 tracking-wider">
-                    ⚡ Incoming Booking &amp; Rate Request from Marketing Agent
-                  </span>
-                </div>
-                <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-md">
-                  Awaiting Acceptance
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white p-3 rounded-xl border border-amber-200 shadow-2xs">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block">Marketing Agent</span>
-                  <strong className="text-gray-950 block">{plot.marketingRequest.agentName}</strong>
-                  <span className="text-gray-600 font-mono text-[11px]">{plot.marketingRequest.agentPhone}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block">Client / Buyer</span>
-                  <strong className="text-gray-950 block">{plot.marketingRequest.buyerName}</strong>
-                  <span className="text-gray-600 font-mono text-[11px]">{plot.marketingRequest.buyerPhone || 'Phone on file'}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block">Proposed Rate</span>
-                  <div className="flex items-center gap-1.5">
-                    <strong className="text-base font-black font-mono text-gray-950">
-                      {formatINR(plot.marketingRequest.proposedRatePerSqYard)}
-                    </strong>
-                    <span className="text-[10px] text-gray-500">/Sq.Yd</span>
-                  </div>
-                  <span className="text-[10px] font-bold block text-emerald-700">
-                    Total: {formatINR(plot.areaSqYards * plot.marketingRequest.proposedRatePerSqYard)}
-                  </span>
-                </div>
-              </div>
-
-              {plot.marketingRequest.notes && (
-                <div className="text-[11px] text-amber-900 bg-amber-100/70 p-2.5 rounded-xl border border-amber-200 italic">
-                  &ldquo;{plot.marketingRequest.notes}&rdquo;
-                </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                <span className="text-[11px] text-amber-900/80 font-medium">
-                  * Accepting this rate will <strong>block</strong> this plot exclusively for this client until token payment is deposited.
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleRejectRateProposal}
-                    className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-                  >
-                    Decline Request
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAcceptRateProposal}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                    <span>Accept Rate &amp; Block Plot</span>
-                  </button>
-                </div>
-              </div>
+            <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 text-xs text-amber-950 space-y-1">
+              <strong className="block text-[11px] uppercase tracking-wider">Booking request noted (historical, no hold)</strong>
+              <p>
+                {plot.marketingRequest.agentName} proposed {formatINR(plot.marketingRequest.proposedRatePerSqYard)}/Sq.Yd for {plot.marketingRequest.buyerName || 'a buyer'}.
+                This request is recorded for reference only. It did not hold the plot and no promised token is counted as money.
+              </p>
+              {plot.marketingRequest.notes && <p className="italic text-amber-900">&ldquo;{plot.marketingRequest.notes}&rdquo;</p>}
             </div>
           )}
 
@@ -454,7 +343,7 @@ Thank you for booking with ${firm.name}.
                     {plot.blockedByAgent && <span> via Agent: <strong className="text-indigo-900">{plot.blockedByAgent}</strong></span>}
                   </span>
                   <span className="text-gray-500 text-[11px] block mt-0.5">
-                    Accepted Rate: <strong className="font-mono text-gray-900">{formatINR(plot.blockedRate || plot.ratePerSqYard)}/Sq.Yd</strong> • Total Outlay: <strong className="font-mono text-gray-900">{formatINR(plot.areaSqYards * (plot.blockedRate || plot.ratePerSqYard))}</strong>
+                    Hold Rate: <strong className="font-mono text-gray-900">{formatINR(plot.blockedRate || plot.ratePerSqYard)}/Sq.Yd</strong> • Total Outlay: <strong className="font-mono text-gray-900">{formatINR(plot.areaSqYards * (plot.blockedRate || plot.ratePerSqYard))}</strong>
                   </span>
                 </div>
                 <div className="text-[11px] text-amber-900 bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-300 font-bold">
@@ -596,7 +485,7 @@ Thank you for booking with ${firm.name}.
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             {plot.pendingBookingId && (
               <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                <strong>Receipt saved — awaiting approval.</strong> The {formatINR(advanceReceived)} receipt will credit the selected project account after approval. Review it in the booking receipts panel.
+                <strong>Historical unposted receipt.</strong> This {formatINR(advanceReceived)} receipt was saved before entries posted automatically and is not in the books. Its author can Correct &amp; Resubmit it from Project Statements to record it.
               </div>
             )}
               <fieldset disabled={!!plot.pendingBookingId} className="space-y-4">
@@ -891,14 +780,7 @@ Thank you for booking with ${firm.name}.
                     Cancel
                   </button>
                   {plot.pendingBookingId ? (
-                    canApproveReceipt ? (
-                      <button type="button" disabled={approving} onClick={() => void handleApproveReceipt()}
-                        className="px-6 py-2.5 bg-emerald-700 text-white font-bold rounded-xl text-xs disabled:opacity-50">
-                        {approving ? 'Recording approval…' : 'Approve Booking Receipt'}
-                      </button>
-                    ) : (
-                      <span className="text-xs font-bold text-amber-800">Awaiting an eligible reviewer</span>
-                    )
+                    <span className="text-xs font-bold text-amber-800">Correct &amp; resubmit from Project Statements</span>
                   ) : <button
                     type="submit"
                     className="px-6 py-2.5 bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black rounded-xl text-xs shadow-md border border-amber-600/30 flex items-center gap-2 active:scale-95 transition-all"

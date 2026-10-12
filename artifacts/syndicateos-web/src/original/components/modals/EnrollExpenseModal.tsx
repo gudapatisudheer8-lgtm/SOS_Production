@@ -369,16 +369,16 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
             </div>
           </div>
 
-          {/* 4. Server-controlled approval workflow */}
+          {/* 4. Posting */}
           <div>
             <div>
               <label className="block text-[11px] font-black text-gray-700 uppercase mb-1">
-                Approval Workflow
+                Posting
               </label>
               <div className="px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-950">
-                Pending independent verification
+                Recorded when saved
               </div>
-              <p className="text-[10px] text-gray-600 mt-1">Ledger debits occur only after the required independent approvals.</p>
+              <p className="text-[10px] text-gray-600 mt-1">The selected account is debited as soon as the expense is saved. Mistakes are fixed with Refer Back or Correct &amp; Resubmit.</p>
             </div>
           </div>
 
@@ -402,7 +402,7 @@ export const EnrollExpenseModal: React.FC<EnrollExpenseModalProps> = ({
             <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3 flex items-start gap-2 text-amber-900 text-[11px]">
               <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
               <span>
-                <strong>Independent verification:</strong> The project's configured approval rules apply. Saving does not debit an account or claim that a partner has approved.
+                <strong>Recorded immediately:</strong> Saving posts this expense to the project books. Check the amount and account before saving.
               </span>
             </div>
           )}

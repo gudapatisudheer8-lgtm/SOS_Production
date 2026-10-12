@@ -15,7 +15,6 @@ export interface ErpRecord {
   createdBy: string;
   createdAt: string;
   data: ErpRecordData;
-  votes: string[];
 }
 
 export type ErpFieldVisibleWhen = { [key: string]: unknown };
@@ -68,12 +67,33 @@ export const FinancialStatementEntryType = {
   debit: 'debit',
 } as const;
 
+export type FinancialStatementEntryPostingState = typeof FinancialStatementEntryPostingState[keyof typeof FinancialStatementEntryPostingState];
+
+
+export const FinancialStatementEntryPostingState = {
+  posted: 'posted',
+  legacy_unposted: 'legacy_unposted',
+  referred_back: 'referred_back',
+  superseded: 'superseded',
+  reversal: 'reversal',
+  rejected: 'rejected',
+} as const;
+
+export type FinancialStatementEntryCorrectionData = {[key: string]: unknown};
+
 export interface FinancialStatementEntry {
   id: string;
   date: string;
   type: FinancialStatementEntryType;
   amount: string;
-  status: string;
+  postingState: FinancialStatementEntryPostingState;
+  revision: number;
+  kind: string;
+  canReferBack: boolean;
+  canResubmit: boolean;
+  correctionReason?: string;
+  correctionFields: ErpField[];
+  correctionData: FinancialStatementEntryCorrectionData;
   accountId: string;
   accountName: string;
   description: string;
@@ -504,6 +524,20 @@ export interface HealthStatus {
  * Explicit authentication, validation, conflict, permission or setup failure
  */
 export type ApiFailureResponse = ApiError;
+
+export type GetProjectNotifications200ItemsItem = {
+  id: string;
+  projectId: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
+};
+
+export type GetProjectNotifications200 = {
+  unread: number;
+  items: GetProjectNotifications200ItemsItem[];
+};
 
 export type GetBusinessMasters200 = {
   revision: number;

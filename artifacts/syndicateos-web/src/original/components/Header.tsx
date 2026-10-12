@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Role, TenantFirm, AuthenticatedAppUser } from '../types';
 import { ShieldCheck, Building2, ChevronDown, KeyRound, LogOut } from 'lucide-react';
 import { ChangePinDialog } from './profile/ChangePinDialog';
+import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   currentRole: Role;
@@ -23,7 +24,7 @@ interface HeaderProps {
 const roleLabel = (r: Role) => (r === 'super_admin' ? 'Product owner' : r === 'accountant' ? 'Firm accountant' : 'Project partner');
 
 export const Header: React.FC<HeaderProps> = ({
-  currentRole, firms, selectedFirmId, onFirmChange, pendingExpensesCount, currentUser, onSignOut, onAccountUpdated,
+  currentRole, firms, selectedFirmId, onFirmChange, currentUser, onSignOut, onAccountUpdated,
 }) => {
   const currentFirm = firms.find((f) => f.id === selectedFirmId) || firms[0];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -77,6 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
             </label>
           )}
 
+          {currentUser && !isOwner && <NotificationBell identityKey={`${currentUser.id}:${currentUser.role}:${currentUser.firmId || ''}`} />}
           {currentUser ? (
             <div ref={wrapRef} className="relative">
               <button ref={btnRef} type="button" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="profile-menu"
@@ -84,9 +86,6 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border border-stone-200 bg-white hover:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors">
                 <span className="relative w-7 h-7 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center text-[11px] font-black">
                   {initials}
-                  {currentRole === 'accountant' && pendingExpensesCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[9px] flex items-center justify-center" aria-label={`${pendingExpensesCount} pending approvals`}>{pendingExpensesCount}</span>
-                  )}
                 </span>
                 <span className="hidden sm:flex flex-col items-start leading-tight text-left">
                   <span className="text-xs font-black text-slate-900 max-w-[140px] truncate">{currentUser.name}</span>

@@ -59,7 +59,6 @@ export const RecordLedgerTransactionModal: React.FC<RecordLedgerTransactionModal
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || '');
   const [description, setDescription] = useState<string>('');
   const [enrolledBy, setEnrolledBy] = useState<string>(firm.accountantName ? `${firm.accountantName} (Accountant)` : 'Accountant Console');
-  const [approvedBy, setApprovedBy] = useState<string>(firm.managingPartnerName ? `${firm.managingPartnerName} (Managing Partner)` : 'Managing Partner Approval');
 
   // Extract all partners across projects for automatic ledger attribution
   const availablePartners = useMemo(() => {
@@ -114,7 +113,6 @@ export const RecordLedgerTransactionModal: React.FC<RecordLedgerTransactionModal
       projectName: matchedProject?.name || undefined,
       balanceAfter: projectedBalance,
       enrolledBy: enrolledBy.trim() || `${firm.accountantName} (Accountant)`,
-      approvedBy: approvedBy.trim() || `${firm.managingPartnerName} (Managing Partner)`,
       status: 'approved',
       paymentMode: paymentMode,
     };
@@ -425,19 +423,6 @@ export const RecordLedgerTransactionModal: React.FC<RecordLedgerTransactionModal
               />
             </div>
 
-            <div>
-              <label className="block text-[11px] font-black text-gray-700 uppercase mb-1 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Approved By (Approver / Signoff)</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Srikanth Reddy (Managing Partner)"
-                value={approvedBy}
-                onChange={(e) => setApprovedBy(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-950 focus:ring-2 focus:ring-[#FFB800] outline-none"
-              />
-            </div>
           </div>
 
           {/* LIVE BALANCE IMPACT SUMMARY BOX */}

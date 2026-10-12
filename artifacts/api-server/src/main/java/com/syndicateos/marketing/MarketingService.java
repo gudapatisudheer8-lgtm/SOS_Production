@@ -237,21 +237,28 @@ public class MarketingService {
             var d=object(records.getFirst().get("data"));
             if(!"available".equals(d.path("status").asText())) throw new ApiProblem(409,"PLOT_UNAVAILABLE","This plot is no longer available.");
             if(jdbc.queryForObject("SELECT count(*) FROM sos.marketing_proposals WHERE plot_id=? AND status='pending'",Integer.class,plot)>0)
-                throw new ApiProblem(409,"PROPOSAL_PENDING","A request for this plot is already awaiting review.");
+                throw new ApiProblem(409,"PROPOSAL_PENDING","This plot has a historical request. Record or withdraw that request before placing another hold.");
             if(!d.path("areaSqYards").isNumber() || d.path("areaSqYards").decimalValue().signum()<=0)
                 throw ApiProblem.invalid("The plot area must be corrected before requesting a booking.");
             if(advance.compareTo(rate.multiply(d.path("areaSqYards").decimalValue()))>0)
                 throw ApiProblem.invalid("The proposed advance cannot exceed the proposed plot value.");
+            var details=object(jdbc.queryForMap("SELECT details FROM sos.projects WHERE id=?",who.get("project_id")).get("details"));
+            if(rate.compareTo(details.path("floorRatePerSqYard").decimalValue())<0)
+                throw ApiProblem.invalid("This rate is below the project's protected floor rate.");
             UUID id=UUID.randomUUID();
             var data=json.createObjectNode();
             data.put("id",id.toString()).put("agentName",who.get("agent_name").toString()).put("agentPhone",who.get("mobile").toString())
                 .put("buyerName",buyer).put("buyerPhone",phone).put("proposedRatePerSqYard",rate).put("proposedAdvanceAmount",advance)
-                .put("tokenDeadlineHours",hours).put("submittedAt",Instant.now().toString()).put("status","pending").put("notes",notes);
-            jdbc.update("INSERT INTO sos.marketing_proposals(id,project_id,agent_id,plot_id,request_id,data,status) VALUES(?,?,?,?,?,?::jsonb,'pending')",
+                .put("tokenDeadlineHours",hours).put("submittedAt",Instant.now().toString()).put("status","accepted_blocked").put("notes",notes);
+            jdbc.update("INSERT INTO sos.marketing_proposals(id,project_id,agent_id,plot_id,request_id,data,status) VALUES(?,?,?,?,?,?::jsonb,'accepted_blocked')",
                 id,who.get("project_id"),who.get("agent_id"),plot,request,data.toString());
             d.set("marketingRequest",data);
+            d.put("status","blocked").put("blockedByAgent",who.get("agent_name").toString());
             jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",d.toString(),plot);
-            return Map.of("id",id,"status","pending");
+            jdbc.update("INSERT INTO sos.project_notifications(id,project_id,record_id,marketing_agent_id,title,message) VALUES(?,?,?,?,?,?)",
+                UUID.randomUUID(),who.get("project_id"),plot,who.get("agent_id"),"Booking hold recorded",
+                "A marketing hold was recorded. No promised advance is included in the project balance.");
+            return Map.of("id",id,"status","accepted_blocked");
         });
     }
     public List<Map<String,Object>> proposals(SessionAccount actor,UUID project) {
@@ -267,35 +274,7 @@ public class MarketingService {
         });
     }
     public Map<String,Object> review(SessionAccount actor,UUID id,JsonNode body) {
-        if(!body.path("accept").isBoolean()) throw ApiProblem.invalid("Choose whether to accept or reject the request.");
-        return tx.execute(s -> {
-            var proposals=jdbc.queryForList("SELECT * FROM sos.marketing_proposals WHERE id=?",id);
-            if(proposals.isEmpty()) throw ApiProblem.denied();
-            var row=proposals.getFirst(); UUID project=(UUID)row.get("project_id");
-            staff(actor,project,true); // Locks project before review writes.
-            access.project(actor,project,"erp.review",true);
-            var plot=jdbc.queryForMap("SELECT data FROM sos.erp_records WHERE id=? AND project_id=? FOR UPDATE",row.get("plot_id"),project);
-            row=jdbc.queryForMap("SELECT * FROM sos.marketing_proposals WHERE id=? FOR UPDATE",id);
-            if(!"pending".equals(row.get("status"))) throw ApiProblem.conflict();
-            var d=object(plot.get("data"));
-            var request=object(row.get("data"));
-            boolean accept=body.path("accept").asBoolean();
-            if(accept && !"available".equals(d.path("status").asText()))
-                throw new ApiProblem(409,"PLOT_UNAVAILABLE","This plot is no longer available. Reject the request or review the plot.");
-            var details=object(jdbc.queryForMap("SELECT details FROM sos.projects WHERE id=?",project).get("details"));
-            if(accept && request.path("proposedRatePerSqYard").decimalValue().compareTo(details.path("floorRatePerSqYard").decimalValue())<0)
-                throw ApiProblem.invalid("This proposal is below the protected project floor rate. Use the authorized discount workflow before accepting.");
-            String status=accept?"accepted_blocked":"rejected";
-            request.put("status",status).put("reviewedBy",actor.displayName());
-            d.set("marketingRequest",request);
-            if(accept) d.put("status","blocked").put("blockedByAgent",request.path("agentName").asText());
-            jdbc.update("UPDATE sos.marketing_proposals SET status=?,data=?::jsonb,reviewed_by=?,reviewed_at=now() WHERE id=?",
-                status,request.toString(),actor.identityId(),id);
-            jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",d.toString(),row.get("plot_id"));
-            jdbc.update("INSERT INTO sos.erp_audit(id,project_id,actor_id,record_id,event) VALUES(?,?,?,?,?)",
-                UUID.randomUUID(),project,actor.identityId(),row.get("plot_id"),accept?"MARKETING_RATE_HELD":"MARKETING_REQUEST_REJECTED");
-            return Map.of("id",id,"status",status);
-        });
+        throw ApiProblem.invalid("Approvals have been removed. Valid marketing requests place a hold immediately; record actual receipts separately.");
     }
     public void logout(String token) {
         jdbc.update("DELETE FROM sos.marketing_sessions WHERE token_hash=?",digest(token));

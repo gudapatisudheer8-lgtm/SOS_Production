@@ -311,7 +311,7 @@ export const MarketingPlotPortalModal: React.FC<MarketingPlotPortalModalProps> =
                     {isAvailable ? (
                       <>
                         <div>Rate: <strong className="text-amber-400 font-mono">{rateText(plot.ratePerSqYard)}</strong></div>
-                        {pending && <div className="text-amber-300 font-bold">Request pending: {plot.marketingRequest?.agentName}</div>}
+                        {pending && <div className="text-amber-300 font-bold">Request noted (no hold): {plot.marketingRequest?.agentName}</div>}
                       </>
                     ) : isBlocked ? (
                       <>

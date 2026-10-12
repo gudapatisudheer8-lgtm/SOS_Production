@@ -11,6 +11,43 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /notifications:
+    get:
+      operationId: getProjectNotifications
+      tags: [workspace]
+      description: Project activity visible only through current active firm/project membership. No approvals are required.
+      responses:
+        "200":
+          description: Latest authorized activity and unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, unread]
+                properties:
+                  unread: { type: integer }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, projectId, title, message, createdAt, read]
+                      properties:
+                        id: { type: string, format: uuid }
+                        projectId: { type: string, format: uuid }
+                        title: { type: string }
+                        message: { type: string }
+                        createdAt: { type: string }
+                        read: { type: boolean }
+        default: { $ref: "#/components/responses/ApiFailure" }
+  /notifications/{notificationId}/read:
+    post:
+      operationId: markProjectNotificationRead
+      tags: [workspace]
+      parameters:
+        - { name: notificationId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Marked read for this authenticated identity }
+        default: { $ref: "#/components/responses/ApiFailure" }
   /configuration/masters:
     get:
       operationId: getBusinessMasters
@@ -169,6 +206,16 @@ paths:
         master.save is owner-only and requires revision when updating an existing choice.
         partner.update and partner.status are accountant-only, require project membership
         revision and affect only that project, never another firm's identity name.
+        erp.save posts valid financial entries immediately; erp.review is disabled.
+        erp.refer-back takes projectId, recordId, revision, requestId and a required reason.
+        It appends a balanced reversal and returns the original record for correction,
+        or refers an unposted historical record without moving money.
+        erp.resubmit takes projectId, recordId, revision, requestId and corrected data.
+        Only the original author may resubmit. It creates a new posted replacement;
+        original entries and reversals remain immutable. Failed corrections roll back.
+        Project statement entries expose postingState, revision, canReferBack,
+        canResubmit, correctionReason, correctionFields and correctionData. Approver
+        names and approval status are not part of the statement contract.
       parameters:
         - { name: action, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -236,7 +283,7 @@ components:
   schemas:
     ErpRecord:
       type: object
-      required: [id, kind, revision, status, createdBy, createdAt, data, votes]
+      required: [id, kind, revision, status, createdBy, createdAt, data]
       properties:
         id: { type: string }
         kind: { type: string }
@@ -245,7 +292,6 @@ components:
         createdBy: { type: string }
         createdAt: { type: string }
         data: { type: object, additionalProperties: {} }
-        votes: { type: array, items: { type: string } }
     ErpField:
       type: object
       required: [key, label, kind, required]
@@ -275,13 +321,20 @@ components:
         canReviewOwn: { type: boolean }
     FinancialStatementEntry:
       type: object
-      required: [id, date, type, amount, status, accountId, accountName, affectsCash, description]
+      required: [id, date, type, amount, postingState, revision, kind, canReferBack, canResubmit, correctionFields, correctionData, accountId, accountName, affectsCash, description]
       properties:
         id: { type: string }
         date: { type: string }
         type: { type: string, enum: [credit, debit] }
         amount: { type: string }
-        status: { type: string }
+        postingState: { type: string, enum: [posted, legacy_unposted, referred_back, superseded, reversal, rejected] }
+        revision: { type: integer }
+        kind: { type: string }
+        canReferBack: { type: boolean }
+        canResubmit: { type: boolean }
+        correctionReason: { type: string }
+        correctionFields: { type: array, items: { $ref: "#/components/schemas/ErpField" } }
+        correctionData: { type: object, additionalProperties: {} }
         accountId: { type: string }
         accountName: { type: string }
         description: { type: string }

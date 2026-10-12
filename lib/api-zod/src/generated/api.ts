@@ -9,6 +9,29 @@ import * as zod from 'zod';
 
 
 /**
+ * Project activity visible only through current active firm/project membership. No approvals are required.
+ */
+export const GetProjectNotificationsResponse = zod.object({
+  "unread": zod.number().int(),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "projectId": zod.string().uuid(),
+  "title": zod.string(),
+  "message": zod.string(),
+  "createdAt": zod.string(),
+  "read": zod.boolean()
+}))
+})
+
+
+export const MarkProjectNotificationReadParams = zod.object({
+  "notificationId": zod.coerce.string().uuid()
+})
+
+export const MarkProjectNotificationReadResponse = zod.unknown()
+
+
+/**
  * Authenticated database-backed business choices and policy metadata. Owners also see disabled entries. Security permissions remain sector-release grants.
  */
 export const getBusinessMastersResponseItemsItemGroupMax = 64;
@@ -47,7 +70,27 @@ export const GetProjectErpResponse = zod.object({
   "date": zod.string(),
   "type": zod.enum(['credit', 'debit']),
   "amount": zod.string(),
-  "status": zod.string(),
+  "postingState": zod.enum(['posted', 'legacy_unposted', 'referred_back', 'superseded', 'reversal', 'rejected']),
+  "revision": zod.number().int(),
+  "kind": zod.string(),
+  "canReferBack": zod.boolean(),
+  "canResubmit": zod.boolean(),
+  "correctionReason": zod.string().optional(),
+  "correctionFields": zod.array(zod.object({
+  "default": zod.unknown().optional(),
+  "unit": zod.string().optional(),
+  "integer": zod.boolean().optional(),
+  "maxLength": zod.number().int().optional(),
+  "visibleWhen": zod.record(zod.string(), zod.unknown()).optional(),
+  "key": zod.string(),
+  "label": zod.string(),
+  "kind": zod.enum(['text', 'number', 'date', 'select', 'boolean', 'account', 'partner', 'inventory', 'multiline']),
+  "required": zod.boolean(),
+  "min": zod.number().optional(),
+  "max": zod.number().optional(),
+  "options": zod.array(zod.string()).optional()
+})),
+  "correctionData": zod.record(zod.string(), zod.unknown()),
   "accountId": zod.string(),
   "accountName": zod.string(),
   "description": zod.string(),
@@ -66,8 +109,7 @@ export const GetProjectErpResponse = zod.object({
   "status": zod.string(),
   "createdBy": zod.string(),
   "createdAt": zod.string(),
-  "data": zod.record(zod.string(), zod.unknown()),
-  "votes": zod.array(zod.string())
+  "data": zod.record(zod.string(), zod.unknown())
 })),
   "resources": zod.array(zod.object({
   "kind": zod.string(),
@@ -328,6 +370,16 @@ export const GetWorkspaceResponse = zod.object({
  * master.save is owner-only and requires revision when updating an existing choice.
  * partner.update and partner.status are accountant-only, require project membership
  * revision and affect only that project, never another firm's identity name.
+ * erp.save posts valid financial entries immediately; erp.review is disabled.
+ * erp.refer-back takes projectId, recordId, revision, requestId and a required reason.
+ * It appends a balanced reversal and returns the original record for correction,
+ * or refers an unposted historical record without moving money.
+ * erp.resubmit takes projectId, recordId, revision, requestId and corrected data.
+ * Only the original author may resubmit. It creates a new posted replacement;
+ * original entries and reversals remain immutable. Failed corrections roll back.
+ * Project statement entries expose postingState, revision, canReferBack,
+ * canResubmit, correctionReason, correctionFields and correctionData. Approver
+ * names and approval status are not part of the statement contract.
  */
 export const ExecuteCommandParams = zod.object({
   "action": zod.coerce.string()

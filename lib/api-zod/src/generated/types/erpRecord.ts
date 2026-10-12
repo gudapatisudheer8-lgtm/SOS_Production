@@ -15,5 +15,4 @@ export interface ErpRecord {
   createdBy: string;
   createdAt: string;
   data: ErpRecordData;
-  votes: string[];
 }

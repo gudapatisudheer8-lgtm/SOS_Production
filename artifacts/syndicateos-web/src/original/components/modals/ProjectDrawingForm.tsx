@@ -55,7 +55,7 @@ export function ProjectDrawingForm({ project, accounts, partners, onSave, open: 
       <label>Destination / handover details<input required className={inputClass} value={destination} onChange={(e) => setDestination(e.target.value)} /></label>
       <label className="sm:col-span-2">Purpose<textarea required className={inputClass} value={purpose} onChange={(e) => setPurpose(e.target.value)} /></label>
     </div>
-    <p className="text-xs text-gray-600 my-3">Pending independent approval. The selected account is debited only when payment clears.</p>
+    <p className="text-xs text-gray-600 my-3">Recorded when saved. The selected account is debited immediately.</p>
     <button type="submit" disabled={saving || !selected} className="rounded-xl bg-amber-400 px-4 py-2 font-bold disabled:opacity-50">{saving ? 'Saving…' : 'Submit drawing'}</button>
     <button type="button" className="ml-3" disabled={saving} onClick={() => setOpen(false)}>Cancel</button>
   </form>;

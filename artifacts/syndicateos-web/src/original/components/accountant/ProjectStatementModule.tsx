@@ -18,16 +18,15 @@ import {
   Filter,
   ArrowDownLeft,
   ArrowUpRight,
-  ShieldCheck,
   User,
   Calendar,
-  CreditCard,
   Landmark,
   Download,
   Printer,
   PlusCircle,
   CheckCircle2,
-  Clock,
+  RotateCcw,
+  PencilLine,
   Layers,
   Coins,
   ChevronDown,
@@ -39,6 +38,8 @@ import {
   Wallet
 } from 'lucide-react';
 import { formatINR } from '../../utils/formatters';
+import { type CorrectionField, type PostingState, countsForCash, postingLabel, runningBalances, statementTotals } from '../../../adapter/financialCorrections';
+import { FinancialCorrectionDialog, type FinancialDialogMode } from './FinancialCorrectionDialog';
 
 export interface UnifiedProjectTransaction {
   affectsCash?: boolean;
@@ -55,15 +56,22 @@ export interface UnifiedProjectTransaction {
   accountName: string;
   accountTypeLabel: string;
   enrolledBy: string;
-  approverName: string;
-  status: 'approved' | 'pending' | 'rejected' | 'cleared';
+  postingState?: PostingState | string;
+  kind?: string;
+  revision?: number;
+  canReferBack?: boolean;
+  canResubmit?: boolean;
+  correctionReason?: string;
+  correctionData?: Record<string, any>;
+  correctionFields?: CorrectionField[];
   paymentMode?: string;
   runningBalance?: number;
   notes?: string;
 }
 
 interface ProjectStatementModuleProps {
-  onReviewFinancial?: (id: string, decision: 'approved' | 'rejected') => Promise<boolean>;
+  onReferBackFinancial?: (entry: UnifiedProjectTransaction, reason: string, requestId: string) => Promise<boolean>;
+  onResubmitFinancial?: (entry: UnifiedProjectTransaction, data: Record<string, any>, requestId: string) => Promise<boolean>;
   onRecordDrawing?: (data: any) => void | boolean | Promise<boolean>;
   project?: Project | null;
   firm: TenantFirm;
@@ -81,7 +89,8 @@ interface ProjectStatementModuleProps {
 
 export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
   onRecordDrawing,
-  onReviewFinancial,
+  onReferBackFinancial,
+  onResubmitFinancial,
   project,
   firm,
   accounts,
@@ -101,7 +110,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
   const [flowFilter, setFlowFilter] = useState<'all' | 'credit' | 'debit'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [accountFilter, setAccountFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'pending'>('all');
+  const [dialog, setDialog] = useState<{ mode: FinancialDialogMode; entry: UnifiedProjectTransaction } | null>(null);
   const [dateFilter, setDateFilter] = useState<'all' | 'month' | 'last30' | 'custom'>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
@@ -164,8 +173,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
             accountName: `${acc.bankName} (${acc.accountNumber.slice(-4)})`,
             accountTypeLabel: accTypeLabel,
             enrolledBy: tx.enrolledBy || tx.partnerName || `${firm.accountantName || 'Accountant'} (Accountant)`,
-            approverName: tx.approvedBy || `${firm.managingPartnerName || 'Managing Partner'} (Managing Partner)`,
-            status: tx.status || 'approved',
+            postingState: (tx.status || 'approved') === 'approved' ? 'posted' : 'legacy_unposted',
+            affectsCash: (tx.status || 'approved') === 'approved',
             paymentMode: tx.paymentMode || (acc.accountType === 'field_petty_cash' ? 'Cash' : 'RTGS / NEFT'),
             runningBalance: tx.balanceAfter,
             notes: tx.notes,
@@ -191,15 +200,6 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
       );
       if (hasBankTx) return;
 
-      const isApproved = exp.status === 'approved';
-      const approver =
-        exp.reconciledBy ||
-        (exp.approvedByPartners && exp.approvedByPartners.length > 0
-          ? exp.approvedByPartners.join(', ')
-          : isApproved
-          ? `${firm.managingPartnerName || 'Managing Partner'} (Managing Partner)`
-          : 'Pending Managing Partner Signoff');
-
       list.push({
         id: `field-exp-${exp.id}`,
         source: 'field_expense',
@@ -213,8 +213,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
         accountName: exp.bankAccountName || 'Site Petty Cash Treasury',
         accountTypeLabel: exp.paymentSource === 'project_bank' ? 'Project Bank Account' : 'Field Imprest Vault',
         enrolledBy: `${exp.partnerName} (Field Partner)`,
-        approverName: approver,
-        status: exp.status,
+        postingState: (exp.status) === 'approved' ? 'posted' : 'legacy_unposted',
+        affectsCash: (exp.status) === 'approved',
         paymentMode: exp.paymentMode || 'Cash / Spot Voucher',
         notes: exp.taxInvoiceNo ? `GST Invoice #${exp.taxInvoiceNo}` : undefined,
       });
@@ -243,8 +243,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
             accountName: primaryAcc ? `${primaryAcc.bankName} (${primaryAcc.accountNumber.slice(-4)})` : 'Pending Bank A/C Setup',
             accountTypeLabel: primaryAcc ? 'Project Bank Account' : 'Customer Advance',
             enrolledBy: 'Sales Liaison Partner',
-            approverName: plt.discountApprovedBy || `${firm.managingPartnerName || 'Managing Partner'} (Managing Partner)`,
-            status: 'approved',
+            postingState: 'posted',
+            affectsCash: true,
             paymentMode: plt.paymentMode || 'RTGS / Bank Transfer',
             notes: plt.paymentMilestone ? `Stage: ${plt.paymentMilestone}` : undefined,
           });
@@ -274,8 +274,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
             accountName: primaryAcc ? `${primaryAcc.bankName} (${primaryAcc.accountNumber.slice(-4)})` : 'Pending Bank A/C Setup',
             accountTypeLabel: primaryAcc ? 'Project Bank Account' : 'Customer Advance',
             enrolledBy: 'Site Sales Coordinator',
-            approverName: unit.discountApprovedBy || `${firm.managingPartnerName || 'Managing Partner'} (Managing Partner)`,
-            status: 'approved',
+            postingState: 'posted',
+            affectsCash: true,
             paymentMode: 'Bank Transfer / Cheque',
             notes: unit.currentMilestone ? `Milestone: ${unit.currentMilestone}` : undefined,
           });
@@ -311,8 +311,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
           accountName: inv.accountName || (inv.accountType === 'cash' ? 'Syndicate Cash Safe Vault' : 'Project Bank Account'),
           accountTypeLabel: inv.accountType === 'cash' ? 'Cash Vault Depository' : 'Commercial Escrow / Bank',
           enrolledBy: inv.enrolledBy || `${inv.partnerName} (Partner)`,
-          approverName: inv.approvedBy || (inv.status === 'approved' ? `${firm.managingPartnerName || 'Managing Partner'}` : 'Pending Consortium Signoff'),
-          status: inv.status || 'approved',
+          postingState: (inv.status || 'approved') === 'approved' ? 'posted' : 'legacy_unposted',
+          affectsCash: (inv.status || 'approved') === 'approved',
           paymentMode: inv.paymentMode || (inv.accountType === 'cash' ? 'Cash' : 'Bank Wire'),
           notes: inv.notes,
         });
@@ -328,9 +328,6 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
       .filter((tx) => {
         // Flow Filter (Credit vs Debit)
         if (flowFilter !== 'all' && tx.type !== flowFilter) return false;
-
-        // Status Filter
-        if (statusFilter !== 'all' && tx.status !== statusFilter) return false;
 
         // Category Filter
         if (categoryFilter !== 'all') {
@@ -374,10 +371,9 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
           const matchDesc = tx.description.toLowerCase().includes(q);
           const matchRef = tx.referenceNo.toLowerCase().includes(q);
           const matchEnrolled = tx.enrolledBy.toLowerCase().includes(q);
-          const matchApprover = tx.approverName.toLowerCase().includes(q);
           const matchAccount = tx.accountName.toLowerCase().includes(q);
           const matchCat = tx.categoryLabel.toLowerCase().includes(q);
-          if (!matchDesc && !matchRef && !matchEnrolled && !matchApprover && !matchAccount && !matchCat) {
+          if (!matchDesc && !matchRef && !matchEnrolled && !matchAccount && !matchCat) {
             return false;
           }
         }
@@ -389,20 +385,15 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
         const dateB = new Date(b.date).getTime() || 0;
         return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
-  }, [allProjectTransactions, flowFilter, statusFilter, categoryFilter, accountFilter, searchTerm, sortOrder]);
+  }, [allProjectTransactions, flowFilter, categoryFilter, accountFilter, searchTerm, sortOrder]);
 
   // Aggregate Metrics for Statement
-  const totalInflows = filteredTransactions
-    .filter((t) => t.type === 'credit' && t.status === 'approved' && t.affectsCash !== false)
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalOutflows = filteredTransactions
-    .filter((t) => t.type === 'debit' && t.status === 'approved' && t.affectsCash !== false)
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const netCashFlow = totalInflows - totalOutflows;
-  const approvedCount = filteredTransactions.filter((t) => t.status === 'approved').length;
-  const pendingCount = filteredTransactions.filter((t) => t.status === 'pending').length;
+  // Cash effect follows the server's affectsCash flag only; reversals and replaced
+  // entries remain readable without being counted twice.
+  const { inflows: totalInflows, outflows: totalOutflows, net: netCashFlow } = statementTotals(filteredTransactions);
+  const balances = useMemo(() => runningBalances(allProjectTransactions), [allProjectTransactions]);
+  const approvedCount = filteredTransactions.filter((t) => countsForCash(t)).length;
+  const pendingCount = filteredTransactions.filter((t) => t.postingState === 'legacy_unposted' || t.postingState === 'referred_back').length;
 
   const bankAccounts = useMemo(() => {
     return projectAccounts.filter((a) => a.accountType !== 'field_petty_cash');
@@ -419,10 +410,10 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
   const totalCashBalance = useMemo(() => {
     const directCash = cashAccounts.reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
     const cashCredits = allProjectTransactions
-      .filter((t) => t.type === 'credit' && t.status === 'approved' && (t.paymentMode?.toLowerCase().includes('cash') || t.accountName.toLowerCase().includes('cash') || t.accountTypeLabel.toLowerCase().includes('cash')))
+      .filter((t) => t.type === 'credit' && countsForCash(t) && (t.paymentMode?.toLowerCase().includes('cash') || t.accountName.toLowerCase().includes('cash') || t.accountTypeLabel.toLowerCase().includes('cash')))
       .reduce((sum, t) => sum + t.amount, 0);
     const cashDebits = allProjectTransactions
-      .filter((t) => t.type === 'debit' && t.status === 'approved' && (t.paymentMode?.toLowerCase().includes('cash') || t.accountName.toLowerCase().includes('cash') || t.accountTypeLabel.toLowerCase().includes('cash')))
+      .filter((t) => t.type === 'debit' && countsForCash(t) && (t.paymentMode?.toLowerCase().includes('cash') || t.accountName.toLowerCase().includes('cash') || t.accountTypeLabel.toLowerCase().includes('cash')))
       .reduce((sum, t) => sum + t.amount, 0);
     const netCashTxs = cashCredits - cashDebits;
     return Math.max(directCash, netCashTxs, 0);
@@ -441,8 +432,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
       'Description',
       'Account / Treasury',
       'Enrolled By',
-      'Approved By',
-      'Approval Status',
+      'Posting',
+      'Affects Cash',
       'Amount (INR)',
       'Payment Mode'
     ];
@@ -455,8 +446,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
       `"${t.description.replace(/"/g, '""')}"`,
       `"${t.accountName}"`,
       `"${t.enrolledBy.replace(/"/g, '""')}"`,
-      `"${t.approverName.replace(/"/g, '""')}"`,
-      t.status.toUpperCase(),
+      `"${postingLabel(t.postingState)}"`,
+      countsForCash(t) ? 'YES' : 'NO',
       t.amount,
       `"${t.paymentMode || 'N/A'}"`
     ]);
@@ -482,16 +473,20 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
   return (
     <div className="space-y-6">
       {canDraw && project && <ProjectDrawingForm key={project.id} project={project} accounts={accounts} partners={partners} onSave={onRecordDrawing!} open={drawingOpen} onOpenChange={setDrawingOpen} />}
-      {onReviewFinancial && project?.financialStatement?.some((t) => t.status === 'pending') && <details className="rounded-xl border border-amber-200 bg-white p-4">
-        <summary className="font-bold cursor-pointer">Pending financial entries — review &amp; approval</summary>
-        {project.financialStatement.filter((t) => t.status === 'pending').map((t) => <div key={t.id} className="flex flex-wrap gap-3 items-center justify-between border-t py-3">
-          <span>{t.categoryLabel} · {t.enrolledBy} · {formatINR(t.amount)} · {t.accountName}</span>
-          {project.reviewableRecordIds?.includes(t.id) ? <div className="flex gap-3">
-            <button className="text-emerald-700 font-bold" onClick={() => void onReviewFinancial(t.id, 'approved')}>Approve</button>
-            <button className="text-red-700 font-bold" onClick={() => void onReviewFinancial(t.id, 'rejected')}>Reject</button>
-          </div> : <span className="text-xs text-gray-500">Awaiting eligible independent reviewer</span>}
-        </div>)}
-      </details>}
+      {dialog && (
+        <FinancialCorrectionDialog
+          key={`${dialog.mode}-${dialog.entry.id}`}
+          mode={dialog.mode}
+          entry={dialog.entry}
+          project={project}
+          accounts={accounts}
+          partners={partners}
+          plots={plots}
+          onClose={() => setDialog(null)}
+          onReferBack={onReferBackFinancial}
+          onResubmit={onResubmitFinancial}
+        />
+      )}
       {/* ======================================================== */}
       {/* 1. PROJECT STATEMENT HEADER & ACTION BUTTONS             */}
       {/* ======================================================== */}
@@ -513,11 +508,11 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
 
             <h3 className="text-xl sm:text-2xl font-black text-gray-950 flex items-center gap-2 mt-1">
               <FileText className="w-6 h-6 text-emerald-600" />
-              <span>Project Account Statement &amp; Approved Transactions</span>
+              <span>Project Account Statement &amp; Recorded Transactions</span>
             </h3>
 
             <p className="text-xs text-gray-500 mt-1">
-              Consolidated real-time passbook recording every customer booking advance, partner capital infusion, verified site outlay, and contractor disbursement. Displays enrolled personnel and statutory approval signoffs for 100% audit clarity.
+              Consolidated real-time passbook recording every customer booking advance, partner capital infusion, verified site outlay, and contractor disbursement. Every entry is recorded the moment it is saved; mistakes are fixed by referring back (a visible reversal) or by a corrected replacement, with the full history kept.
             </p>
           </div>
 
@@ -571,7 +566,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                 aria-expanded={drawingOpen}
                 onClick={() => setDrawingOpen((v) => !v)}
                 className={`${actionBtn} bg-white hover:bg-amber-50 text-gray-950 border border-amber-400`}
-                title="Record a partner drawing (pending independent approval)"
+                title="Record a partner drawing"
               >
                 <PlusCircle className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
                 <span>{drawingOpen ? 'Close Drawing Form' : '+ Record Partner Drawing'}</span>
@@ -621,11 +616,11 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
             <div className="text-[11px] font-semibold text-emerald-700 flex items-center justify-between">
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{approvedCount} Verified &amp; Cleared</span>
+                <span>{approvedCount} Affect cash</span>
               </span>
               {pendingCount > 0 && (
                 <span className="px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded-full font-bold text-[10px]">
-                  {pendingCount} Pending
+                  {pendingCount} Needs correction
                 </span>
               )}
             </div>
@@ -751,7 +746,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {/* Filter 1: Search Box */}
             <div className="lg:col-span-2 relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -760,7 +755,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search narration, ref #, enrolled person, or approver..."
+                placeholder="Search narration, ref #, enrolled person, or account..."
                 className="w-full pl-10 pr-9 py-2.5 bg-gray-50 border border-gray-300 rounded-2xl text-xs font-semibold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none"
               />
               {searchTerm && (
@@ -814,19 +809,6 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
               </select>
             </div>
 
-            {/* Filter 5: Approval Status */}
-            <div>
-              <select
-                id="statement-status-filter"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-2xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
-              >
-                <option value="all">All Statuses (Approved &amp; Pending)</option>
-                <option value="approved">✓ Approved &amp; Cleared Only</option>
-                <option value="pending">⏳ Pending Approval Only</option>
-              </select>
-            </div>
           </div>
 
           {/* Quick Active Filter Pills & Reset */}
@@ -915,7 +897,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                 <RefreshCw className="w-3 h-3 text-gray-400" />
               </button>
 
-              {(searchTerm || flowFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all' || accountFilter !== 'all') && (
+              {(searchTerm || flowFilter !== 'all' || categoryFilter !== 'all' || accountFilter !== 'all') && (
                 <button
                   type="button"
                   onClick={() => {
@@ -923,7 +905,6 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                     setFlowFilter('all');
                     setAccountFilter('all');
                     setCategoryFilter('all');
-                    setStatusFilter('all');
                   }}
                   className="text-xs text-amber-800 hover:underline font-bold"
                 >
@@ -952,7 +933,6 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                 setSearchTerm('');
                 setFlowFilter('all');
                 setCategoryFilter('all');
-                setStatusFilter('all');
               }}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gray-950 text-white font-bold text-xs shadow-sm hover:bg-gray-800 transition-colors"
             >
@@ -970,8 +950,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                   <th className="py-3.5 px-4">Narration &amp; Category</th>
                   <th className="py-3.5 px-4">Account / Treasury</th>
                   <th className="py-3.5 px-4">Enrolled By</th>
-                  <th className="py-3.5 px-4">Approver Name</th>
-                  <th className="py-3.5 px-4 text-center">Status</th>
+                  <th className="py-3.5 px-4">Actions</th>
                   <th className="py-3.5 px-4 text-right">Amount</th>
                 </tr>
               </thead>
@@ -1037,31 +1016,30 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                       </div>
                     </td>
 
-                    {/* 6. Approver Name */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span className="font-bold text-gray-900">{tx.approverName}</span>
+                    {/* 6. Actions */}
+                    <td className="py-3.5 px-4 whitespace-nowrap" data-testid={`cell-actions-${tx.id}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                        tx.postingState === 'reversal' ? 'bg-rose-50 text-rose-800 border-rose-200'
+                        : tx.postingState === 'superseded' || tx.postingState === 'referred_back' ? 'bg-gray-100 text-gray-600 border-gray-300'
+                        : tx.postingState === 'legacy_unposted' ? 'bg-amber-50 text-amber-900 border-amber-300'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`} data-testid={`text-posting-${tx.id}`}>
+                        {postingLabel(tx.postingState)}
+                      </span>
+                      {tx.correctionReason && <span className="block text-[10px] text-gray-500 mt-0.5 max-w-[180px] truncate" title={tx.correctionReason}>{tx.correctionReason}</span>}
+                      <div className="flex gap-1.5 mt-1">
+                        {tx.canReferBack && onReferBackFinancial && (
+                          <button type="button" data-testid={`button-refer-back-${tx.id}`} onClick={() => setDialog({ mode: 'refer-back', entry: tx })}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 font-bold text-[10px]">
+                            <RotateCcw className="w-3 h-3" /> Refer Back
+                          </button>
+                        )}
+                        {tx.canResubmit && onResubmitFinancial && (
+                          <button type="button" data-testid={`button-resubmit-${tx.id}`} onClick={() => setDialog({ mode: 'resubmit', entry: tx })}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 font-bold text-[10px]">
+                            <PencilLine className="w-3 h-3" /> Correct &amp; Resubmit
+                          </button>
+                        )}
                       </div>
-                    </td>
-
-                    {/* 7. Status */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      {tx.status === 'approved' || tx.status === 'cleared' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Approved</span>
-                        </span>
-                      ) : tx.status === 'pending' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
-                          <Clock className="w-3 h-3" />
-                          <span>Pending</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
-                          <span>Rejected</span>
-                        </span>
-                      )}
                     </td>
 
                     {/* 8. Amount */}
@@ -1074,9 +1052,10 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                         {tx.type === 'credit' ? '+' : '-'}
                         {formatINR(tx.amount)}
                       </span>
-                      {tx.runningBalance !== undefined && (
+                      {!countsForCash(tx) && <span className="text-[10px] text-gray-400 block">Not in balance</span>}
+                      {balances.has(tx.id) && (
                         <span className="text-[10px] text-gray-400 block font-mono">
-                          Bal: {formatINR(tx.runningBalance)}
+                          Bal: {formatINR(balances.get(tx.id) as number)}
                         </span>
                       )}
                     </td>

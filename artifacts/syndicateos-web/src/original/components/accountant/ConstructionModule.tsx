@@ -448,7 +448,7 @@ export const ConstructionModule: React.FC<ConstructionModuleProps> = ({
                   />
                   {selectedUnit.baseRate < FLOOR_RATE_PER_SQFT && (
                     <span className="text-[10px] text-red-600 font-bold block mt-1">
-                      Below Floor Rate! Multi-partner signoff required.
+                      Below Floor Rate! A justification will be recorded.
                     </span>
                   )}
                 </div>

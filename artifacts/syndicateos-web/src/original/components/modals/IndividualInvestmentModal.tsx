@@ -243,14 +243,14 @@ export const IndividualInvestmentModal: React.FC<IndividualInvestmentModalProps>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs max-h-[82vh] overflow-y-auto">
-          {/* Transparency & Approval Banner */}
+          {/* Posting banner */}
           <div className="bg-gradient-to-r from-amber-50 to-emerald-50 border border-amber-200/80 rounded-2xl p-3.5 flex items-start gap-3 text-gray-900">
             <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">
               <span className="font-black text-emerald-950 block text-xs">
                 Record Project Investment
               </span>
-              Your investment is submitted automatically for project approval. The selected cash or bank account and partner capital ledger update only after approval.
+              Your investment is recorded as soon as you save. The selected cash or bank account and partner capital ledger update immediately; mistakes are fixed with Refer Back or Correct &amp; Resubmit.
             </div>
           </div>
 

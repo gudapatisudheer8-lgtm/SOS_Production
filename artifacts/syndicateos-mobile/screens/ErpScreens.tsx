@@ -46,6 +46,8 @@ export interface ErpCtx { project: Project | null; account: SessionAccount; }
 export const FINANCIAL = ['transactions', 'investments', 'expenses', 'settlements', 'stock-draws', 'drawings'];
 export const str = (v: unknown) => (v === null || v === undefined ? '' : String(v));
 export const live = (r: ErpRecord) => r.status !== 'deleted';
+export const recordStateLabel = (s: string) => ({ approved: 'Recorded', pending: 'Not posted (historical)',
+  referred_back: 'Referred back', superseded: 'Replaced by correction', rejected: 'Withdrawn (historical)' }[s] || s);
 export const tone = (s: string): 'ok' | 'warn' | 'bad' | 'muted' => (s === 'approved' || s === 'available' || s === 'registered' ? 'ok' : s === 'pending' || s === 'reserved' || s === 'booked' ? 'warn' : s === 'rejected' || s === 'blocked' || s === 'deleted' ? 'bad' : 'muted');
 export const money = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : str(v); };
 
@@ -226,14 +228,15 @@ export function RecordForm({ erp, res, rec, ctx, onDone, fixed }: { erp: Project
     if (Object.keys(e).length) return;
     setBusy(true); setMsg(null);
     try {
-      await cmd.save(res.kind, data, { requestId: reqId, recordId: rec?.id, revision: rec?.revision });
+      if (rec && FINANCIAL.includes(res.kind)) await cmd.resubmit(rec.id, rec.revision, data, reqId);
+      else await cmd.save(res.kind, data, { requestId: reqId, recordId: rec?.id, revision: rec?.revision });
       onDone();
     } catch (x) { setMsg(errMessage(x)); } finally { setBusy(false); }
   };
   if (badField) return <Banner tone="error" title="Configuration error" text={`Field "${badField.label}" is ${badField.kind === 'select' ? 'a select with no options defined' : `of unsupported kind "${badField.kind}"`}. This form cannot be used until the configuration is fixed.`} />;
   return (
     <View>
-      {FINANCIAL.includes(res.kind) && !rec ? <Banner tone="warn" title="Starts as pending" text="Financial records are reviewed before they count. Approved financial records cannot be edited or deleted." /> : null}
+      {FINANCIAL.includes(res.kind) ? <Banner tone="warn" title="Records immediately" text="Valid entries update the project ledger when saved. Corrections use Refer Back and resubmission, retaining the original history." /> : null}
       {fixed ? <Banner tone="warn" title="Linked record" text={`This entry is tied to ${Object.keys(fixed).map((k) => fields.find((f) => f.key === k)?.label ?? k).join(', ')} and cannot be changed here.`} /> : null}
       {alloc ? <Banner tone="warn" title={`Equity remaining: ${Math.max(0, Math.round((totalPct - othersPct) * 100) / 100)}% of ${totalPct}%`} text={Number.isFinite(budget) ? `Capital is calculated from the project budget of ${money(budget)}. It cannot exceed the budget.` : 'Project budget is not set.'} /> : null}
       {fields.filter((f) => !hidden(f) && (f as XField).ui !== 'hidden' && !(fixed && f.key in fixed)).map((f) => {
@@ -253,9 +256,9 @@ export function RecordForm({ erp, res, rec, ctx, onDone, fixed }: { erp: Project
         return <Field key={f.key} label={lab} value={vals[f.key] ?? ''} onChangeText={(v) => setVals((s) => ({ ...s, [f.key]: v }))} multiline={f.kind === 'multiline'} keyboardType={f.kind === 'number' ? 'numeric' : 'default'} error={errs[f.key]} hint={f.kind === 'date' ? 'YYYY-MM-DD' : undefined} />;
       })}
       {needsConfirm ? <Field label="Confirm account number *" value={confirmNo} onChangeText={setConfirmNo} error={errs.confirmAccountNumber} hint="Used only to check for typing mistakes; it is not stored." /> : null}
-      {res.kind === 'expenses' && vals.accountId && !hidden({ key: 'accountId', visibleWhen: fields.find((f) => f.key === 'accountId')?.visibleWhen } as ErpField) ? (() => { const b = erp.balances.find((x) => x.accountId === vals.accountId); return <Banner tone="warn" title={`Cleared balance: ${b ? money(Number(b.balance)) : 'not available'}`} text="Only cleared money is counted. This expense stays pending until independently approved and does not change the balance now." />; })() : null}
+      {res.kind === 'expenses' && vals.accountId && !hidden({ key: 'accountId', visibleWhen: fields.find((f) => f.key === 'accountId')?.visibleWhen } as ErpField) ? (() => { const b = erp.balances.find((x) => x.accountId === vals.accountId); return <Banner tone="warn" title={`Available balance: ${b ? money(Number(b.balance)) : 'not available'}`} text="This expense debits the selected account as soon as it is recorded." />; })() : null}
       {msg ? <Banner tone="error" title="Not saved" text={msg} /> : null}
-      <Btn label={rec ? 'Save changes' : `Create ${res.title}`} onPress={submit} loading={busy} />
+      <Btn label={rec && FINANCIAL.includes(res.kind) ? 'Correct & Resubmit' : rec ? 'Save changes' : `Create ${res.title}`} onPress={submit} loading={busy} />
     </View>
   );
 }
@@ -269,6 +272,8 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
   const [edit, setEdit] = useState(false);
   const [del, setDel] = useState(false);
   const [reason, setReason] = useState('');
+  const [refer, setRefer] = useState(false);
+  const [requestId] = useState(newRequestId);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const act = async (f: () => Promise<unknown>, close = true) => {
@@ -287,12 +292,10 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
     return str(v);
   };
   if (edit) return <Dialog title={`Edit ${nice(res)}`} onClose={() => setEdit(false)}><RecordForm erp={erp} res={res} rec={rec} ctx={ctx} onDone={onClose} /></Dialog>;
-  const pending = rec.status === 'pending';
-  const own = rec.createdBy === ctx.account.identityId || (ctx.account.role === 'PARTNER' && str(rec.data.partnerId) === ctx.account.identityId);
-  const canRev = res.canReview && pending && (!own || res.canReviewOwn);
+  const entry = erp.statement?.find((e) => e.id === rec.id);
   return (
     <Dialog title={`${res.title}: ${label(rec)}`} onClose={onClose}>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}><Badge text={rec.status} tone={tone(rec.status)} />{rec.data.status ? <Badge text={str(rec.data.status)} tone={tone(str(rec.data.status))} /> : null}</View>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}><Badge text={recordStateLabel(rec.status)} tone={tone(rec.status)} />{rec.data.status ? <Badge text={str(rec.data.status)} tone={tone(str(rec.data.status))} /> : null}</View>
       {res.fields.filter((f) => !/attachmentid$/i.test(f.key) && (f as XField).ui !== 'hidden').map((f) => (
         <View key={f.key} style={{ marginBottom: 10 }}>
           <Label>{f.label}</Label>
@@ -300,26 +303,23 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
         </View>
       ))}
       {attKeys.map((k) => <AttachmentView key={k} projectId={erp.projectId} id={str(rec.data[k])} label={k === 'voiceAttachmentId' ? 'Voice memo' : k === 'receiptAttachmentId' ? 'Photo voucher / bill' : 'Document'} />)}
-      <Text style={{ color: c.mutedForeground, fontSize: 12, marginVertical: 6 }}>Created {rec.createdAt.slice(0, 16).replace('T', ' ')}{creator ? ` by ${creator}` : ''} · revision {rec.revision} · {rec.votes.length} vote{rec.votes.length === 1 ? '' : 's'}{rec.votes.length ? `: ${rec.votes.map((v) => erp.partners.find((p) => p.id === v)?.name ?? 'reviewer').join(', ')}` : ''}</Text>
+      <Text style={{ color: c.mutedForeground, fontSize: 12, marginVertical: 6 }}>Created {rec.createdAt.slice(0, 16).replace('T', ' ')}{creator ? ` by ${creator}` : ''} · revision {rec.revision}</Text>
       {msg ? <Banner tone="error" title="Action refused" text={msg} /> : null}
-      {res.canReview && pending && own && !res.canReviewOwn ? <Banner tone="warn" title="Your own record" text="You cannot review a record you created or that is booked to you. Another reviewer must approve it." /> : null}
-      {canRev ? (
-        <View style={{ marginTop: 8 }}>
-          <Field label="Review note (optional, shown on rejection)" value={reason} onChangeText={setReason} />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}><Btn label="Approve" icon="check" loading={busy} onPress={() => void act(() => cmd.review(rec.id, rec.revision, 'approved', reason.trim() || undefined))} /></View>
-            <View style={{ flex: 1 }}><Btn label="Reject" variant="danger" icon="x" loading={busy} onPress={() => void act(() => cmd.review(rec.id, rec.revision, 'rejected', reason.trim() || undefined))} /></View>
-          </View>
-        </View>
-      ) : null}
-      {res.canManage && rec.status !== 'deleted' ? (
+      {entry?.canReferBack ? <Btn label="Refer Back" variant="ghost" onPress={() => setRefer(true)} disabled={busy} /> : null}
+      {refer ? <View>
+        <Banner tone="warn" title="Reverse and return for correction" text="The original journal is preserved. Its balance effect is reversed and the original author can correct and resubmit it." />
+        <Field label="Reason *" value={reason} onChangeText={setReason} multiline />
+        <Btn label="Confirm Refer Back" loading={busy} disabled={!reason.trim()} onPress={() => void act(() => cmd.referBack(rec.id, rec.revision, reason.trim(), requestId))} />
+      </View> : null}
+      {entry?.canResubmit ? <Btn label="Correct & Resubmit" onPress={() => setEdit(true)} disabled={busy} /> : null}
+      {res.canManage && rec.status !== 'deleted' && !FINANCIAL.includes(res.kind) ? (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
           <View style={{ flex: 1 }}><Btn label="Edit" variant="ghost" icon="edit-2" onPress={() => setEdit(true)} /></View>
           <View style={{ flex: 1 }}><Btn label="Delete" variant="ghost" icon="trash-2" onPress={() => setDel(true)} /></View>
         </View>
       ) : null}
       {footer}
-      {del ? <Confirm title="Delete record?" text="The server rejects deletion of approved financial records." confirmLabel="Delete" danger onCancel={() => setDel(false)} onConfirm={() => void act(() => cmd.remove(rec.id, rec.revision))} /> : null}
+      {del ? <Confirm title="Delete record?" text="Referenced records and posted financial history cannot be deleted." confirmLabel="Delete" danger onCancel={() => setDel(false)} onConfirm={() => void act(() => cmd.remove(rec.id, rec.revision))} /> : null}
     </Dialog>
   );
 }
@@ -408,15 +408,15 @@ export function Dashboard({ erp }: { erp: ProjectErp }) {
         <Stat l="Invested" v={money(sum('invested'))} />
         <Stat l="Expenses" v={money(sum('expenses'))} />
         <Stat l="Drawings" v={money(sum('drawings'))} />
-        <Stat l="Pending review" v={String(pend)} />
+        <Stat l="Historical unposted" v={String(pend)} />
         <Stat l={t('totalPlots')} v={String(plots.length)} sub={`${plots.filter((p) => p.data.status === 'sold').length} sold · ${plots.filter((p) => p.data.status === 'available').length} available`} />
       </View>
       <Card>
-        <Label>PENDING APPROVALS</Label>
+        <Label>HISTORICAL UNPOSTED ENTRIES</Label>
         {live_.filter((r) => r.status === 'pending').length === 0 ? <Text style={{ color: c.mutedForeground }}>Nothing is pending.</Text> : live_.filter((r) => r.status === 'pending').slice(0, 12).map((r) => {
           const who = erp.partners.find((p) => p.id === (r.data.partnerId ?? r.createdBy))?.name ?? erp.partners.find((p) => p.id === r.createdBy)?.name ?? 'Unknown submitter';
           const rs = erp.resources.find((x) => x.kind === r.kind);
-          return <View key={r.id} style={{ paddingVertical: 5, borderTopWidth: 1, borderColor: c.border }}><Text style={{ color: c.foreground, fontFamily: 'Inter_600SemiBold' }}>{rs?.title ?? r.kind}: {label(r)}</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>{who}{r.data.amount !== undefined ? ` · Rs ${money(r.data.amount)}` : ''} · {r.votes.length} sign-off(s)</Text></View>;
+          return <View key={r.id} style={{ paddingVertical: 5, borderTopWidth: 1, borderColor: c.border }}><Text style={{ color: c.foreground, fontFamily: 'Inter_600SemiBold' }}>{rs?.title ?? r.kind}: {label(r)}</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>{who}{r.data.amount !== undefined ? ` · Rs ${money(r.data.amount)}` : ''} · Historical unposted entry</Text></View>;
         })}
       </Card>
       <Card>
@@ -467,7 +467,7 @@ function Statement({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const c = useColors();
   const [note, setNote] = useState<string | null>(null);
   const tx = erp.statement || [];
-  const exportCsv = () => setNote(downloadText('project-statement.csv', csvOf([['Date', 'Account', 'Type', 'Description', 'Amount', 'Status', 'Posted account movement'], ...tx.map((r) => [r.date, r.accountName, r.type, r.description, r.amount, r.status, r.affectsCash ? 'yes' : 'no'])]), 'text/csv'));
+  const exportCsv = () => setNote(downloadText('project-statement.csv', csvOf([['Date', 'Account', 'Type', 'Description', 'Amount', 'Posted account movement'], ...tx.map((r) => [r.date, r.accountName, r.type, r.description, r.amount, r.affectsCash ? 'yes' : 'no'])]), 'text/csv'));
   const print = () => { if (Platform.OS === 'web' && typeof window !== 'undefined') window.print(); else setNote('Printing is available on web only in this build.'); };
   void ctx;
   return (
@@ -476,12 +476,12 @@ function Statement({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
       {note ? <Banner tone="warn" title={note} /> : null}
       <Equity erp={erp} />
       <Card>
-        <Label>ACCOUNT BALANCES (APPROVED)</Label>
+        <Label>ACCOUNT BALANCES</Label>
         {erp.balances.length === 0 ? <Text style={{ color: c.mutedForeground }}>No accounts.</Text> : erp.balances.map((b) => <View key={b.accountId} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}><Text style={{ color: c.foreground }}>{recLabel(erp.records, b.accountId)}</Text><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold' }}>{money(b.balance)}</Text></View>)}
       </Card>
       <Card>
         <Label>PROJECT FINANCIAL ENTRIES</Label>
-        {tx.length === 0 ? <Text style={{ color: c.mutedForeground }}>No financial entries yet.</Text> : tx.map((r) => <View key={r.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, gap: 8 }}><Text style={{ color: c.foreground, flex: 1 }}>{r.date} · {r.accountName} · {r.description} · {r.status}</Text><Text style={{ color: c.foreground }}>{r.type === 'credit' ? '+' : '−'}{money(r.amount)}</Text></View>)}
+        {tx.length === 0 ? <Text style={{ color: c.mutedForeground }}>No financial entries yet.</Text> : tx.map((r) => <View key={r.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, gap: 8 }}><Text style={{ color: c.foreground, flex: 1 }}>{r.date} · {r.accountName} · {r.description}</Text><Text style={{ color: c.foreground }}>{r.type === 'credit' ? '+' : '−'}{money(r.amount)}</Text></View>)}
       </Card>
     </View>
   );

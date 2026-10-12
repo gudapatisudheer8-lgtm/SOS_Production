@@ -287,7 +287,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
                   />
                   {selectedPlot.ratePerSqYard < FLOOR_RATE_PER_SQYD && (
                     <span className="text-[10px] text-red-600 font-bold block mt-1">
-                      Below Floor Rate! Will require 2-partner consensus sign-off.
+                      Below Floor Rate! A justification will be recorded.
                     </span>
                   )}
                 </div>

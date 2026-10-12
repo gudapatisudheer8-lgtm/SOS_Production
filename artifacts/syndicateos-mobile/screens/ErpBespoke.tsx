@@ -4,6 +4,7 @@ import type { ErpRecord, ErpResource, ProjectErp } from '@workspace/api-client-r
 import { Badge, Banner, Btn, Card, Chips, Empty, Field, Label } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { useErpCommands } from '@/lib/erp';
+import { recordStateLabel } from '@/screens/ErpScreens';
 import { errMessage } from '@/lib/session';
 import { formatINR, formatIndianCompact } from '@/lib/sourceCalc';
 import { erpSetup } from '@/lib/erpSetup';
@@ -239,7 +240,7 @@ function UnitsModule({ erp, ctx, onBook }: { erp: ProjectErp; ctx: ErpCtx; onBoo
 function ResourceViewDetail({ erp, res, rec, ctx, onClose }: { erp: ProjectErp; res?: ErpResource; rec: ErpRecord; ctx: ErpCtx; onClose: () => void }) {
   const [open, setOpen] = useState(false);
   if (!res) return null;
-  return <View><Btn label="Details, edit and review" variant="ghost" onPress={() => setOpen(true)} />{open ? <RecordDetail erp={erp} res={res} rec={rec} ctx={ctx} onClose={() => { setOpen(false); onClose(); }} /> : null}</View>;
+  return <View><Btn label="Details & corrections" variant="ghost" onPress={() => setOpen(true)} />{open ? <RecordDetail erp={erp} res={res} rec={rec} ctx={ctx} onClose={() => { setOpen(false); onClose(); }} /> : null}</View>;
 }
 
 /* ===== Syndicate equity module ===== */
@@ -346,7 +347,7 @@ function AccountLedger({ erp, acct, ctx, onClose }: { erp: ProjectErp; acct: Erp
   if (edit && res) return <RecordDetail erp={erp} res={res} rec={acct} ctx={ctx} onClose={() => setEdit(false)} />;
   return (
     <Dialog title={`${label(acct)}: account ledger`} onClose={onClose}>
-      <Text style={{ color: c.mutedForeground, fontSize: 12 }}>Server-computed balance (approved records)</Text>
+      <Text style={{ color: c.mutedForeground, fontSize: 12 }}>Server-computed balance from recorded entries</Text>
       <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 26, marginBottom: 8 }}>{b !== undefined ? formatINR(nv(b)) : '-'}</Text>
       {res ? <Btn label="Account details" variant="ghost" onPress={() => setEdit(true)} /> : null}
       <View style={{ height: 8 }} />
@@ -390,7 +391,7 @@ function BookingWizard({ erp, ctx, initial, onClose }: { erp: ProjectErp; ctx: E
   const total = chosen && nv(v.ratePerSqYard) > 0 ? nv(v.ratePerSqYard) * nv(chosen.data.areaSqYards) : 0;
   return (
     <Dialog title="Customer booking" onClose={onClose}>
-      {done ? <View><Banner tone="ok" title="Booking submitted" text="It is pending review. Inventory status changes only when the server records it." /><Btn label="Close" onPress={onClose} /></View> : <View>
+      {done ? <View><Banner tone="ok" title="Booking recorded" text="The inventory and any received advance have been recorded immediately." /><Btn label="Close" onPress={onClose} /></View> : <View>
         <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>{steps.map((s, i) => <View key={s} style={{ flex: 1 }}><View style={{ height: 4, borderRadius: 2, backgroundColor: i <= step ? AMBER : c.muted }} /><Text style={{ fontSize: 10, color: i === step ? c.foreground : c.mutedForeground, marginTop: 3 }}>{i + 1}. {s}</Text></View>)}</View>
         {chosen && step > 0 ? <View style={{ backgroundColor: c.muted, borderRadius: 12, padding: 10, marginBottom: 10 }}><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold' }}>{chosen.kind === 'plots' ? 'Plot' : 'Flat'} {label(chosen)}</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>{[str(chosen.data.facing), chosen.data.areaSqYards !== undefined ? `${str(chosen.data.areaSqYards)} Sq.Yds` : '', str(chosen.data.dimensions), chosen.data.roadWidthFt !== undefined ? `${str(chosen.data.roadWidthFt)} ft road` : ''].filter(Boolean).join(' · ')}</Text></View> : null}
         {step === 0 ? (inv.length ? <Chips label="Available plot or unit" options={inv.map((r) => ({ value: r.id, label: `${r.kind === 'plots' ? 'Plot' : 'Flat'} ${label(r)}` }))} value={v.inventoryId} onChange={pickRate} /> : <Empty icon="inbox" title="Nothing available to book" />) : null}
@@ -444,7 +445,7 @@ function Reimbursements({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   return (
     <Card>
       <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 15 }}>Reimbursements</Text>
-      <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 8 }}>Repay a partner who paid an approved expense personally. The bank is debited only here, once the reimbursement itself is approved, so nothing is debited twice.</Text>
+      <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 8 }}>Repay a partner who paid a recorded expense personally. Recording a reimbursement debits the selected project account immediately, without counting the expense twice.</Text>
       {res.canCreate ? <Btn label="Reimburse an expense" icon="plus" variant="ghost" onPress={() => { setExp(null); setPick(true); }} /> : null}
       <View style={{ height: 8 }} />
       {!list.length ? <Text style={{ color: c.mutedForeground }}>No reimbursements yet.</Text> : list.map((r) => (
@@ -473,8 +474,8 @@ function ApprovalsDesk({ erp, kind, ctx }: { erp: ProjectErp; kind: string; ctx:
   if (!res) return <Empty icon="slash" title="Not available" text={`"${kind}" is not available to your role in this project.`} />;
   const isInv = kind === 'investments';
   const filters = isInv
-    ? [['all', t('filterAllInvestments')], ['mine', t('filterMyInvestments')], ['cash', t('filterCashOnly')], ['bank', t('filterBankOnly')], ['pending', t('filterInvPending')], ['approved', t('filterInvApproved')]]
-    : [['all', t('filterAll')], ['mine', t('filterMyInvestments')], ['pending', t('filterPending')], ['approved', t('filterApproved')], ['rejected', 'Rejected']];
+    ? [['all', t('filterAllInvestments')], ['mine', t('filterMyInvestments')], ['cash', t('filterCashOnly')], ['bank', t('filterBankOnly')], ['pending', 'Historical unposted'], ['approved', 'Recorded']]
+    : [['all', t('filterAll')], ['mine', t('filterMyInvestments')], ['pending', 'Historical unposted'], ['approved', 'Recorded'], ['rejected', 'Withdrawn (historical)']];
   const modeOf = (r: ErpRecord) => str(r.data.paymentMode || r.data.paymentChannel || r.data.payoutMode || r.data.mode);
   const shown = recs.filter((r) => {
     if (f === 'mine' && r.data.partnerId !== ctx.account.identityId && r.createdBy !== ctx.account.identityId) return false;
@@ -491,13 +492,13 @@ function ApprovalsDesk({ erp, kind, ctx }: { erp: ProjectErp; kind: string; ctx:
     <View>
       {partner ? <Title sub={isInv ? t('investmentsBannerSubtitle') : t('expensesBannerSubtitle')}>{isInv ? t('investmentsBannerTitle') : t('expensesBannerTitle')}</Title> : <Title>{res.title}</Title>}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-        <Stat l="Approved total" v={formatINR(total)} sub="in current filter" />
-        <Stat l="Awaiting review" v={String(recs.filter((r) => r.status === 'pending').length)} />
+        <Stat l="Recorded total" v={formatINR(total)} sub="in current filter" />
+        <Stat l="Historical unposted" v={String(recs.filter((r) => r.status === 'pending').length)} />
       </View>
       {res.canCreate ? <Btn label={partner ? (isInv ? t('enrollExpenseBtn').replace(/expenses/i, 'Investment') : t(addKey === 'investedAmount' ? 'submitExpenseBtn' : addKey)) : `Add ${res.title}`} icon="plus" onPress={() => setAdding(true)} /> : null}
       {kind === 'expenses' ? <Reimbursements erp={erp} ctx={ctx} /> : null}
       <View style={{ height: 10 }} />
-      <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', marginBottom: 6 }}>{t(titleKey as 'recentDraws')}</Text>
+      <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', marginBottom: 6 }}>{isInv ? 'Investment records' : kind === 'drawings' ? 'Drawing records' : 'Expense records'}</Text>
       <Chips options={filters.map(([value, l]) => ({ value, label: l }))} value={f} onChange={setF} />
       <Field label="Search" value={q} onChangeText={setQ} />
       {!shown.length ? <Empty icon="inbox" title={isInv ? t('noInvestmentsFound') : kind === 'drawings' ? t('noDrawings') : t('noExpenses')} /> : shown.map((r) => (
@@ -506,9 +507,9 @@ function ApprovalsDesk({ erp, kind, ctx }: { erp: ProjectErp; kind: string; ctx:
             <View style={{ flex: 1 }}>
               <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold' }}>{formatINR(nv(r.data.amount))}</Text>
               <Text style={{ color: c.mutedForeground, fontSize: 12 }} numberOfLines={2}>{[erp.partners.find((p) => p.id === r.data.partnerId)?.name, str(r.data.category), str(r.data.vendorName), modeOf(r), r.data.accountId ? recLabel(erp.records, r.data.accountId) : '', str(r.data.date)].filter(Boolean).join(' · ')}</Text>
-              <Text style={{ color: c.mutedForeground, fontSize: 11 }}>{r.votes.length} consensus sign-off(s){r.data.receiptAttachmentId ? ' · bill attached' : ''}{r.data.voiceAttachmentId ? ' · voice memo' : ''}</Text>
+              <Text style={{ color: c.mutedForeground, fontSize: 11 }}>{r.data.receiptAttachmentId ? 'Bill attached' : ''}{r.data.voiceAttachmentId ? ' · voice memo' : ''}</Text>
             </View>
-            <Badge text={r.status === 'pending' ? t('statusPending') : r.status === 'approved' ? t('statusApproved') : r.status} tone={tone(r.status)} />
+            <Badge text={recordStateLabel(r.status)} tone={tone(r.status)} />
           </View>
         </Card></Pressable>
       ))}
@@ -593,7 +594,7 @@ function PartnerDashboard({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
           {tile(`${t('viewPlotsBtn')} (${plots.length})`, 'grid', () => go('plots'))}
           {tile(t('viewPassbookBtn'), 'bank', () => go('statement'))}
         </View>
-        <Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 8 }}>{exps.filter((r) => r.status === 'pending' && mine(r)).length} of your expense record(s) await review.</Text>
+        <Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 8 }}>{exps.filter((r) => r.status === 'pending' && mine(r)).length} historical expense(s) can be corrected and resubmitted from Project Statement.</Text>
       </Card>
     </View>
   );

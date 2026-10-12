@@ -39,7 +39,11 @@ export function useErpCommands(projectId: string) {
     save: (kind: string, data: Record<string, unknown>, ex?: { recordId?: string; revision?: number; requestId?: string }) =>
       run('erp.save', { kind, data, requestId: ex?.requestId ?? newRequestId(), ...(ex?.recordId ? { recordId: ex.recordId, revision: ex.revision } : {}) }),
     review: (recordId: string, revision: number, decision: 'approved' | 'rejected', reason?: string) =>
-      run('erp.review', { recordId, revision, decision, ...(reason ? { reason } : {}) }),
+      Promise.reject(new Error('Approvals have been removed. Use the project statement to correct an entry.')),
+    referBack: (recordId: string, revision: number, reason: string, requestId: string) =>
+      run('erp.refer-back', { recordId, revision, reason, requestId }),
+    resubmit: (recordId: string, revision: number, data: Record<string, unknown>, requestId: string) =>
+      run('erp.resubmit', { recordId, revision, data, requestId }),
     remove: (recordId: string, revision: number) => run('erp.delete', { recordId, revision }),
     bulkSave: (kind: string, records: Record<string, unknown>[], requestId?: string) => run('erp.bulk-save', { kind, records, requestId: requestId ?? newRequestId() }),
     inventoryStage: (recordId: string, revision: number, p: { status: string; paymentMilestone?: string; currentMilestone?: string; officialDocValue?: number }) => run('erp.inventory-stage', { recordId, revision, ...p }),

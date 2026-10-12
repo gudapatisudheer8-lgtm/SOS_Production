@@ -5,6 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ErpField } from './erpField';
+import type { FinancialStatementEntryCorrectionData } from './financialStatementEntryCorrectionData';
+import type { FinancialStatementEntryPostingState } from './financialStatementEntryPostingState';
 import type { FinancialStatementEntryType } from './financialStatementEntryType';
 
 export interface FinancialStatementEntry {
@@ -12,7 +15,14 @@ export interface FinancialStatementEntry {
   date: string;
   type: FinancialStatementEntryType;
   amount: string;
-  status: string;
+  postingState: FinancialStatementEntryPostingState;
+  revision: number;
+  kind: string;
+  canReferBack: boolean;
+  canResubmit: boolean;
+  correctionReason?: string;
+  correctionFields: ErpField[];
+  correctionData: FinancialStatementEntryCorrectionData;
   accountId: string;
   accountName: string;
   description: string;
