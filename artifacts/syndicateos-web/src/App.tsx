@@ -353,7 +353,8 @@ function App() {
   });
 
   const handleUpdatePartner = (p: SyndicatePartner): Promise<boolean> => {
-    const prev: any = data?.partners.find((x) => x.id === p.id);
+    const targetProject = (p as any).__projectId || activeProjectId;
+    const prev: any = data?.partners.find((x) => x.id === p.id && (x as any).__projectId === targetProject);
     if (!prev) return Promise.resolve(unsupported('partner is not a saved backend record.'));
     const projectId = prev.__projectId as string;
     if ((p as any).__resetCredential) {
@@ -407,7 +408,9 @@ function App() {
 
   const saveSettings = (label: string, settings: Record<string, any>) => run(label, () => {
     if (!activeProjectId) throw new Error('Select a project first.');
-    return command('erp.settings', { projectId: activeProjectId, settings });
+    const revision = erpOf(activeProjectId)?.settings?.revision;
+    if (!Number.isInteger(revision) || revision < 0) throw new Error('Project settings are still loading. Retry when the project finishes loading.');
+    return command('erp.settings', { projectId: activeProjectId, revision, settings });
   });
   const handleUpdateLayoutCalc = (c: LayoutCalculation) => saveSettings('Layout calculation saved', { layoutCalculation: c });
   const handleUpdatePricingMatrix = (m: ApartmentPricingMatrix) => saveSettings('Pricing matrix saved', { pricingMatrix: m });

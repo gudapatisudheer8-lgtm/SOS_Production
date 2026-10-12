@@ -114,14 +114,34 @@ public class CommandService {
         config.audit(actor,"SECTOR_ASSIGNED",firm,release);
     }
     private Map<String,Object> reset(SessionAccount actor,JsonNode input) {
-        actor.owner(); UUID identity=Values.id(input,"identityId");
+        actor.business(); UUID identity=Values.id(input,"identityId");
+        UUID auditFirm=null, auditRelease=null;
+        if(!"OWNER".equals(actor.role())) {
+            if(!"ACCOUNTANT".equals(actor.role())||identity.equals(actor.identityId())) throw ApiProblem.denied();
+            UUID project=Values.id(input,"projectId");
+            Map<String,Object> row=projectForAccountant(actor,project);
+            auditFirm=(UUID)row.get("firm_id");
+            auditRelease=access.accountantAccess(actor,auditFirm,(UUID)row.get("sector_id"),"partners.write");
+            if(jdbc.queryForObject("""
+                SELECT count(*) FROM sos.project_memberships pm
+                WHERE pm.project_id=? AND pm.identity_id=? AND pm.enabled
+                AND EXISTS(SELECT 1 FROM sos.firm_memberships fm WHERE fm.firm_id=?
+                    AND fm.identity_id=pm.identity_id AND fm.role_code='PARTNER' AND fm.enabled)
+                """,Integer.class,project,identity,auditFirm)==0) throw ApiProblem.denied();
+            // Credentials are global: do not grant control of another firm's or an accountant's access.
+            if(jdbc.queryForObject("""
+                SELECT count(*) FROM sos.firm_memberships WHERE identity_id=? AND enabled
+                    AND (firm_id<>? OR role_code<>'PARTNER')
+                """,Integer.class,identity,auditFirm)>0)
+                throw new ApiProblem(403,"OWNER_RESET_REQUIRED","This identity has access outside this firm's partners. Ask the product owner to reset its shared credential.");
+        }
         if (jdbc.queryForObject("SELECT count(*) FROM sos.owner_memberships WHERE identity_id=?",Integer.class,identity)>0) throw ApiProblem.denied();
         List<Map<String,Object>> rows=jdbc.queryForList("SELECT mobile FROM sos.identities WHERE id=? AND enabled FOR UPDATE",identity);
         if (rows.isEmpty()) throw new ApiProblem(404,"NOT_FOUND","Identity not found.");
         String temporary=Values.temporaryCredential(); Instant expiry=Instant.now().plus(7,ChronoUnit.DAYS);
         jdbc.update("UPDATE sos.identities SET credential_hash=?,must_change_credential=true,temporary_credential_expires_at=?,credential_version=credential_version+1 WHERE id=?",encoder.encode(temporary),Timestamp.from(expiry),identity);
         jdbc.update("UPDATE sos.auth_sessions SET revoked_at=now() WHERE identity_id=?",identity);
-        config.audit(actor,"CREDENTIAL_RESET",null,null);
+        config.audit(actor,"CREDENTIAL_RESET",auditFirm,auditRelease);
         return Map.of("status","ok","access",Map.of("mobile",rows.getFirst().get("mobile"),"reused",false,"temporaryCredential",temporary,"expiresAt",expiry));
     }
     private Map<String,Object> createSector(SessionAccount actor,JsonNode input) {

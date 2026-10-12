@@ -38,3 +38,9 @@ Authenticated browser checks through the real development Preview must distingui
 **Why:** A valid client sign-in remained on “Authenticating…” beyond a short default assertion window; direct API login succeeded, and waiting for its response followed by configuration/workspace hydration verified the dashboard.
 
 **How to apply:** Await the actual login response and then the signed-in dashboard readiness separately. Do not diagnose slow Preview requests as invalid credentials or bypass real authentication with mocked sessions.
+
+Accountant recovery authority is firm-scoped, but a credential reset changes the person's global login. Shared or privileged identities need product-owner recovery.
+
+**Why:** Letting one firm's accountant issue a temporary credential for a shared person would also transfer control of that person's other firm or accountant/owner access.
+
+**How to apply:** Allow an accountant to recover an enabled partner in their authorized project only when that identity has no enabled external-firm or privileged membership. Deny self-reset through the admin action; use personal credential change instead. Explain owner-only recovery explicitly rather than presenting it as a broken reset.

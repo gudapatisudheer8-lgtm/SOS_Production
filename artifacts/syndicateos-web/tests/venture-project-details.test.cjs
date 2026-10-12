@@ -11,7 +11,8 @@ const sourceRoot = path.resolve(__dirname, '../src') + path.sep;
 for (const extension of ['.ts', '.tsx']) {
   require.extensions[extension] = (module, filename) => {
     assert.ok(filename.startsWith(sourceRoot));
-    const { outputText } = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    const source = fs.readFileSync(filename, 'utf8').replace(/\bimport\.meta\.env\b/g, '({ BASE_URL: "/", DEV: false })');
+    const { outputText } = ts.transpileModule(source, {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React,
         target: ts.ScriptTarget.ES2022, esModuleInterop: true,

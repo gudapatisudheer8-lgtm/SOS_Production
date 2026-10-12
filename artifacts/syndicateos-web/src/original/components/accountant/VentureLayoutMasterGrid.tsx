@@ -23,6 +23,7 @@ import {
   Lock,
   AlertCircle
 } from 'lucide-react';
+import { BlueprintWorkspace } from '../blueprint/BlueprintWorkspace';
 import { MarketingPlotPortalModal } from '../marketing/MarketingPlotPortalModal';
 import { ProjectLayoutDetails, savedProjectText } from './ProjectLayoutDetails';
 
@@ -44,6 +45,7 @@ interface VentureLayoutMasterGridProps {
   onSelectPlot: (plot: Plot) => void;
   floorRate?: number;
   onUpdatePlot?: (plot: Plot) => void | boolean | Promise<boolean>;
+  onUploadDocuments?: (projectId: string, documents: PlanUploadDocument[]) => Promise<boolean>;
 }
 
 export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = ({
@@ -54,6 +56,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
   onSelectPlot,
   floorRate = 0,
   onUpdatePlot,
+  onUploadDocuments,
 }) => {
   // Never display another project's plot measurements when the selection changes.
   const plots = useMemo(
@@ -64,8 +67,9 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
   const [facingFilter, setFacingFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'blocked' | 'reserved' | 'sold'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'interactive_grid' | 'blueprint_overlay' | 'split_view'>('interactive_grid');
-  const [isPresentationMode, setIsPresentationMode] = useState(false);
+  const [viewMode, setViewMode] = useState<'interactive_grid' | 'blueprint'>('interactive_grid');
+  // Customer presentation mode was retired; kept as a constant so existing styling branches stay inert.
+  const isPresentationMode = false as boolean;
   const [showMarketingPortal, setShowMarketingPortal] = useState(false);
 
   // Check URL query parameters on mount to auto-open Marketing Portal if shared link was accessed
@@ -75,16 +79,6 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
       setShowMarketingPortal(true);
     }
   }, []);
-
-  // Derive blueprint image
-  const projectBlueprints = project?.planDocuments?.filter(
-    (d) => d.category === 'master_layout' || d.category === 'statutory_clearance' || d.category === 'floor_plan'
-  ) || [];
-
-  const blueprintUrl =
-    projectBlueprints.length > 0 && projectBlueprints[0].dataUrl
-      ? projectBlueprints[0].dataUrl
-      : '';
 
   // Filtered plots
   const filteredPlots = useMemo(() => {
@@ -315,44 +309,19 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
 
             <button
               type="button"
-              onClick={() => setViewMode('blueprint_overlay')}
+              onClick={() => setViewMode('blueprint')}
+              aria-pressed={viewMode === 'blueprint'}
+              data-testid="button-view-blueprint"
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                viewMode === 'blueprint_overlay'
+                viewMode === 'blueprint'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-gray-700 hover:text-gray-950'
               }`}
             >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Uploaded Blueprint</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode('split_view')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                viewMode === 'split_view'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-gray-700 hover:text-gray-950'
-              }`}
-            >
-              <Split className="w-3.5 h-3.5" />
-              <span>Split View</span>
+              <FileText className="w-3.5 h-3.5" />
+              <span>Original Plan &amp; 3D</span>
             </button>
           </div>
-
-          {/* Customer Walk-in / Presentation Mode Button */}
-          <button
-            type="button"
-            onClick={() => setIsPresentationMode(!isPresentationMode)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-black shadow-xs transition-all ${
-              isPresentationMode
-                ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-            }`}
-          >
-            {isPresentationMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            <span>{isPresentationMode ? 'Exit Customer Mode' : '📱 Customer Presentation Mode'}</span>
-          </button>
 
           {/* Marketing Agent Portal & Share Link Button (Field Sales & Brokers) */}
           <button
@@ -400,6 +369,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
       )}
 
       {/* 2. DIRECTIONAL FACING SPLIT SUMMARY TILES */}
+      <div className="text-[10px] font-semibold text-gray-500">{`LP / RERA: ${project?.lpOrReraNumber ?? 'Unspecified'}`}</div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
         {/* East Facing */}
         <button
@@ -636,69 +606,12 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
       </div>
 
       {/* 4. MAIN VIEWPORT AREA */}
-      {viewMode === 'blueprint_overlay' && (
-        <div className="bg-slate-950 p-4 rounded-3xl border border-slate-800 text-center space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-300 pb-2 border-b border-slate-800">
-            <span className="font-bold flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-amber-400" />
-              Uploaded Master Layout Plan &amp; Clearance Documents
-            </span>
-            <span className="text-[11px] text-amber-400 font-mono">
-              LP / RERA: {savedProjectText(project?.lpOrReraNumber)}
-            </span>
-          </div>
-
-          <div className="bg-slate-900 rounded-2xl overflow-hidden p-2 flex items-center justify-center min-h-[460px]">
-            {(blueprintUrl) ? <img
-              src={blueprintUrl}
-              alt="Uploaded Master Plan Blueprint"
-              className="max-h-[600px] w-auto object-contain rounded-xl shadow-lg border border-slate-800"
-            /> : <p className="text-xs font-bold text-stone-400">No plan document uploaded yet.</p>}
-          </div>
-
-          <p className="text-xs text-slate-400">
-            Uploaded layout document. Refer to the saved plan for survey boundaries, road alignments, and open-space details.
-          </p>
-        </div>
-      )}
-
-      {viewMode === 'split_view' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Left: Blueprint */}
-          <div className="lg:col-span-5 bg-slate-950 p-3.5 rounded-3xl border border-slate-800 space-y-2">
-            <div className="flex items-center justify-between text-xs text-slate-300 pb-2 border-b border-slate-800">
-              <span className="font-bold flex items-center gap-1">
-                <FileText className="w-3.5 h-3.5 text-amber-400" />
-                Uploaded Blueprint
-              </span>
-              <span className="text-[10px] text-amber-400 font-mono">
-                LP / RERA: {savedProjectText(project?.lpOrReraNumber)}
-              </span>
-            </div>
-            <div className="bg-slate-900 rounded-2xl p-2 flex items-center justify-center min-h-[380px]">
-              {(blueprintUrl) ? <img
-                src={blueprintUrl}
-                alt="Uploaded Layout Blueprint"
-                className="max-h-[500px] w-auto object-contain rounded-xl"
-              /> : <p className="text-xs font-bold text-stone-400">No plan document uploaded yet.</p>}
-            </div>
-          </div>
-
-          {/* Right: Interactive Grid */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-bold ${isPresentationMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                Showing {filteredPlots.length} Plots (Tap to Book):
-              </span>
-              <span className="text-[11px] text-emerald-600 font-bold">
-                {availableCount} Available for Spot Allotment
-              </span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[600px] overflow-y-auto p-1">
-              {filteredPlots.map((plot) => renderPlotCard(plot, true))}
-            </div>
-          </div>
-        </div>
+      {viewMode === 'blueprint' && (
+        project ? (
+          <BlueprintWorkspace key={project.id} projectId={project.id} plots={plots} onUploadDocuments={onUploadDocuments} />
+        ) : (
+          <p className="text-xs font-semibold text-gray-600">Select a project to view its original plan.</p>
+        )
       )}
 
       {viewMode === 'interactive_grid' && (

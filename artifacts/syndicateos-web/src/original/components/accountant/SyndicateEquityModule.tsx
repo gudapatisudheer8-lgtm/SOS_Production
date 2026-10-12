@@ -1,5 +1,5 @@
 import { masterItem } from '../../../adapter/config';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   SyndicatePartner,
   FieldExpenseLog,
@@ -75,6 +75,21 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
   firmAccounts = [],
   individualInvestments = [],
 }) => {
+  const [splitSaving, setSplitSaving] = useState(false);
+  const [splitStatus, setSplitStatus] = useState('');
+  const splitSavingRef = useRef(false);
+  const changeSplitMode = async (mode: EquitySplitMode) => {
+    if (splitSavingRef.current || mode === splitMode) return;
+    splitSavingRef.current = true; setSplitSaving(true); setSplitStatus('Saving equity basis…');
+    try {
+      const ok = await onToggleSplitMode(mode);
+      setSplitStatus(ok === false ? 'Equity basis was not changed.' : 'Equity basis saved.');
+    } catch {
+      setSplitStatus('Could not save the equity basis. It was not changed.');
+    } finally {
+      splitSavingRef.current = false; setSplitSaving(false);
+    }
+  };
   const [selectedPartnerForAdjust, setSelectedPartnerForAdjust] = useState<SyndicatePartner | null>(null);
   const [isAddPartnerModalOpen, setIsAddPartnerModalOpen] = useState(false);
   const [newPartnerName, setNewPartnerName] = useState('');
@@ -334,8 +349,10 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
               <button
                 id="btn-split-fixed"
                 type="button"
-                onClick={() => onToggleSplitMode('fixed')}
-                className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
+                onClick={() => void changeSplitMode('fixed')}
+                disabled={splitSaving}
+                aria-pressed={splitMode === 'fixed'}
+                className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer disabled:cursor-wait disabled:opacity-60 ${
                   splitMode === 'fixed'
                     ? 'bg-[#111827] text-white shadow'
                     : 'text-gray-600 hover:text-gray-950'
@@ -346,8 +363,10 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
               <button
                 id="btn-split-proportional"
                 type="button"
-                onClick={() => onToggleSplitMode('proportional')}
-                className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
+                onClick={() => void changeSplitMode('proportional')}
+                disabled={splitSaving}
+                aria-pressed={splitMode === 'proportional'}
+                className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer disabled:cursor-wait disabled:opacity-60 ${
                   splitMode === 'proportional'
                     ? 'bg-[#111827] text-white shadow'
                     : 'text-gray-600 hover:text-gray-950'
@@ -355,6 +374,7 @@ export const SyndicateEquityModule: React.FC<SyndicateEquityModuleProps> = ({
               >
                 Capital-Weighted
               </button>
+              <span role="status" aria-live="polite" className="sr-only sm:not-sr-only sm:px-2 text-[10px] font-semibold text-gray-500">{splitStatus}</span>
             </div>
           </div>
         </div>

@@ -42,6 +42,7 @@ interface OpenPlottingModuleProps {
   firm?: TenantFirm;
   firmAccounts?: FirmAccount[];
   onAddAccountTransaction?: (accountId: string, tx: FirmAccountTransaction) => void | boolean | Promise<boolean>;
+  onUploadProjectDocuments?: (projectId: string, documents: PlanUploadDocument[]) => Promise<boolean>;
 }
 
 export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
@@ -54,12 +55,11 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
   firm,
   firmAccounts = [],
   onAddAccountTransaction,
+  onUploadProjectDocuments,
 }) => {
   const [plotFilter, setPlotFilter] = useState<'all' | 'available' | 'reserved' | 'sold'>('all');
   const [selectedPlot, setSelectedPlot] = useState<Plot | null>(null);
   const [customerBookingPlot, setCustomerBookingPlot] = useState<Plot | null>(null);
-  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
-  const [activeBlueprintDoc, setActiveBlueprintDoc] = useState<PlanUploadDocument | null>(null);
 
   // Fallback firm if not passed directly
   const effectiveFirm: TenantFirm = firm || {
@@ -87,16 +87,6 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
       enableAuditLock: false,
     },
   };
-
-  // Derive blueprint image from project documents or fallback to sample
-  const projectBlueprints = project?.planDocuments?.filter(
-    (d) => d.category === 'master_layout' || d.category === 'statutory_clearance' || d.category === 'floor_plan'
-  ) || [];
-
-  const defaultBlueprintUrl =
-    projectBlueprints.length > 0 && projectBlueprints[0].dataUrl
-      ? projectBlueprints[0].dataUrl
-      : '';
 
   // Floor Price Protection Modal state
   const FLOOR_RATE_PER_SQYD = project?.floorRatePerSqYard ?? layoutCalc.floorRatePerSqYard ?? 0;
@@ -176,23 +166,6 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveBlueprintDoc(projectBlueprints[0] || null);
-                setShowBlueprintModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white font-bold rounded-full text-xs shadow-xs transition-all"
-            >
-              <Eye className="w-3.5 h-3.5 text-amber-400" />
-              <span>Sanctioned Blueprint</span>
-              {projectBlueprints.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-gray-950 font-black text-[10px]">
-                  {projectBlueprints.length}
-                </span>
-              )}
-            </button>
-
             <div className="flex items-center gap-2 bg-[#FFFDF0] px-3.5 py-1.5 rounded-full border border-amber-300 text-xs">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span className="text-gray-700 font-bold">Floor Rate Lock: </span>
@@ -256,6 +229,7 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
         onSelectPlot={(plot) => setCustomerBookingPlot(plot)}
         floorRate={FLOOR_RATE_PER_SQYD}
         onUpdatePlot={onUpdatePlot}
+        onUploadDocuments={onUploadProjectDocuments}
       />
 
       {/* PLOT DETAIL & BOOKING MODAL */}
@@ -396,66 +370,6 @@ export const OpenPlottingModule: React.FC<OpenPlottingModuleProps> = ({
           unitExtent={pendingDiscountPlot.areaSqYards}
           extentUnit="Sq.Yd"
         />
-      )}
-
-      {/* Blueprint Fullscreen Lightbox Modal */}
-      {showBlueprintModal && (
-        <div className="fixed inset-0 z-60 bg-black/85 backdrop-blur-md flex flex-col p-4 sm:p-6 overflow-hidden">
-          <div className="flex items-center justify-between text-white pb-3 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 text-gray-950 flex items-center justify-center font-black">
-                <Compass className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-black truncate max-w-md sm:max-w-xl">
-                  {activeBlueprintDoc?.title ||
-                    `${project?.name || 'Venture'} - CRDA / DTCP Approved Master Layout Blueprint`}
-                </h3>
-                <p className="text-[11px] text-gray-400">
-                  LP Number: {project?.lpOrReraNumber || 'Approved Layout Permit'} • {plots.length} Demarcated Plots •{' '}
-                  {savedExtent}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {projectBlueprints.length > 1 && (
-                <div className="flex items-center gap-1 bg-white/10 px-2 py-1 rounded-xl">
-                  {projectBlueprints.map((doc, idx) => (
-                    <button
-                      key={doc.id}
-                      type="button"
-                      onClick={() => setActiveBlueprintDoc(doc)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        (activeBlueprintDoc?.id || projectBlueprints[0].id) === doc.id
-                          ? 'bg-amber-500 text-gray-950 font-black'
-                          : 'text-white hover:bg-white/20'
-                      }`}
-                    >
-                      Plan #{idx + 1}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setShowBlueprintModal(false)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 bg-slate-950 rounded-2xl overflow-auto p-2 sm:p-4 flex items-center justify-center border border-white/10">
-            <img
-              src={activeBlueprintDoc?.dataUrl || defaultBlueprintUrl}
-              alt="Approved Master Layout Blueprint"
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-            />
-          </div>
-        </div>
       )}
 
       {/* FAST CUSTOMER ON-SPOT BOOKING & TOKEN VOUCHER MODAL */}

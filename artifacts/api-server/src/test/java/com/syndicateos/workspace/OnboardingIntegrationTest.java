@@ -150,6 +150,18 @@ class OnboardingIntegrationTest {
         assertFalse(secondLogin.path("account").path("mustChangeCredential").asBoolean());
         String accountantB=secondLogin.path("token").asText();
         String projectB=command("project.create",Map.of("sectorId",sectorId,"name","Firm B project","details",details),accountantB,200).path("entity").path("id").asText();
+        JsonNode resetFixture=command("partner.add",Map.of("projectId",projectB,"name","Reset fixture","mobile","9888880066"),accountantB,200);
+        String resetIdentity=resetFixture.path("entity").path("identityId").asText();
+        String initial=resetFixture.path("access").path("temporaryCredential").asText();
+        JsonNode resetFixtureLogin=login("CLIENT","9888880066",initial,"TEST-B",200);
+        String resetFixtureToken=request("POST","/auth/credential",Map.of("currentCredential",initial,"newCredential","669988"),resetFixtureLogin.path("token").asText(),200).path("token").asText();
+        command("credentials.reset",Map.of("projectId",projectB,"identityId",resetIdentity),accountant,403);
+        command("credentials.reset",Map.of("projectId",projectB,"identityId",resetIdentity),resetFixtureToken,403);
+        command("credentials.reset",Map.of("projectId",projectB,"identityId",secondLogin.path("account").path("identityId").asText()),accountantB,403);
+        JsonNode accountantReset=command("credentials.reset",Map.of("projectId",projectB,"identityId",resetIdentity),accountantB,200);
+        assertTrue(accountantReset.path("access").path("temporaryCredential").asText().matches("[0-9]{6}"));
+        request("GET","/workspace",null,resetFixtureToken,401);
+        assertTrue(login("CLIENT","9888880066",accountantReset.path("access").path("temporaryCredential").asText(),"TEST-B",200).path("account").path("mustChangeCredential").asBoolean());
         command("project.update",Map.of("projectId",projectB,"revision",1,"status","ACTIVE","name","Cross tenant"),accountant,403);
         assertEquals(1,request("GET","/workspace",null,accountant,200).path("projects").size());
         JsonNode reused=command("partner.add",Map.of("projectId",projectB,"name","Existing partner","mobile","9888880002"),accountantB,200);
@@ -381,6 +393,7 @@ class OnboardingIntegrationTest {
         assertEquals(0,new java.math.BigDecimal("100").compareTo(jdbc.queryForObject("SELECT (data->>'areaSqYards')::numeric FROM sos.erp_records WHERE id=?::uuid",java.math.BigDecimal.class,plot)));
         assertEquals("1100.00",accountBalance(request("GET","/erp/"+id,null,accountant,200),acct));
         exerciseMatrixEditor(id,sector,accountant,historical,acct,plot);
+        exerciseBlueprint(id,accountant,partner,outsider,partnerId,plot);
         String otherPlot=jdbc.queryForObject("SELECT id::text FROM sos.erp_records WHERE project_id=?::uuid AND kind='plots' AND status<>'deleted' AND id<>?::uuid LIMIT 1",String.class,id,plot);
         Map<String,Object> lifecycleData=Map.of("inventoryId",otherPlot,"buyerName","Lifecycle test buyer","buyerPhone","9888880099",
             "advanceReceived","0.00","ratePerSqYard","11.00","accountId",acct,"paymentMode","UPI","date","2026-10-09");
@@ -561,5 +574,41 @@ class OnboardingIntegrationTest {
     private ObjectNode matrixGroup(JsonNode matrix,String key) {
         return (ObjectNode)matrix.path("groups").findParents("key").stream()
             .filter(group->key.equals(group.path("key").asText())).findFirst().orElseThrow();
+    }
+    private void exerciseBlueprint(String id,String accountant,String partner,String outsider,String identity,String plot) throws Exception {
+        String attachment=java.util.UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO sos.erp_attachments(id,project_id,uploaded_by,file_name,content_type,size_bytes) VALUES (?::uuid,?::uuid,?::uuid,'review-test.png','image/png',100)",
+            attachment,id,identity);
+        long postings=jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE project_id=?::uuid",Long.class,id);
+        long plotRevision=jdbc.queryForObject("SELECT revision FROM sos.erp_records WHERE id=?::uuid",Long.class,plot);
+        String number=jdbc.queryForObject("SELECT data->>'plotNumber' FROM sos.erp_records WHERE id=?::uuid",String.class,plot);
+        ObjectNode geometry=(ObjectNode)json.readTree("""
+            {"plots":[{"number":"placeholder","facing":"UNKNOWN","points":[{"x":10,"y":10},{"x":40,"y":10},{"x":40,"y":40}]}],
+             "roads":[{"name":"Road","widthFeet":20,"points":[{"x":0,"y":45},{"x":100,"y":45},{"x":100,"y":50}]}],"northDegrees":null,"notes":"Fixture draft"}
+            """);
+        ((ObjectNode)geometry.path("plots").get(0)).put("number",number);
+        String path="/erp/"+id+"/blueprint";
+        assertEquals(0,request("GET",path,null,accountant,200).path("revision").asInt());
+        JsonNode saved=request("POST",path+"/save",Map.of("attachmentId",attachment,"revision",0,"geometry",geometry,"confirm",false),accountant,200);
+        assertEquals("DRAFT",saved.path("status").asText());
+        request("POST",path+"/save",Map.of("attachmentId",attachment,"revision",1,"geometry",geometry,"confirm",true),accountant,400);
+        request("POST",path+"/save",Map.of("attachmentId",java.util.UUID.randomUUID().toString(),"revision",1,"geometry",geometry,"confirm",false),accountant,403);
+        JsonNode confirmed=request("POST",path+"/save",Map.of("attachmentId",attachment,"revision",1,"geometry",geometry,"confirm",true,"reviewAcknowledged",true),accountant,200);
+        assertEquals("CONFIRMED",confirmed.path("status").asText());
+        ObjectNode revised=geometry.deepCopy();revised.put("notes","New draft, not yet confirmed");
+        JsonNode draft=request("POST",path+"/save",Map.of("attachmentId",attachment,"revision",2,"geometry",revised,"confirm",false),accountant,200);
+        assertEquals("Fixture draft",draft.path("confirmed").path("notes").asText());
+        request("POST",path+"/save",Map.of("attachmentId",attachment,"revision",2,"geometry",revised,"confirm",false),accountant,409);
+        boolean existing=jdbc.queryForObject("SELECT count(*) FROM sos.project_memberships WHERE project_id=?::uuid AND identity_id=?::uuid",Integer.class,id,identity)>0;
+        if(!existing) jdbc.update("INSERT INTO sos.project_memberships(project_id,identity_id) VALUES (?::uuid,?::uuid)",id,identity);
+        try {
+            JsonNode visible=request("GET",path,null,partner,200);
+            assertFalse(visible.path("canManage").asBoolean());
+            assertTrue(visible.path("draft").isNull()||visible.path("draft").isMissingNode());assertEquals("Fixture draft",visible.path("confirmed").path("notes").asText());
+            request("POST",path+"/save",Map.of("attachmentId",attachment,"revision",3,"geometry",revised,"confirm",false),partner,403);
+            request("GET",path,null,outsider,403);
+        } finally { if(!existing) jdbc.update("DELETE FROM sos.project_memberships WHERE project_id=?::uuid AND identity_id=?::uuid",id,identity); }
+        assertEquals(postings,jdbc.queryForObject("SELECT count(*) FROM sos.erp_postings WHERE project_id=?::uuid",Long.class,id));
+        assertEquals(plotRevision,jdbc.queryForObject("SELECT revision FROM sos.erp_records WHERE id=?::uuid",Long.class,plot));
     }
 }

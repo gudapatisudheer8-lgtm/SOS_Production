@@ -102,6 +102,18 @@ export function newRequestId(): string {
 }
 
 /** Downloads private project files with the same bearer session as API calls. */
+export async function fetchProjectAttachmentBlob(projectId: string, attachmentId: string): Promise<Blob> {
+  const token = getToken();
+  const response = await nativeFetch(apiUrl(`/erp/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'include', redirect: 'manual',
+  });
+  assertNoAccessRedirect(response);
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new ApiError(response.status, error?.error || 'DOWNLOAD_FAILED', error?.message || 'Could not load this private project document.');
+  }
+  return response.blob();
+}
 export async function downloadProjectAttachment(projectId: string, attachmentId: string) {
   const token = getToken();
   const response = await nativeFetch(apiUrl(`/erp/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`), {

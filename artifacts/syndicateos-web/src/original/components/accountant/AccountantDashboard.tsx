@@ -649,46 +649,6 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             </button>
           )}
 
-          {/* Bar 6: Project Accounts & Treasury */}
-          <button
-            id="topbar-accounts"
-            onClick={() => setActiveTab('accounts')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === 'accounts'
-                ? 'bg-[#111827] text-white shadow-md'
-                : 'text-gray-700 hover:text-gray-950 hover:bg-gray-100'
-            }`}
-          >
-            <Landmark className="w-4 h-4 text-[#FFB800]" />
-            <span>Project Accounts</span>
-            <span
-              className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                activeTab === 'accounts' ? 'bg-amber-400 text-gray-950' : 'bg-gray-200 text-gray-800'
-              }`}
-            >
-              {projectAccounts.length}
-            </span>
-          </button>
-
-          {/* Bar 7: Expenses & Approvals */}
-          <button
-            id="topbar-expenses"
-            onClick={() => setActiveTab('expenses')}
-            className={`relative flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === 'expenses'
-                ? 'bg-[#111827] text-white shadow-md'
-                : 'text-gray-700 hover:text-gray-950 hover:bg-gray-100'
-            }`}
-          >
-            <Receipt className="w-4 h-4 text-[#FFB800]" />
-            <span>Expenses &amp; Approvals</span>
-            {pendingExpensesCount > 0 && (
-              <span className="px-2 py-0.5 bg-red-600 text-white rounded-full text-[10px] font-black animate-pulse">
-                {pendingExpensesCount}
-              </span>
-            )}
-          </button>
-
           {/* Bar 8: Project Statement */}
           <button
             id="topbar-project-statement"
@@ -1048,6 +1008,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             firm={firm}
             firmAccounts={firmAccounts}
             onAddAccountTransaction={onAddAccountTransaction}
+            onUploadProjectDocuments={onUploadProjectDocuments}
           />
         )
       )}
@@ -1741,7 +1702,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             apartmentUnits={activeUnits}
             partners={activeProjectPartners}
             individualInvestments={individualInvestments}
-            onOpenRecordTransactionModal={() => setIsRecordTxModalOpen(true)}
+            onOpenIndividualInvestmentModal={() => setIsIndividualInvestmentModalOpen(true)}
             onOpenEnrollExpenseModal={() => setIsEnrollExpenseModalOpen(true)}
           />
         )

@@ -93,6 +93,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
   onOpenEnrollExpenseModal,
   onOpenIndividualInvestmentModal,
 }) => {
+  const [drawingOpen, setDrawingOpen] = useState(false);
   // Top filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [flowFilter, setFlowFilter] = useState<'all' | 'credit' | 'debit'>('all');
@@ -425,6 +426,9 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
     return Math.max(directCash, netCashTxs, 0);
   }, [cashAccounts, allProjectTransactions]);
 
+  const canDraw = !!(project?.canRecordDrawings && onRecordDrawing);
+  const actionBtn = 'flex items-center justify-center gap-1.5 px-3.5 py-2.5 min-h-[40px] rounded-2xl font-black text-xs transition-all shadow-sm cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1';
+
   // Export to CSV Function
   const handleExportCSV = () => {
     const headers = [
@@ -475,7 +479,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
 
   return (
     <div className="space-y-6">
-      {project?.canRecordDrawings && onRecordDrawing && <ProjectDrawingForm key={project.id} project={project} accounts={accounts} partners={partners} onSave={onRecordDrawing} />}
+      {canDraw && project && <ProjectDrawingForm key={project.id} project={project} accounts={accounts} partners={partners} onSave={onRecordDrawing!} open={drawingOpen} onOpenChange={setDrawingOpen} />}
       {onReviewFinancial && project?.financialStatement?.some((t) => t.status === 'pending') && <details className="rounded-xl border border-amber-200 bg-white p-4">
         <summary className="font-bold cursor-pointer">Pending financial entries — review &amp; approval</summary>
         {project.financialStatement.filter((t) => t.status === 'pending').map((t) => <div key={t.id} className="flex flex-wrap gap-3 items-center justify-between border-t py-3">
@@ -530,16 +534,32 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
               </button>
             )}
 
-            {onOpenRecordTransactionModal && (
+            {onOpenIndividualInvestmentModal && (
               <button
-                id="btn-stmt-record-tx"
+                id="btn-stmt-add-investment"
+                data-testid="button-stmt-add-investment"
                 type="button"
-                onClick={onOpenRecordTransactionModal}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition-all shadow-sm cursor-pointer active:scale-95"
-                title="Record bank account credit or debit entry"
+                onClick={onOpenIndividualInvestmentModal}
+                className={`${actionBtn} bg-gray-900 hover:bg-black text-white`}
+                title="Record a partner capital investment for this project"
               >
-                <PlusCircle className="w-3.5 h-3.5 text-white" />
-                <span>+ Record Bank Tx</span>
+                <PlusCircle className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+                <span>+ Add Investment</span>
+              </button>
+            )}
+
+            {canDraw && (
+              <button
+                id="btn-stmt-record-drawing"
+                data-testid="button-stmt-record-drawing"
+                type="button"
+                aria-expanded={drawingOpen}
+                onClick={() => setDrawingOpen((v) => !v)}
+                className={`${actionBtn} bg-white hover:bg-amber-50 text-gray-950 border border-amber-400`}
+                title="Record a partner drawing (pending independent approval)"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
+                <span>{drawingOpen ? 'Close Drawing Form' : '+ Record Partner Drawing'}</span>
               </button>
             )}
 

@@ -2,12 +2,17 @@ import React, { useState } from 'react';
 import type { Project, FirmAccount, SyndicatePartner } from '../../types';
 import { formatINR } from '../../utils/formatters';
 
-export function ProjectDrawingForm({ project, accounts, partners, onSave }: {
+export function ProjectDrawingForm({ project, accounts, partners, onSave, open: controlledOpen, onOpenChange }: {
   project: Project; accounts: FirmAccount[]; partners: SyndicatePartner[];
   onSave: (data: any) => void | boolean | Promise<boolean>;
+  /** Optional controlled mode: the trigger lives elsewhere (e.g. statement actions row). */
+  open?: boolean; onOpenChange?: (open: boolean) => void;
 }) {
   const modes: string[] = project.financialForms?.drawings?.find((f) => f.key === 'payoutMode')?.options || [];
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const controlled = controlledOpen !== undefined;
+  const open = controlled ? !!controlledOpen : localOpen;
+  const setOpen = (v: boolean) => { if (controlled) onOpenChange?.(v); else setLocalOpen(v); };
   const [partnerId, setPartnerId] = useState('');
   const [mode, setMode] = useState(modes[0] || '');
   const [accountId, setAccountId] = useState('');
@@ -22,6 +27,7 @@ export function ProjectDrawingForm({ project, accounts, partners, onSave }: {
   const selected = eligible.find((a) => a.id === accountId);
   const members = partners.filter((p) => project.partners.some((m) => m.partnerId === p.id));
   const inputClass = 'w-full rounded-xl border border-gray-200 p-2 text-sm';
+  if (!open && controlled) return null;
   if (!open) return <button className="rounded-xl bg-amber-400 px-4 py-2 font-bold mb-3" onClick={() => setOpen(true)}>+ Record partner drawing</button>;
   return <form className="rounded-2xl border border-amber-200 bg-white p-4 mb-4" onSubmit={async (e) => {
     e.preventDefault();
