@@ -1,6 +1,6 @@
 import { MasterOptions } from '../../../adapter/config';
 import { ProjectDrawingForm } from '../modals/ProjectDrawingForm';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Project,
   TenantFirm,
@@ -37,6 +37,8 @@ import {
   Receipt,
   Wallet
 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { enrolledMatches, enrolledPeople, sortStatement, type StatementSortKey } from '../../../adapter/statementOrdering';
 import { formatINR } from '../../utils/formatters';
 import { type CorrectionField, type PostingState, countsForCash, postingLabel, runningBalances, statementTotals } from '../../../adapter/financialCorrections';
 import { FinancialCorrectionDialog, type FinancialDialogMode } from './FinancialCorrectionDialog';
@@ -110,9 +112,30 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
   const [flowFilter, setFlowFilter] = useState<'all' | 'credit' | 'debit'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [enrolledByFilter, setEnrolledByFilter] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<StatementSortKey>('date');
   const [dialog, setDialog] = useState<{ mode: FinancialDialogMode; entry: UnifiedProjectTransaction } | null>(null);
   const [dateFilter, setDateFilter] = useState<'all' | 'month' | 'last30' | 'custom'>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  useEffect(() => {
+    setEnrolledByFilter(null);
+    setDialog(null);
+  }, [project?.id, firm.id]);
+  const changeSort = (key: StatementSortKey) => {
+    if (sortKey === key) setSortOrder((order) => order === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortOrder(key === 'date' || key === 'amount' ? 'desc' : 'asc'); }
+  };
+  const sortableHeading = (key: StatementSortKey, label: string, right = false) => (
+    <th className={`py-3.5 px-4 ${right ? 'text-right' : ''}`}
+      aria-sort={sortKey === key ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" onClick={() => changeSort(key)}
+        className={`inline-flex items-center gap-1.5 whitespace-nowrap hover:text-amber-800 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${sortKey === key ? 'text-amber-800' : ''}`}
+        title={`Sort by ${label}`} aria-label={`Sort by ${label}`}>
+        {label}
+        {sortKey !== key ? <ArrowUpDown className="h-3 w-3" /> : sortOrder === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+      </button>
+    </th>
+  );
 
   const targetFirmId = firm?.id || project?.firmId;
 
@@ -324,8 +347,9 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
 
   // Apply User-Friendly Top Filters
   const filteredTransactions = useMemo(() => {
-    return allProjectTransactions
+    return sortStatement(allProjectTransactions
       .filter((tx) => {
+        if (!enrolledMatches(tx, enrolledByFilter)) return false;
         // Flow Filter (Credit vs Debit)
         if (flowFilter !== 'all' && tx.type !== flowFilter) return false;
 
@@ -379,13 +403,9 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
         }
 
         return true;
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.date).getTime() || 0;
-        const dateB = new Date(b.date).getTime() || 0;
-        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
-      });
-  }, [allProjectTransactions, flowFilter, categoryFilter, accountFilter, searchTerm, sortOrder]);
+      }), sortKey, sortOrder);
+  }, [allProjectTransactions, flowFilter, categoryFilter, accountFilter, searchTerm, enrolledByFilter, sortKey, sortOrder]);
+  const enrolledByOptions = useMemo(() => enrolledPeople(allProjectTransactions), [allProjectTransactions]);
 
   // Aggregate Metrics for Statement
   // Cash effect follows the server's affectsCash flag only; reversals and replaced
@@ -746,7 +766,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             {/* Filter 1: Search Box */}
             <div className="lg:col-span-2 relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -778,8 +798,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                 className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-2xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer"
               >
                 <option value="all">All Flows (Inflow &amp; Outflow)</option>
-                <option value="credit">🟢 Inflows Only (Credits / Capital)</option>
-                <option value="debit">🔴 Outflows Only (Debits / Expenses)</option>
+                <option value="credit">Inflows Only (Credits / Capital)</option>
+                <option value="debit">Outflows Only (Debits / Expenses)</option>
               </select>
             </div>
 
@@ -806,6 +826,16 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
               >
                 <option value="all">All Categories</option>
                 <MasterOptions group="statement_categories" />
+              </select>
+            </div>
+            <div>
+              <label htmlFor="statement-enrolled-by-filter" className="sr-only">Enrolled By</label>
+              <select id="statement-enrolled-by-filter" aria-label="Enrolled By"
+                value={enrolledByFilter === null ? 'all' : `person:${enrolledByFilter}`}
+                onChange={(e) => setEnrolledByFilter(e.target.value === 'all' ? null : e.target.value.slice(7))}
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-2xl text-xs font-bold text-gray-950 focus:bg-white focus:ring-2 focus:ring-[#FFB800] outline-none cursor-pointer">
+                <option value="all">Enrolled By: Everyone</option>
+                {enrolledByOptions.map((person) => <option key={person} value={`person:${person}`}>{person || 'No recorded name'}</option>)}
               </select>
             </div>
 
@@ -890,14 +920,14 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+                onClick={() => changeSort('date')}
                 className="text-xs text-gray-600 hover:text-gray-950 font-bold flex items-center gap-1 cursor-pointer"
               >
-                <span>Date: {sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}</span>
+                <span>{sortKey === 'date' ? `Date: ${sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}` : 'Sort by Date'}</span>
                 <RefreshCw className="w-3 h-3 text-gray-400" />
               </button>
 
-              {(searchTerm || flowFilter !== 'all' || categoryFilter !== 'all' || accountFilter !== 'all') && (
+              {(searchTerm || flowFilter !== 'all' || categoryFilter !== 'all' || accountFilter !== 'all' || enrolledByFilter !== null) && (
                 <button
                   type="button"
                   onClick={() => {
@@ -905,6 +935,7 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                     setFlowFilter('all');
                     setAccountFilter('all');
                     setCategoryFilter('all');
+                    setEnrolledByFilter(null);
                   }}
                   className="text-xs text-amber-800 hover:underline font-bold"
                 >
@@ -933,6 +964,8 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
                 setSearchTerm('');
                 setFlowFilter('all');
                 setCategoryFilter('all');
+                setAccountFilter('all');
+                setEnrolledByFilter(null);
               }}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gray-950 text-white font-bold text-xs shadow-sm hover:bg-gray-800 transition-colors"
             >
@@ -945,13 +978,13 @@ export const ProjectStatementModule: React.FC<ProjectStatementModuleProps> = ({
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-black uppercase tracking-wider text-[10px]">
                 <tr>
-                  <th className="py-3.5 px-4">Date</th>
-                  <th className="py-3.5 px-4">Voucher / Ref #</th>
-                  <th className="py-3.5 px-4">Narration &amp; Category</th>
-                  <th className="py-3.5 px-4">Account / Treasury</th>
-                  <th className="py-3.5 px-4">Enrolled By</th>
+                  {sortableHeading('date', 'Date')}
+                  {sortableHeading('referenceNo', 'Voucher / Ref #')}
+                  {sortableHeading('description', 'Narration & Category')}
+                  {sortableHeading('accountName', 'Account / Treasury')}
+                  {sortableHeading('enrolledBy', 'Enrolled By')}
                   <th className="py-3.5 px-4">Actions</th>
-                  <th className="py-3.5 px-4 text-right">Amount</th>
+                  {sortableHeading('amount', 'Amount', true)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

@@ -19,6 +19,7 @@ for (const extension of ['.ts', '.tsx']) {
 }
 global.window = { fetch: global.fetch, location: { search: '', origin: 'http://localhost' } };
 const fc = require('../src/adapter/financialCorrections.ts');
+const ordering = require('../src/adapter/statementOrdering.ts');
 const { normalizeFeed, freshIds } = require('../src/original/components/NotificationBell.tsx');
 const { ProjectStatementModule } = require('../src/original/components/accountant/ProjectStatementModule.tsx');
 const { ConfigProvider } = require('../src/adapter/config.tsx');
@@ -79,6 +80,41 @@ test('statement shows Actions column with correction buttons and no approver/sta
   assert.match(html, /Refer Back/);
   assert.match(html, /Correct &amp; Resubmit/);
   assert.doesNotMatch(html, /Approver|Approve|Pending Approval/i);
+  assert.match(html, /id="statement-enrolled-by-filter"/);
+  assert.match(html, /Enrolled By: Everyone/);
+  assert.match(html, /aria-sort="descending"/);
+  for (const label of ['Date', 'Voucher / Ref #', 'Account / Treasury', 'Enrolled By', 'Amount']) {
+    assert.ok(html.includes(`aria-label="Sort by ${label}"`), label);
+  }
+});
+
+test('enrolled-by filter derives people from current rows and matches exactly', () => {
+  const entries = [{ enrolledBy: 'Partner' }, { enrolledBy: 'Accountant' }, { enrolledBy: 'Partner' }, { enrolledBy: '' }];
+  assert.deepEqual(ordering.enrolledPeople(entries), ['', 'Accountant', 'Partner']);
+  assert.equal(ordering.enrolledMatches(entries[0], 'Partner'), true);
+  assert.equal(ordering.enrolledMatches(entries[0], 'Accountant'), false);
+  assert.equal(ordering.enrolledMatches(entries[0], null), true);
+  assert.equal(ordering.enrolledMatches(entries[3], ''), true);
+  assert.deepEqual(ordering.enrolledPeople([{ enrolledBy: 'New project author' }]), ['New project author']);
+});
+
+test('statement headings sort dates, numeric vouchers, names and signed amounts without modifying money', () => {
+  const entries = [
+    { id: 'a', date: '2026-10-01', type: 'credit', amount: 50, referenceNo: 'REF-10', description: 'Investment', accountName: 'Bank', enrolledBy: 'Zoya' },
+    { id: 'b', date: '2026-10-03', type: 'debit', amount: 100, referenceNo: 'REF-2', description: 'Expense', accountName: 'Cash', enrolledBy: 'Anil' },
+    { id: 'c', date: '2026-10-02', type: 'credit', amount: 200, referenceNo: 'REF-3', description: 'Booking', accountName: 'Bank', enrolledBy: 'Anil' },
+  ];
+  const before = JSON.stringify(entries);
+  const ids = (key, order) => ordering.sortStatement(entries, key, order).map((entry) => entry.id);
+  assert.deepEqual(ids('date', 'desc'), ['b', 'c', 'a']);
+  assert.deepEqual(ids('date', 'asc'), ['a', 'c', 'b']);
+  assert.deepEqual(ids('referenceNo', 'asc'), ['b', 'c', 'a']);
+  assert.deepEqual(ids('description', 'asc'), ['c', 'b', 'a']);
+  assert.deepEqual(ids('enrolledBy', 'asc'), ['b', 'c', 'a']);
+  assert.deepEqual(ids('accountName', 'asc'), ['c', 'a', 'b']);
+  assert.deepEqual(ids('amount', 'desc'), ['c', 'a', 'b']);
+  assert.deepEqual(ids('amount', 'asc'), ['b', 'a', 'c']);
+  assert.equal(JSON.stringify(entries), before);
 });
 
 test('no marketing review endpoint or accept/reject controls remain in web source', () => {

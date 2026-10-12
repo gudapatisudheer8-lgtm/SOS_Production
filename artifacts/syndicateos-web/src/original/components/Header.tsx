@@ -3,6 +3,7 @@ import { Role, TenantFirm, AuthenticatedAppUser } from '../types';
 import { ShieldCheck, Building2, ChevronDown, KeyRound, LogOut } from 'lucide-react';
 import { ChangePinDialog } from './profile/ChangePinDialog';
 import { NotificationBell } from './NotificationBell';
+import { useHeaderSlotHost } from './HeaderSlot';
 
 interface HeaderProps {
   currentRole: Role;
@@ -32,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const isOwner = currentRole === 'super_admin';
+  const slot = useHeaderSlotHost();
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -46,8 +48,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-[#FBFAF6]/95 backdrop-blur-md text-slate-900 border-b border-stone-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none lg:max-w-[18rem]">
           <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0">
             <span className="font-black text-base tracking-tighter">S<span className="text-amber-950">OS</span></span>
           </div>
@@ -65,8 +67,12 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {/* Page-owned context controls (project/firm selectors, actions) portal in here. */}
+        <div ref={slot.ref} data-testid="header-slot"
+          className="order-last w-full min-w-0 empty:hidden lg:order-none lg:w-auto lg:flex-1" />
+
         <div className="flex items-center gap-2 shrink-0">
-          {currentRole === 'accountant' && firms.length > 1 && (
+          {currentRole === 'accountant' && firms.length > 1 && !slot.occupied && (
             <label className="flex items-center gap-2 text-[11px] font-bold text-stone-600">
               <span>Firm</span>
               <select id="tenant-firm-selector" value={selectedFirmId} onChange={(e) => onFirmChange(e.target.value)}

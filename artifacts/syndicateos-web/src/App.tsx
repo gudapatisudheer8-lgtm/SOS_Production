@@ -5,6 +5,7 @@ import type {
   FirmAccount, FirmAccountTransaction, AuthenticatedAppUser, DrawingRequest,
 } from './original/types';
 import { Header } from './original/components/Header';
+import { HeaderSlotProvider } from './original/components/HeaderSlot';
 import { ProductionAuthGate } from './original/components/auth/ProductionAuthGate';
 import { SuperAdminView } from './original/components/superadmin/SuperAdminView';
 import { AccountantDashboard } from './original/components/accountant/AccountantDashboard';
@@ -507,6 +508,7 @@ function App() {
   };
 
   return (
+    <HeaderSlotProvider>
     <div className="min-h-screen bg-[#FDFCF7] text-slate-900 flex flex-col font-sans selection:bg-amber-100 selection:text-amber-900">
       <Header
         currentRole={currentRole}
@@ -703,6 +705,7 @@ function App() {
         </div>
       )}
     </div>
+    </HeaderSlotProvider>
   );
 }
 

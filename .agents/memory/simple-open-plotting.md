@@ -54,3 +54,7 @@ Keep the partner dashboard focused on project plot inventory and bank-plus-cash 
 **Why:** The user explicitly requested this simpler partner layout and the same project-wide counts and account balance used by the accountant, rather than the crossed personal investment/drawings/profit cards.
 
 **How to apply:** Preserve underlying records and permissions when removing navigation. Keep partner drawing requests distinct from accountant drawing entry, and make the statement buttons open forms directly.
+
+Keep firm/project selection and project actions in the single shared sticky header for accountant and partner dashboards, rather than separate context banners.
+**Why:** the user asked to combine the accountant's top bars and move partner controls upward to free page space.
+**How to apply:** retain selectors, project actions, notifications and the profile menu with responsive wrapping; do not reintroduce duplicate context bars or hardcoded offsets for stacked headers.

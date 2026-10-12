@@ -25,6 +25,7 @@ import { ConstructionModule } from './ConstructionModule';
 import { SyndicateEquityModule } from './SyndicateEquityModule';
 import { LiquorVendSettlementModule } from './LiquorVendSettlementModule';
 import { ProjectStatementModule, type UnifiedProjectTransaction } from './ProjectStatementModule';
+import { HeaderSlot } from '../HeaderSlot';
 import { AddProjectModal } from '../modals/AddProjectModal';
 import { FirmAccountsBar } from './FirmAccountsBar';
 import { AddFirmAccountModal } from '../modals/AddFirmAccountModal';
@@ -444,94 +445,79 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* ======================================================== */}
-      {/* 1. TOP HEADER: Firm Console & Project Dropdown Selector */}
-      {/* ======================================================== */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-gray-200 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[11px] font-bold text-gray-500">
-            <span className="uppercase tracking-wider text-amber-700">Project treasury</span>
-            <span className="font-mono text-gray-400">{firm.code}</span>
+      {/* Project treasury controls live in the shared sticky Header (one combined bar). */}
+      <HeaderSlot>
+        <div className="flex flex-wrap items-center gap-2 min-w-0 lg:justify-end" data-testid="header-project-treasury">
+          <div className="hidden xl:flex flex-col min-w-0 mr-auto pl-3 border-l border-stone-200 max-w-[16rem]">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">Project treasury <span className="font-mono text-stone-400 normal-case">{firm.code}</span></span>
+            <span className="text-xs font-black text-slate-900 truncate" title={[firm.name, firm.location, firm.accountantName ? `Accountant: ${firm.accountantName}` : ''].filter(Boolean).join(' · ')}>{activeProject ? activeProject.name : firm.name}</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-950 mt-0.5 truncate">{activeProject ? activeProject.name : firm.name}</h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {[firm.name, firm.location, firm.managingPartnerName ? `Managing partner: ${firm.managingPartnerName}` : '', firm.accountantName ? `Accountant: ${firm.accountantName}` : ''].filter(Boolean).join(' · ')}
-          </p>
-        </div>
-
-        {/* PROJECT SELECTOR DROPDOWN & + ADD PROJECTS BUTTON */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 min-w-0 w-full lg:w-auto">
-          <div className="flex items-center gap-2.5 bg-[#F4F4F6] px-4 py-2.5 rounded-2xl border border-gray-300 shadow-inner min-w-0 flex-1 lg:max-w-[420px]">
-            <FolderOpen className="w-4 h-4 text-amber-600 shrink-0" />
-            <div className="flex flex-col min-w-0 flex-1 sm:min-w-[240px]">
-              <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                Select Project / Venture:
-              </span>
-              <select
-                id="accountant-project-select"
-                value={selectedProjectId}
-                onChange={(e) => onSelectProject(e.target.value)}
-                className="w-full min-w-0 text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate"
-              >
-                {firmActiveProjects.length > 0 ? (
-                  firmActiveProjects.map((proj) => (
-                    <option key={proj.id} value={proj.id}>
-                      {proj.name} ({proj.code})
-                    </option>
-                  ))
-                ) : (
-                  <option value="">No Active Projects in Enabled Sectors</option>
-                )}
-              </select>
-            </div>
-          </div>
+          <label className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[12rem] sm:max-w-[300px]">
+            <FolderOpen className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span className="sr-only">Select project</span>
+            <select
+              id="accountant-project-select"
+              data-testid="select-project"
+              value={selectedProjectId}
+              onChange={(e) => onSelectProject(e.target.value)}
+              className="w-full min-w-0 text-xs font-black text-slate-900 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate"
+            >
+              {firmActiveProjects.length > 0 ? (
+                firmActiveProjects.map((proj) => (
+                  <option key={proj.id} value={proj.id}>{proj.name} ({proj.code})</option>
+                ))
+              ) : (
+                <option value="">No Active Projects in Enabled Sectors</option>
+              )}
+            </select>
+          </label>
 
           {firms.length > 0 && (
-            <div className="flex items-center gap-2.5 bg-[#F4F4F6] px-4 py-2.5 rounded-2xl border border-gray-300 shadow-inner min-w-0 sm:max-w-[260px]">
-              <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
-              <div className="flex flex-col min-w-0 flex-1">
-                <label htmlFor="accountant-firm-select" className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Firm:</label>
-                <select
-                  id="accountant-firm-select"
-                  data-testid="select-firm"
-                  value={firm.id}
-                  disabled={firms.length < 2 || !onSelectFirm}
-                  onChange={(e) => { setEditProjectId(null); setIsAddProjectModalOpen(false); onSelectFirm?.(e.target.value); }}
-                  className="w-full min-w-0 text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate disabled:cursor-default"
-                >
-                  {!firms.some((f) => f.id === firm.id) && <option value={firm.id}>{firm.name} ({firm.code})</option>}
-                  {firms.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.code})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <label htmlFor="accountant-firm-select" className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[10rem] sm:max-w-[220px]">
+              <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="sr-only">Firm</span>
+              <select
+                id="accountant-firm-select"
+                data-testid="select-firm"
+                value={firm.id}
+                disabled={firms.length < 2 || !onSelectFirm}
+                onChange={(e) => { setEditProjectId(null); setIsAddProjectModalOpen(false); onSelectFirm?.(e.target.value); }}
+                className="w-full min-w-0 text-xs font-black text-slate-900 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-4 outline-none truncate disabled:cursor-default"
+              >
+                {!firms.some((f) => f.id === firm.id) && <option value={firm.id}>{firm.name} ({firm.code})</option>}
+                {firms.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name} ({f.code})</option>
+                ))}
+              </select>
+            </label>
           )}
 
-          {/* Edit selected project */}
-          <button
-            id="btn-edit-project"
-            data-testid="button-edit-project"
-            type="button"
-            disabled={!canEditProject}
-            title={!activeProject ? 'Select a project to edit' : canEditProject ? `Edit ${activeProject.name}` : 'Project details are still loading'}
-            onClick={() => canEditProject && activeProject && setEditProjectId(activeProject.id)}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white hover:bg-gray-50 text-gray-950 font-black text-xs shadow-sm transition-all border border-gray-300 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Pencil className="w-4 h-4" />
-            <span>Edit Project</span>
-          </button>
-
-          {/* + Add Projects Button */}
-          <button
-            id="btn-add-project"
-            onClick={() => openAddProject()}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#FFB800] hover:bg-amber-400 text-gray-950 font-black text-xs shadow-md hover:shadow-lg transition-all border border-amber-500/40 shrink-0"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>+ Add Projects</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              id="btn-edit-project"
+              data-testid="button-edit-project"
+              type="button"
+              disabled={!canEditProject}
+              title={!activeProject ? 'Select a project to edit' : canEditProject ? `Edit ${activeProject.name}` : 'Project details are still loading'}
+              onClick={() => canEditProject && activeProject && setEditProjectId(activeProject.id)}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-50 text-slate-900 font-black text-xs border border-stone-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Edit Project</span>
+            </button>
+            <button
+              id="btn-add-project"
+              data-testid="button-add-project"
+              type="button"
+              onClick={() => openAddProject()}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFB800] hover:bg-amber-400 text-slate-950 font-black text-xs border border-amber-500/40"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Add Project</span>
+            </button>
+          </div>
         </div>
-      </div>
+      </HeaderSlot>
 
       {/* ======================================================== */}
       {/* 2. TOP SIDE BARS / NAVIGATION TABS (SPLIT SECTIONS)      */}

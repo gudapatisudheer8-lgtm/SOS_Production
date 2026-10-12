@@ -57,6 +57,7 @@ import { OpenPlottingModule } from '../accountant/OpenPlottingModule';
 import { ProjectStatementModule, type UnifiedProjectTransaction } from '../accountant/ProjectStatementModule';
 import { CustomerPlotBookingModal } from '../modals/CustomerPlotBookingModal';
 import { IndividualInvestmentModal, IndividualInvestmentData } from '../modals/IndividualInvestmentModal';
+import { HeaderSlot } from '../HeaderSlot';
 import { EntryDialog } from './EntryDialog';
 import { EnrollExpenseModal } from '../modals/EnrollExpenseModal';
 import { computePlotCounts, computeProjectBalance } from './partnerDashboardStats';
@@ -970,118 +971,88 @@ export const FieldPartnerMobileView: React.FC<FieldPartnerMobileViewProps> = ({
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* 1. TOP PARTNER HEADER CARD WITH LANGUAGE SWITCH BUTTON   */}
-      {/* ======================================================== */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-gray-200">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          {/* Partner & Firm Details */}
-          <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap text-[11px] font-bold text-gray-500">
-              <span className="uppercase tracking-wider text-amber-800">{lang === 'te' ? 'పెట్టుబడి వాటా' : 'Your partner stake'}</span>
-              <span className="font-mono text-gray-400">{activeFirm.code}</span>
-              {contributedFirms.length > 1 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
-                  {contributedFirms.length} firms, {partnerContributedProjects.length} projects
-                </span>
-              )}
-            </div>
-            <h1 className="text-xl sm:text-2xl font-black text-gray-950 pt-0.5">{activeFirm.name}</h1>
-            <p className="text-xs text-gray-600">
-              {activeProject ? <>Viewing <strong className="text-gray-900">{activeProject.name}</strong> as {currentPartner.name}</> : <>Signed in as {currentPartner.name}</>}
-            </p>
+      {/* Partner context controls live in the shared sticky Header (one combined bar). */}
+      <HeaderSlot>
+        <div className="flex flex-wrap items-center gap-2 min-w-0 lg:justify-end" data-testid="header-partner-stake">
+          <div className="hidden xl:flex flex-col min-w-0 mr-auto pl-3 border-l border-stone-200 max-w-[16rem]">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">
+              {lang === 'te' ? 'పెట్టుబడి వాటా' : 'Your partner stake'} <span className="font-mono text-stone-400 normal-case">{activeFirm.code}</span>
+            </span>
+            <span className="text-xs text-stone-600 truncate" data-testid="text-partner-context">
+              {activeProject ? <><strong className="text-slate-900">{activeProject.name}</strong> as {currentPartner.name}</> : <>Signed in as {currentPartner.name}</>}
+            </span>
           </div>
 
-          {/* Right Side Controls: Firm Selector, Project Selector & Language Switch Button */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto min-w-0 lg:max-w-[65%] self-stretch lg:self-center flex-wrap">
-            {/* 1. Firm / Syndicate Selector Dropdown */}
-            {onSelectFirm && (
-              <div className="flex items-center gap-2 bg-[#F4F4F6] px-3.5 py-2 rounded-2xl border border-gray-300 shadow-inner min-w-0 flex-1">
-                <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
-                <div className="flex flex-col min-w-0 flex-1 sm:min-w-[150px]">
-                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-wider">
-                    {lang === 'te' ? 'సంస్థను మార్చండి' : 'Switch Firm / Syndicate'}
-                  </span>
-                  <select
-                    value={activeFirm.id}
-                    onChange={(e) => {
-                      const newFirmId = e.target.value;
-                      onSelectFirm(newFirmId);
-                      const targetProjects = projects.filter((p) => p.firmId === newFirmId);
-                      if (targetProjects[0] && onSelectProject) {
-                        onSelectProject(targetProjects[0].id);
-                      }
-                    }}
-                    className="w-full min-w-0 text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-3 outline-none truncate"
-                  >
-                    {contributedFirms.map((f) => {
-                      const projCount = projects.filter((p) => p.firmId === f.id).length;
-                      return (
-                        <option key={f.id} value={f.id}>
-                          {f.name} ({f.code}) {projCount > 0 ? `• ${projCount} Proj` : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              </div>
-            )}
+          {onSelectFirm && contributedFirms.length > 0 && (
+            <label className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[10rem] sm:max-w-[240px]">
+              <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="sr-only">{lang === 'te' ? 'సంస్థను మార్చండి' : 'Switch Firm / Syndicate'}</span>
+              <select
+                data-testid="select-partner-firm"
+                value={activeFirm.id}
+                disabled={contributedFirms.length < 2}
+                onChange={(e) => {
+                  const newFirmId = e.target.value;
+                  onSelectFirm(newFirmId);
+                  const targetProjects = projects.filter((p) => p.firmId === newFirmId);
+                  if (targetProjects[0] && onSelectProject) {
+                    onSelectProject(targetProjects[0].id);
+                  }
+                }}
+                className="w-full min-w-0 text-xs font-black text-slate-900 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-3 outline-none truncate disabled:cursor-default"
+              >
+                {!contributedFirms.some((f) => f.id === activeFirm.id) && <option value={activeFirm.id}>{activeFirm.name} ({activeFirm.code})</option>}
+                {contributedFirms.map((f) => {
+                  const projCount = projects.filter((p) => p.firmId === f.id).length;
+                  return (
+                    <option key={f.id} value={f.id}>
+                      {f.name} ({f.code}){projCount > 0 ? ` · ${projCount} Proj` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          )}
 
-            {/* 2. Project / Venture Selector Dropdown */}
-            {onSelectProject && (
-              <div className="flex items-center gap-2 bg-[#F4F4F6] px-3.5 py-2 rounded-2xl border border-gray-300 shadow-inner min-w-0 flex-1">
-                <FolderOpen className="w-4 h-4 text-amber-600 shrink-0" />
-                <div className="flex flex-col min-w-0 flex-1 sm:min-w-[150px]">
-                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-wider">
-                    {t('selectProject')}
-                  </span>
-                  <select
-                    value={activeProject?.id || ''}
-                    onChange={(e) => onSelectProject(e.target.value)}
-                    className="w-full min-w-0 text-xs font-black text-gray-950 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-3 outline-none truncate"
-                  >
-                    {firmProjects.length > 0 ? (
-                      firmProjects.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.code})
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">{t('allVentures')}</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-            )}
+          {onSelectProject && (
+            <label className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-stone-300 min-w-0 flex-1 basis-[12rem] sm:max-w-[280px]">
+              <FolderOpen className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="sr-only">{t('selectProject')}</span>
+              <select
+                data-testid="select-partner-project"
+                value={activeProject?.id || ''}
+                onChange={(e) => onSelectProject(e.target.value)}
+                className="w-full min-w-0 text-xs font-black text-slate-900 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 pr-3 outline-none truncate"
+              >
+                {firmProjects.length > 0 ? (
+                  firmProjects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                  ))
+                ) : (
+                  <option value="">{t('allVentures')}</option>
+                )}
+              </select>
+            </label>
+          )}
 
-            {/* Language Switch Button at Top (Clean Toggle: English | తెలుగు) */}
-            <div className="flex items-center bg-gray-100 p-1 rounded-2xl border border-gray-300 shadow-2xs">
+          <div role="group" aria-label="Language" className="flex items-center bg-stone-100 p-0.5 rounded-xl border border-stone-300 shrink-0">
+            {(['en', 'te'] as const).map((code) => (
               <button
+                key={code}
                 type="button"
-                onClick={() => handleLanguageChange('en')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  lang === 'en'
-                    ? 'bg-[#111827] text-white shadow-sm'
-                    : 'text-gray-700 hover:text-gray-950 font-bold'
+                data-testid={`button-lang-${code}`}
+                aria-pressed={lang === code}
+                onClick={() => handleLanguageChange(code)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-colors cursor-pointer ${
+                  lang === code ? 'bg-[#111827] text-white' : 'text-stone-700 hover:text-slate-950'
                 }`}
               >
-                English
+                {code === 'en' ? 'English' : 'తెలుగు'}
               </button>
-              <button
-                type="button"
-                onClick={() => handleLanguageChange('te')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  lang === 'te'
-                    ? 'bg-[#111827] text-white shadow-sm'
-                    : 'text-gray-700 hover:text-gray-950 font-bold'
-                }`}
-              >
-                తెలుగు
-              </button>
-            </div>
+            ))}
           </div>
         </div>
-      </div>
+      </HeaderSlot>
 
       {/* ======================================================== */}
       {/* 2. TOP BARS NAVIGATION (5 MAIN TABS)                     */}
