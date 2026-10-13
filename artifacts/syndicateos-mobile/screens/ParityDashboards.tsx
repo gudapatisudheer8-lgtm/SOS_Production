@@ -74,6 +74,23 @@ function Line({ k, v, dark }: { k: string; v: string; dark?: boolean }) {
   return <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2, gap: 8 }}><Text style={{ color: dark ? 'rgba(255,255,255,0.7)' : c.mutedForeground, fontSize: 12, flexShrink: 1 }}>{k}</Text><Text style={{ color: dark ? '#fff' : c.foreground, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>{v}</Text></View>;
 }
 
+function ProjectAccount({ erp }: { erp: ProjectErp }) {
+  const bc = bankCash(erp);
+  const cb = cashBreakdown(erp);
+  return (
+    <Kpi title="Project Account" value={cb ? formatINR(bc.bank + bc.cash) : 'Unavailable'} sub={`Bank + Cash · ${bc.count} A/Cs · net balance from live bank and cash account balances`} onPress={() => navTo({ kind: 'statement' })}>
+      {cb ? <>
+        <Text style={{ fontSize: 10, color: '#6b7280', fontFamily: 'Inter_700Bold', textTransform: 'uppercase', marginBottom: 2 }}>Posted cash movements</Text>
+        {([['Opening balance', cb.opening, 1], ['Investments', cb.investments, 1], ['Plot booking / customer receipts', cb.receipts, 1], ['Other inflows', cb.otherIn, 1], ['Expenses', cb.expenses, -1], ['Drawings', cb.drawings, -1], ['Other outflows', cb.otherOut, -1]] as [string, number, number][]).map(([k, v, sg]) => (
+          <View key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1, gap: 8 }}><Text style={{ color: '#4b5563', fontSize: 12, flexShrink: 1 }}>{sg > 0 ? '+' : '-'} {k}</Text><Text style={{ color: sg > 0 ? '#047857' : '#be123c', fontSize: 12, fontFamily: 'Inter_700Bold', textAlign: 'right' }}>{formatINR(v)}</Text></View>
+        ))}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: '#f3f4f6', paddingTop: 3, marginTop: 2, gap: 8 }}><Text style={{ color: '#1f2937', fontSize: 12, fontFamily: 'Inter_700Bold' }}>= Posted net</Text><Text style={{ color: '#030712', fontSize: 12, fontFamily: 'Inter_700Bold', textAlign: 'right' }}>{formatINR(cb.net)}</Text></View>
+        {Math.abs(cb.net - (bc.bank + bc.cash)) >= 0.005 ? <Text style={{ color: '#92400e', fontSize: 11, marginTop: 4, fontFamily: 'Inter_600SemiBold' }}>Differs from live balances by {formatINR(Math.abs(cb.net - (bc.bank + bc.cash)))}. Review the Project Statement to reconcile.</Text> : null}
+      </> : <Text style={{ color: '#4b5563', fontSize: 11 }}>Posted cash breakdown unavailable: the server statement for this project has not loaded. Open the Project Statement for the full ledger.</Text>}
+    </Kpi>
+  );
+}
+
 function partnerCommitment(erp: ProjectErp, partnerId: string) {
   return nv(erp.records.find(r => r.kind === 'partner-profiles' && live(r) && r.data.partnerId === partnerId)?.data.initialCapital);
 }
@@ -92,8 +109,6 @@ export function AccountantDashboard({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx
   const outlay = det.totalEstimatedOutlay;
   const hasOutlay = outlay !== undefined && outlay !== null && outlay !== '';
   const inv = inventory(erp);
-  const bc = bankCash(erp);
-  const cb = cashBreakdown(erp);
   const invested = erp.partners.reduce((n, p) => n + nv(p.invested), 0);
   const surplus = hasOutlay ? inv.value - nv(outlay) : null;
   return (
@@ -112,16 +127,7 @@ export function AccountantDashboard({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx
           <Line k="Sold" v={String(inv.sold)} />
           <Line k="Blocked" v={String(inv.blocked)} />
         </Kpi>
-        <Kpi title="Project Account" value={cb ? formatINR(bc.bank + bc.cash) : 'Unavailable'} sub={`Bank + Cash · ${bc.count} A/Cs · net balance from live bank and cash account balances`} onPress={() => navTo({ kind: 'statement' })}>
-          {cb ? <>
-            <Text style={{ fontSize: 10, color: '#6b7280', fontFamily: 'Inter_700Bold', textTransform: 'uppercase', marginBottom: 2 }}>Posted cash movements</Text>
-            {([['Opening balance', cb.opening, 1], ['Investments', cb.investments, 1], ['Plot booking / customer receipts', cb.receipts, 1], ['Other inflows', cb.otherIn, 1], ['Expenses', cb.expenses, -1], ['Drawings', cb.drawings, -1], ['Other outflows', cb.otherOut, -1]] as [string, number, number][]).map(([k, v, sg]) => (
-              <View key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1 }}><Text style={{ color: '#4b5563', fontSize: 12 }}>{sg > 0 ? '+' : '-'} {k}</Text><Text style={{ color: sg > 0 ? '#047857' : '#be123c', fontSize: 12, fontFamily: 'Inter_700Bold' }}>{formatINR(v)}</Text></View>
-            ))}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: '#f3f4f6', paddingTop: 3, marginTop: 2 }}><Text style={{ color: '#1f2937', fontSize: 12, fontFamily: 'Inter_700Bold' }}>= Posted net</Text><Text style={{ color: '#030712', fontSize: 12, fontFamily: 'Inter_700Bold' }}>{formatINR(cb.net)}</Text></View>
-            {Math.abs(cb.net - (bc.bank + bc.cash)) >= 0.005 ? <Text style={{ color: '#92400e', fontSize: 11, marginTop: 4, fontFamily: 'Inter_600SemiBold' }}>Differs from live balances by {formatINR(Math.abs(cb.net - (bc.bank + bc.cash)))}. Review the Project Statement to reconcile.</Text> : null}
-          </> : <Text style={{ color: '#4b5563', fontSize: 11 }}>Posted cash breakdown unavailable: the server statement for this project has not loaded. Open the Project Statement for the full ledger.</Text>}
-        </Kpi>
+        <ProjectAccount erp={erp} />
       </View>
     </View>
   );
@@ -138,8 +144,6 @@ export function PartnerHome({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const eq = partnerShare(erp, ctx.account.identityId);
   const det = (ctx.project?.details ?? {}) as Record<string, unknown>;
   const inv = inventory(erp);
-  const bc = bankCash(erp);
-  const cb = cashBreakdown(erp);
   const profit = Math.round((eq / 100) * Math.max(0, inv.value - nv(det.totalEstimatedOutlay)));
   // Web FieldPartnerMobileView: actualInvested + shareOfFieldExpenses - drawings. Server partner.expenses is that share.
   const net = act + nv(me?.expenses) - draws;
@@ -176,7 +180,7 @@ export function PartnerHome({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
           <Line k="Blocked" v={String(inv.blocked)} />
           <Line k="Sellable area" v={`${Math.round(inv.area).toLocaleString('en-IN')} Sq.Yds`} />
         </Kpi>
-        <Kpi title="Project Account Balance" value={formatINR(bc.bank + bc.cash)} sub={`Bank ${formatIndianCompact(bc.bank)} · Cash ${formatIndianCompact(bc.cash)}`} onPress={() => navTo({ kind: 'statement' })} />
+        <ProjectAccount erp={erp} />
       </View>
       <Card>
         <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', marginBottom: 6 }}>{t('allottedSellableArea')}</Text>
