@@ -3,6 +3,14 @@ name: Role platforms and delivery order
 description: Confirmed browser and mobile delivery requirements for SOS roles.
 ---
 
+## Keep both platforms
+
+Keep both web and mobile versions available. Showing or updating the mobile version must not replace the web application.
+
+**Why:** The user explicitly asked to keep both web and mobile while trying the mobile preview.
+
+**How to apply:** Preserve both application artifacts and distinguish the native mobile preview from the responsive web application and its EC2 deployment.
+
 ## Current delivery priority: original replica first
 
 The user now requests the complete Google AI Studio application's interfaces and connected workflows as they are, before any further changes. Earlier requests for simplification or customized screens are deferred until that replica is complete, not prerequisites for the baseline.
