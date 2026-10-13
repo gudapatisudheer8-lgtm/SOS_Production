@@ -81,10 +81,10 @@ export function WorkspaceShell({ mode, bell }: { mode: 'owner' | 'client'; bell?
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
               <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 15, color: '#0f172a', letterSpacing: -1 }}>S<Text style={{ color: '#451a03' }}>OS</Text></Text>
+                <Text style={{ fontFamily: 'Inter_900Black', fontWeight: 'normal', fontSize: 15, color: '#0f172a', letterSpacing: -1 }}>S<Text style={{ fontFamily: 'Inter_900Black', fontWeight: 'normal', color: '#451a03' }}>OS</Text></Text>
               </View>
               <View style={{ flexShrink: 1 }}>
-                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 16, color: '#0f172a' }}>Syndicate<Text style={{ color: '#d97706' }}>OS</Text></Text>
+                <Text style={{ fontFamily: 'Inter_900Black', fontWeight: 'normal', fontSize: 16, color: '#0f172a' }}>Syndicate<Text style={{ fontFamily: 'Inter_900Black', fontWeight: 'normal', color: '#d97706' }}>OS</Text></Text>
                 <Text numberOfLines={1} style={{ color: '#57534e', fontSize: 11 }}>{af ? af.name : 'No active firm assigned'} · {account?.role === 'PARTNER' ? 'Partner' : 'Accountant'}</Text>
               </View>
             </View>
