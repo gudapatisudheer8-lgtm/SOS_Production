@@ -27,22 +27,22 @@ public class NotificationController {
         var projects=authorized(actor);
         if(projects.isEmpty()) return Map.of("items",List.of(),"unread",0);
         String placeholders=String.join(",",Collections.nCopies(projects.size(),"?"));
-        List<Object> args=new ArrayList<>(); args.add(actor.identityId()); args.addAll(projects);
+        List<Object> args=new ArrayList<>(); args.add(actor.identityId()); args.addAll(projects); args.add(actor.identityId());
         var items=jdbc.queryForList("""
-            SELECT n.id::text AS id,n.project_id::text AS "projectId",n.title,n.message,n.created_at::text AS "createdAt",
+            SELECT n.id::text AS id,n.project_id::text AS "projectId",n.inventory_id::text AS "inventoryId",n.title,n.message,n.created_at::text AS "createdAt",
               r.notification_id IS NOT NULL AS read
             FROM sos.project_notifications n LEFT JOIN sos.project_notification_reads r
               ON r.notification_id=n.id AND r.identity_id=?
             WHERE n.project_id IN (
-            """+placeholders+") ORDER BY n.created_at DESC,n.id LIMIT 100",args.toArray());
-        var unreadArgs=new ArrayList<Object>(); unreadArgs.addAll(projects); unreadArgs.add(actor.identityId());
+            """+placeholders+") AND NOT n.invalidated AND (n.recipient_id IS NULL OR n.recipient_id=?) ORDER BY n.created_at DESC,n.id LIMIT 100",args.toArray());
+        var unreadArgs=new ArrayList<Object>(); unreadArgs.addAll(projects); unreadArgs.add(actor.identityId()); unreadArgs.add(actor.identityId());
         long unread=jdbc.queryForObject("SELECT count(*) FROM sos.project_notifications n WHERE n.project_id IN ("+placeholders+
-            ") AND NOT EXISTS(SELECT 1 FROM sos.project_notification_reads r WHERE r.notification_id=n.id AND r.identity_id=?)",Long.class,unreadArgs.toArray());
+            ") AND NOT n.invalidated AND (n.recipient_id IS NULL OR n.recipient_id=?) AND NOT EXISTS(SELECT 1 FROM sos.project_notification_reads r WHERE r.notification_id=n.id AND r.identity_id=?)",Long.class,unreadArgs.toArray());
         return Map.of("items",items,"unread",unread);
     }
     @PostMapping("/{id}/read")
     public Map<String,Object> markRead(@AuthenticationPrincipal SessionAccount actor,@PathVariable UUID id) {
-        var rows=jdbc.queryForList("SELECT project_id FROM sos.project_notifications WHERE id=?",id);
+        var rows=jdbc.queryForList("SELECT project_id FROM sos.project_notifications WHERE id=? AND NOT invalidated AND (recipient_id IS NULL OR recipient_id=?)",id,actor.identityId());
         if(rows.isEmpty()) throw ApiProblem.denied();
         access.project(actor,(UUID)rows.getFirst().get("project_id"),"erp.read",false);
         jdbc.update("INSERT INTO sos.project_notification_reads(notification_id,identity_id) VALUES(?,?) ON CONFLICT DO NOTHING",id,actor.identityId());

@@ -13,3 +13,4 @@
 - [Payment retry recovery](payment-retry-recovery.md) — a failed refresh can follow a successful payment; recover its receipt before allowing a new request.
 - [Promotional video authorization](promotional-video-authorization.md) — keep the film on hold; resume only when the user explicitly asks.
 - [Blueprint review](blueprint-review.md) — original plan → reviewed AI/manual geometry → illustrative 3D; no invented measurements or changes to bookings/money.
+- [Registration scheduling](registration-scheduling.md) — keep appointments inside the existing booking form; appointment actions never create money or automatic sale transitions.

@@ -24,13 +24,27 @@ public class ErpConfiguration {
         for(JsonNode field:fields) if(!obsolete.contains(field.path("key").asText())) clean.add(field);
         return clean;
     }
+    /** Keep historical stage codes valid while exposing the existing database master
+     * used by the web booking form. Never rewrite an immutable release. */
+    public static JsonNode effectiveFields(String kind,JsonNode fields,JdbcTemplate jdbc) {
+        JsonNode clean=liveFields(kind,fields).deepCopy();
+        if("bookings".equals(kind)) for(JsonNode field:clean) if("paymentMilestone".equals(field.path("key").asText())) {
+            var options=com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode();
+            Set<String> values=new LinkedHashSet<>();
+            for(JsonNode value:field.path("options")) values.add(value.asText());
+            values.addAll(jdbc.queryForList("SELECT value_code FROM sos.business_masters WHERE group_code='booking_stages' AND enabled ORDER BY position",String.class));
+            values.forEach(options::add);
+            ((com.fasterxml.jackson.databind.node.ObjectNode)field).set("options",options);
+        }
+        return clean;
+    }
     public ArrayNode read(UUID release) {
         ArrayNode result=json.createArrayNode();
         for(var r:jdbc.queryForList("SELECT * FROM sos.erp_resources WHERE release_id=? ORDER BY kind",release)) {
             var item=result.addObject().put("kind",r.get("kind").toString()).put("title",r.get("title").toString())
                 .put("financial",(Boolean)r.get("financial"));
             try {
-                item.set("fields",liveFields(r.get("kind").toString(),json.readTree(r.get("fields").toString())));
+                item.set("fields",effectiveFields(r.get("kind").toString(),json.readTree(r.get("fields").toString()),jdbc));
                 for(String key:List.of("submit","manage"))
                     item.set(key+"Roles",json.valueToTree(((java.sql.Array)r.get(key+"_roles")).getArray()));
             } catch(Exception e) { throw new IllegalStateException("Invalid ERP resource configuration",e); }

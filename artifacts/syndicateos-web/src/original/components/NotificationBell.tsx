@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, BellRing, Check, RefreshCw } from 'lucide-react';
 import { api } from '../../adapter/api';
+import { enablePush, disablePush, pushState, supportsPush } from '../../adapter/browserPush';
 
 export const NOTIFICATIONS_REFRESH_EVENT = 'sos-notifications-refresh';
 export const NOTIFICATION_POLL_MS = 30000;
 
-export interface AppNotification { id: string; projectId?: string | number | null; title: string; message: string; createdAt: string; read: boolean }
+export interface AppNotification { id: string; projectId?: string | number | null; inventoryId?: string | null; title: string; message: string; createdAt: string; read: boolean }
 export interface NotificationFeed { items: AppNotification[]; unread: number }
 
 export function normalizeFeed(raw: any): NotificationFeed {
   const items: AppNotification[] = (Array.isArray(raw?.items) ? raw.items : []).map((n: any) => ({
-    id: String(n.id), projectId: n.projectId ?? null, title: String(n.title ?? ''), message: String(n.message ?? ''),
+    id: String(n.id), projectId: n.projectId ?? null, inventoryId: n.inventoryId ?? null, title: String(n.title ?? ''), message: String(n.message ?? ''),
     createdAt: String(n.createdAt ?? ''), read: n.read === true,
   }));
   const unread = Number.isFinite(Number(raw?.unread)) ? Number(raw.unread) : items.filter((n) => !n.read).length;
@@ -37,6 +38,8 @@ export const NotificationBell: React.FC<{ identityKey: string }> = ({ identityKe
   const [open, setOpen] = useState(false);
   const [marking, setMarking] = useState<string | null>(null);
   const [permission, setPermission] = useState<string>(browserNotify ? Notification.permission : 'unsupported');
+  const [pushStatus, setPushStatus] = useState('Checking background push…');
+  const [pushBusy, setPushBusy] = useState(false);
   const known = useRef<Set<string> | null>(null);
   const inflight = useRef(false);
   const identity = useRef(identityKey);
@@ -56,14 +59,8 @@ export const NotificationBell: React.FC<{ identityKey: string }> = ({ identityKe
     try {
       const next = normalizeFeed(await api<any>('/notifications'));
       if (who !== identity.current) return;
-      const fresh = freshIds(known.current, next.items);
       known.current = new Set(next.items.map((n) => n.id));
       setFeed(next); setError(null);
-      if (fresh.length && browserNotify && Notification.permission === 'granted' && document.hidden) {
-        for (const n of next.items.filter((x) => fresh.includes(x.id)).slice(0, 3)) {
-          try { new Notification(n.title || 'SyndicateOS', { body: n.message, tag: `sos-${n.id}` }); } catch { /* browser refused */ }
-        }
-      }
     } catch (e: any) {
       if (who === identity.current) setError(e?.message || 'Notifications could not load.');
     } finally {
@@ -84,11 +81,13 @@ export const NotificationBell: React.FC<{ identityKey: string }> = ({ identityKe
 
   useEffect(() => {
     if (!open) return;
+    let alive = true;
+    pushState().then((value) => { if (alive) setPushStatus(value); }).catch((e) => { if (alive) setPushStatus(e.message); });
     const down = (e: MouseEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false); };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', down); document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key); };
-  }, [open]);
+    return () => { alive = false; document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key); };
+  }, [open, identityKey]);
 
   const markRead = async (id: string) => {
     if (marking) return;
@@ -106,8 +105,10 @@ export const NotificationBell: React.FC<{ identityKey: string }> = ({ identityKe
   };
 
   const askPermission = async () => {
-    if (!browserNotify) return;
-    try { setPermission(await Notification.requestPermission()); } catch { setPermission(Notification.permission); }
+    setPushBusy(true);
+    try { setPushStatus(await enablePush()); }
+    catch (e: any) { setPushStatus(e.message || 'Background push subscription failed. The bell remains available.'); }
+    finally { setPermission(browserNotify ? Notification.permission : 'unsupported'); setPushBusy(false); }
   };
 
   const Icon = feed.unread > 0 ? BellRing : Bell;
@@ -148,6 +149,9 @@ export const NotificationBell: React.FC<{ identityKey: string }> = ({ identityKe
                 <div className="min-w-0 flex-1">
                   <div className={`text-xs ${n.read ? 'font-semibold text-stone-700' : 'font-black text-slate-900'}`}>{n.title}</div>
                   <p className="text-[11px] text-stone-600 break-words">{n.message}</p>
+                  {n.projectId && n.inventoryId && <button type="button" data-testid={`open-registration-${n.id}`}
+                    onClick={() => { setOpen(false); window.dispatchEvent(new CustomEvent('sos-open-registration', { detail: { projectId: String(n.projectId), inventoryId: n.inventoryId } })); }}
+                    className="block text-[11px] font-bold text-blue-800 underline mt-1">Open plot booking form</button>}
                   <span className="text-[10px] text-stone-400 font-mono">{fmt(n.createdAt)}</span>
                 </div>
                 {!n.read && (
@@ -160,10 +164,16 @@ export const NotificationBell: React.FC<{ identityKey: string }> = ({ identityKe
             ))}
           </ul>
           <div className="px-4 py-2 border-t border-stone-100 text-[10px] text-stone-500">
-            {permission === 'granted' ? 'Browser alerts are on while this tab is open.'
-              : permission === 'denied' ? 'Browser alerts are blocked in this browser’s site settings.'
-              : permission === 'unsupported' ? 'This browser does not support alerts; the bell still updates.'
-              : <button type="button" data-testid="button-enable-browser-alerts" onClick={() => void askPermission()} className="font-bold text-amber-800 hover:underline">Enable browser alerts while this tab is open</button>}
+            <p role="status">{pushStatus}</p>
+            {supportsPush() && permission !== 'denied' && <div className="flex flex-wrap gap-3 mt-1">
+              <button type="button" disabled={pushBusy} data-testid="button-enable-browser-alerts" onClick={() => void askPermission()} className="font-bold text-amber-800 hover:underline disabled:opacity-40">Enable / repair background alerts</button>
+              <button type="button" disabled={pushBusy} onClick={async () => {
+                setPushBusy(true);
+                try { await disablePush(); setPushStatus('Background alerts disabled for this browser. The bell remains available.'); }
+                catch (e: any) { setPushStatus(e.message); }
+                finally { setPushBusy(false); }
+              }} className="font-bold underline disabled:opacity-40">Disable alerts</button>
+            </div>}
           </div>
         </div>
       )}

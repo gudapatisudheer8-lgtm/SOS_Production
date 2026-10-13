@@ -1,6 +1,8 @@
 package com.syndicateos.erp;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.fasterxml.jackson.databind.*;
 import com.syndicateos.auth.SessionAccount;
 import com.syndicateos.core.ApiProblem;
@@ -19,13 +21,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
     "spring.datasource.password=", "spring.datasource.hikari.read-only=false",
     "sos.database-name=sos_direct_test", "sos.setup-approved=true", "sos.writes-enabled=true",
     "SOS_OWNER_MOBILE=+919888880001", "SOS_OWNER_INITIAL_PASSWORD=Direct-test-owner-123",
-    "spring.flyway.enabled=false"
+    "spring.flyway.enabled=false", "sos.registration-initial-delay-ms=1000000", "sos.push-initial-delay-ms=1000000"
 })
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 class DirectPostingIntegrationTest {
     @Autowired ErpService service;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
     @Autowired NotificationController notifications;
+    @Autowired RegistrationService registrations;
+    @Autowired BrowserPushService push;
+    @Autowired org.springframework.test.web.servlet.MockMvc http;
+    @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;
     record Fixture(UUID firm,UUID project,UUID bank,SessionAccount accountant,SessionAccount partner) {}
     private Fixture fixture() {
         UUID firm=UUID.randomUUID(),project=UUID.randomUUID(),bank=UUID.randomUUID(),staff=UUID.randomUUID(),partner=UUID.randomUUID();
@@ -280,5 +287,146 @@ class DirectPostingIntegrationTest {
         submit(f,id,UUID.randomUUID(),booking,f.accountant);
         balance(f,"1150");
         assertEquals("reserved",jdbc.queryForObject("SELECT data->>'status' FROM sos.erp_records WHERE id=?",String.class,plot));
+    }
+    private JsonNode registrationInput(int revision,java.time.Instant starts,String action) {
+        var date=starts.atZone(java.time.ZoneId.of("Asia/Kolkata"));
+        return json.valueToTree(Map.of("revision",revision,"requestId",UUID.randomUUID().toString(),"action",action,
+            "date",date.toLocalDate().toString(),"time",date.toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+            "location","District sub-registrar office","reminderMinutes",List.of(1440,60)));
+    }
+    private int count(String table,UUID project) { return jdbc.queryForObject("SELECT count(*) FROM sos."+table+" WHERE project_id=?",Integer.class,project); }
+    @Test void registrationIsIndependentIdempotentScopedAndRestartSafe() {
+        var f=fixture(); UUID plot=paymentPlot(f);
+        UUID booking=save(f,"bookings",plotPayment(f,plot,100000),UUID.randomUUID(),f.accountant);
+        int records=count("erp_records",f.project),postings=count("erp_postings",f.project);
+        String money=paymentSummary(f,plot).toString();
+        var input=registrationInput(0,java.time.Instant.now().plusSeconds(3*86400),"save");
+        JsonNode slot=(JsonNode)registrations.save(f.partner,f.project,plot,input).get("appointment");
+        assertEquals(1,slot.path("revision").asInt());
+        assertEquals("scheduled",slot.path("state").asText());
+        assertEquals(slot,registrations.save(f.partner,f.project,plot,input).get("appointment"));
+        assertEquals(records,count("erp_records",f.project)); assertEquals(postings,count("erp_postings",f.project));
+        assertEquals(money,paymentSummary(f,plot).toString()); balance(f,"101000");
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.registration_jobs WHERE inventory_id=? AND state='pending'",Integer.class,plot));
+        assertEquals(slot,registrations.read(f.accountant,f.project,plot).get("appointment"));
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.project_notifications WHERE inventory_id=? AND NOT invalidated",Integer.class,plot));
+        var outsider=fixture();
+        assertThrows(ApiProblem.class,()->registrations.read(outsider.accountant,f.project,plot));
+        assertThrows(ApiProblem.class,()->registrations.save(outsider.partner,f.project,plot,input));
+        assertFalse(((List<Map<String,Object>>)notifications.read(outsider.accountant).get("items")).stream().anyMatch(n->plot.toString().equals(n.get("inventoryId"))));
+        UUID unrelated=UUID.randomUUID();
+        jdbc.update("INSERT INTO sos.identities(id,mobile,display_name,credential_hash,must_change_credential) VALUES(?,?,'Unassigned','not-a-login-hash',false)",unrelated,"+91"+Math.abs(System.nanoTime()%10000000000L));
+        jdbc.update("INSERT INTO sos.firm_memberships(firm_id,identity_id,role_code) VALUES(?,?,'PARTNER')",f.firm,unrelated);
+        assertFalse(registrations.recipients(f.project).stream().anyMatch(n->unrelated.equals(n.get("identity_id"))));
+        // A new worker instance sees persisted jobs; no client timer/in-memory schedule.
+        jdbc.update("UPDATE sos.registration_jobs SET due_at=now()-interval '1 minute' WHERE inventory_id=?",plot);
+        var restarted=new RegistrationService(jdbc,json,new ErpAccess(jdbc,configuration),transaction,gate,true);
+        restarted.reminders(); restarted.reminders();
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.registration_jobs WHERE inventory_id=? AND state='sent'",Integer.class,plot));
+        assertEquals(6,jdbc.queryForObject("SELECT count(*) FROM sos.project_notifications WHERE inventory_id=? AND NOT invalidated",Integer.class,plot));
+        assertEquals(3,((List<Map<String,Object>>)notifications.read(f.partner).get("items")).stream().filter(n->plot.toString().equals(n.get("inventoryId"))).count());
+        var edited=registrationInput(1,java.time.Instant.now().plusSeconds(2*3600),"save");
+        registrations.save(f.accountant,f.project,plot,edited);
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.registration_jobs WHERE inventory_id=? AND state='pending'",Integer.class,plot));
+        assertThrows(ApiProblem.class,()->registrations.save(f.partner,f.project,plot,registrationInput(1,java.time.Instant.now().plusSeconds(4*86400),"save")));
+        registrations.save(f.partner,f.project,plot,registrationInput(2,java.time.Instant.now().plusSeconds(2*3600),"cancel"));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.registration_jobs WHERE inventory_id=? AND state='pending'",Integer.class,plot));
+        assertEquals("cancelled",((JsonNode)registrations.read(f.partner,f.project,plot).get("appointment")).path("state").asText());
+        assertEquals(records,count("erp_records",f.project)); assertEquals(postings,count("erp_postings",f.project)); balance(f,"101000");
+    }
+    @Autowired com.syndicateos.configuration.ConfigurationService configuration;
+    @Autowired org.springframework.transaction.support.TransactionTemplate transaction;
+    @Autowired com.syndicateos.core.DatabaseGate gate;
+    @Test void registrationValidationReleaseAndCompletionStopReminders() {
+        var f=fixture(); UUID plot=paymentPlot(f);
+        assertThrows(ApiProblem.class,()->registrations.save(f.accountant,f.project,plot,registrationInput(0,java.time.Instant.now().plusSeconds(86400),"save")));
+        UUID booking=save(f,"bookings",plotPayment(f,plot,100000),UUID.randomUUID(),f.accountant);
+        var input=(com.fasterxml.jackson.databind.node.ObjectNode)registrationInput(0,java.time.Instant.now().plusSeconds(4*86400),"save");
+        input.put("date","2026-02-30");
+        assertThrows(ApiProblem.class,()->registrations.save(f.accountant,f.project,plot,input));
+        final var past=registrationInput(0,java.time.Instant.now().minusSeconds(86400),"save");
+        assertThrows(ApiProblem.class,()->registrations.save(f.accountant,f.project,plot,past));
+        var empty=(com.fasterxml.jackson.databind.node.ObjectNode)registrationInput(0,java.time.Instant.now().plusSeconds(4*86400),"save");
+        empty.put("location"," ");
+        assertThrows(ApiProblem.class,()->registrations.save(f.accountant,f.project,plot,empty));
+        registrations.save(f.accountant,f.project,plot,registrationInput(0,java.time.Instant.now().plusSeconds(4*86400),"save"));
+        refer(f,booking,UUID.randomUUID(),f.accountant);
+        assertEquals("cancelled",((JsonNode)registrations.read(f.accountant,f.project,plot).get("appointment")).path("state").asText());
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.registration_jobs WHERE inventory_id=? AND state='pending'",Integer.class,plot));
+        var second=fixture(); UUID secondPlot=paymentPlot(second);
+        save(second,"bookings",plotPayment(second,secondPlot,100000),UUID.randomUUID(),second.accountant);
+        registrations.save(second.accountant,second.project,secondPlot,registrationInput(0,java.time.Instant.now().plusSeconds(4*86400),"save"));
+        service.execute(second.accountant,"erp.inventory-stage",json.valueToTree(Map.of("projectId",second.project,"recordId",secondPlot,"revision",revision(secondPlot),"paymentMilestone","Registered & Cleared")));
+        assertEquals("completed",((JsonNode)registrations.read(second.accountant,second.project,secondPlot).get("appointment")).path("state").asText());
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.registration_jobs WHERE inventory_id=? AND state='pending'",Integer.class,secondPlot));
+        var third=fixture(); UUID thirdPlot=paymentPlot(third);
+        save(third,"bookings",plotPayment(third,thirdPlot,100000),UUID.randomUUID(),third.accountant);
+        registrations.save(third.partner,third.project,thirdPlot,registrationInput(0,java.time.Instant.now().plusSeconds(4*86400),"save"));
+        var cleared=plotPayment(third,thirdPlot,100000); cleared.put("paymentMilestone","Registered & Cleared");
+        save(third,"bookings",cleared,UUID.randomUUID(),third.accountant);
+        assertEquals("completed",((JsonNode)registrations.read(third.accountant,third.project,thirdPlot).get("appointment")).path("state").asText());
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.registration_jobs WHERE inventory_id=? AND state='pending'",Integer.class,thirdPlot));
+        assertEquals("reserved",jdbc.queryForObject("SELECT data->>'status' FROM sos.erp_records WHERE id=?",String.class,thirdPlot));
+        assertThrows(ApiProblem.class,()->registrations.save(third.partner,third.project,thirdPlot,registrationInput(1,java.time.Instant.now().plusSeconds(4*86400),"save")));
+    }
+    @Test void pushFailuresAreBoundedAndNeverRemoveBellNotifications() {
+        var f=fixture(); UUID plot=paymentPlot(f),subscription=UUID.randomUUID();
+        save(f,"bookings",plotPayment(f,plot,100000),UUID.randomUUID(),f.accountant);
+        // Deliberately invalid synthetic keys force a local encryption failure,
+        // before any network request can reach a real provider.
+        jdbc.update("""
+            INSERT INTO sos.browser_push_subscriptions(id,identity_id,firm_id,role_code,endpoint,p256dh,auth)
+            VALUES(?,?,?,'ACCOUNTANT',?,'','')
+            """,subscription,f.accountant.identityId(),f.firm,"https://fcm.googleapis.com/fcm/send/synthetic-"+subscription);
+        var input=registrationInput(0,java.time.Instant.now().plusSeconds(4*86400),"save");
+        registrations.save(f.accountant,f.project,plot,input);
+        registrations.save(f.accountant,f.project,plot,input);
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.browser_push_deliveries WHERE subscription_id=?",Integer.class,subscription));
+        for(int i=0;i<7;i++) {
+            jdbc.update("UPDATE sos.browser_push_deliveries SET next_attempt_at=now()-interval '1 minute' WHERE subscription_id=?",subscription);
+            push.deliver();
+        }
+        assertEquals("failed",jdbc.queryForObject("SELECT state FROM sos.browser_push_deliveries WHERE subscription_id=?",String.class,subscription));
+        assertEquals(5,jdbc.queryForObject("SELECT attempts FROM sos.browser_push_deliveries WHERE subscription_id=?",Integer.class,subscription));
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM sos.project_notifications WHERE inventory_id=? AND NOT invalidated",Integer.class,plot));
+        assertFalse(jdbc.queryForObject("SELECT last_error FROM sos.browser_push_subscriptions WHERE id=?",String.class,subscription).isBlank());
+        registrations.save(f.accountant,f.project,plot,registrationInput(1,java.time.Instant.now().plusSeconds(4*86400),"save"));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.browser_push_deliveries WHERE subscription_id=? AND state='pending'",Integer.class,subscription));
+        registrations.save(f.partner,f.project,plot,registrationInput(2,java.time.Instant.now().plusSeconds(4*86400),"cancel"));
+        // The cancellation's own informational alert remains eligible; the update is obsolete.
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.browser_push_deliveries WHERE subscription_id=? AND state='invalidated'",Integer.class,subscription));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sos.browser_push_deliveries WHERE subscription_id=? AND state='pending'",Integer.class,subscription));
+        assertThrows(ApiProblem.class,()->push.unsubscribe(f.partner,subscription));
+        push.unsubscribe(f.accountant,subscription);
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.browser_push_deliveries WHERE subscription_id=? AND state='pending'",Integer.class,subscription));
+    }
+    private String login(Fixture f,SessionAccount actor) throws Exception {
+        jdbc.update("UPDATE sos.identities SET credential_hash=? WHERE id=?",passwords.encode("123456"),actor.identityId());
+        String mobile=jdbc.queryForObject("SELECT mobile FROM sos.identities WHERE id=?",String.class,actor.identityId());
+        var response=http.perform(post("/api/auth/login").contentType("application/json").content(json.writeValueAsString(
+            Map.of("role","CLIENT","mobile",mobile,"credential","123456","clientCode",f.accountant.clientCode()))))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return json.readTree(response).path("token").asText();
+    }
+    @Test void authenticatedRegistrationBellAndPushEndpointsRemainReachable() throws Exception {
+        var f=fixture(); UUID plot=paymentPlot(f);
+        save(f,"bookings",plotPayment(f,plot,100000),UUID.randomUUID(),f.accountant);
+        int postings=count("erp_postings",f.project);
+        String bearer="Bearer "+login(f,f.accountant);
+        http.perform(put("/api/erp/"+f.project+"/plots/"+plot+"/registration").header("Authorization",bearer)
+            .contentType("application/json").content(registrationInput(0,java.time.Instant.now().plusSeconds(4*86400),"save").toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.state").value("scheduled"));
+        http.perform(get("/api/notifications").header("Authorization",bearer))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].inventoryId").value(plot.toString()));
+        http.perform(get("/api/browser-push").header("Authorization",bearer))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.configured").isBoolean());
+        String partner="Bearer "+login(f,f.partner);
+        http.perform(get("/api/notifications").header("Authorization",partner))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].inventoryId").value(plot.toString()));
+        http.perform(get("/api/erp/"+f.project+"/plots/"+plot+"/registration").header("Authorization",partner))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.state").value("scheduled"));
+        assertEquals(postings,count("erp_postings",f.project));
+        http.perform(get("/api/notifications")).andExpect(status().isUnauthorized());
+        http.perform(get("/api/browser-push")).andExpect(status().isUnauthorized());
     }
 }

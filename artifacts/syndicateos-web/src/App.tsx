@@ -5,6 +5,8 @@ import type {
   FirmAccount, FirmAccountTransaction, AuthenticatedAppUser, DrawingRequest,
 } from './original/types';
 import { Header } from './original/components/Header';
+import { RegistrationNotificationLauncher } from './original/components/RegistrationNotificationLauncher';
+import { disablePush } from './adapter/browserPush';
 import { HeaderSlotProvider } from './original/components/HeaderSlot';
 import { ProductionAuthGate } from './original/components/auth/ProductionAuthGate';
 import { SuperAdminView } from './original/components/superadmin/SuperAdminView';
@@ -89,10 +91,12 @@ function App() {
     };
     const interval = window.setInterval(refresh, 15000);
     window.addEventListener('focus', refresh);
+    window.addEventListener('sos-registration-changed', refresh);
     document.addEventListener('visibilitychange', refresh);
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('focus', refresh);
+      window.removeEventListener('sos-registration-changed', refresh);
       document.removeEventListener('visibilitychange', refresh);
     };
   }, [currentUser, reload]);
@@ -134,6 +138,8 @@ function App() {
   };
 
   const handleSignOut = async () => {
+    try { await disablePush(); }
+    catch (e: any) { setStickyNotice(`Could not disable this browser's background alerts before sign-out: ${e.message}. Retry sign-out while connected.`); return; }
     try { await api('/auth/logout', { method: 'POST' }); } catch { /* token may already be invalid */ }
     clearSession();
     clearConfigRef.current();
@@ -523,6 +529,11 @@ function App() {
         }}
       />
 
+      {currentUser && currentRole !== 'super_admin' && data && <RegistrationNotificationLauncher
+        identityKey={`${currentUser.id}:${currentUser.role}:${currentUser.firmId}`}
+        firm={data.firms.find((firm) => firm.id === selectedFirmId)} projects={data.projects} plots={data.plots}
+        accounts={data.accounts} onSelectProject={setSelectedProjectId} onUpdatePlot={handleUpdatePlot}
+      />}
       {(loadError || stickyNotice) && (
         <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 space-y-2">
           {loadError && (

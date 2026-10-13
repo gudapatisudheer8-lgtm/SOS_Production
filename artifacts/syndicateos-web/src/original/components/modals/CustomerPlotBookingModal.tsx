@@ -1,6 +1,7 @@
 import { MasterOptions } from '../../../adapter/config';
 import React, { useEffect, useRef, useState } from 'react';
 import { BookingReceiptView } from './BookingReceiptView';
+import { RegistrationAppointment } from './RegistrationAppointment';
 import { bookingBusinessDate, createRequestIdKeeper, findCommittedReceipt, paymentPosition, validatePayment, toPaise, fromPaise, receiptAnnotation } from './bookingPayments';
 import { Plot, Project, TenantFirm, FirmAccount, FirmAccountTransaction } from '../../types';
 import { formatINR } from '../../utils/formatters';
@@ -282,7 +283,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
   const facingInfo = getFacingBadge(plot.facing);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-fade-in">
+    <div role="dialog" aria-modal="true" aria-label={`Plot ${plot.plotNumber} booking and collections`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-2xl w-full my-auto overflow-hidden flex flex-col max-h-[92vh]">
         {/* MODAL HEADER */}
         <div className="bg-slate-900 text-white p-4 sm:p-5 flex items-center justify-between border-b border-slate-800 shrink-0">
@@ -314,6 +315,8 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
           </div>
 
           <button
+            type="button"
+            aria-label="Close plot booking form"
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition-colors"
           >
@@ -719,7 +722,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
                     {selectedAccount && (
                       <div className="flex items-center justify-between text-[10px] text-gray-500 mt-1 px-1">
                         <span>
-                          Account Type: <strong className="text-gray-800 uppercase">{selectedAccount.accountType.replace('_', ' ')}</strong>
+                          Account Type: <strong className="text-gray-800 uppercase">{selectedAccount.accountType?.replace('_', ' ') || 'Not specified'}</strong>
                         </span>
                         <span>
                           IFSC: <strong className="text-gray-800 font-mono">{selectedAccount.ifscCode}</strong> • Branch: <strong className="text-gray-800">{selectedAccount.branchName}</strong>
@@ -776,6 +779,7 @@ export const CustomerPlotBookingModal: React.FC<CustomerPlotBookingModalProps> =
               </div>
 
               {/* NOTES / REMARKS */}
+              <RegistrationAppointment plot={plot} project={project} stage={paymentMilestone} onLoadedStage={setPaymentMilestone} />
               <div>
                 <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
                   Agreement Terms / Field Notes

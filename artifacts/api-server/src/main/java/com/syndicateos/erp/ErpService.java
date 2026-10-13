@@ -37,7 +37,7 @@ public class ErpService {
         var rows=jdbc.queryForList("SELECT * FROM sos.erp_resources WHERE release_id=? AND kind=?",release,kind);
         if(rows.isEmpty()) throw ApiProblem.invalid("This record type is not configured for your sector.");
         var row=rows.getFirst();
-        row.put("fields",ErpConfiguration.liveFields(kind,parse(row.get("fields"))).toString());
+        row.put("fields",ErpConfiguration.effectiveFields(kind,parse(row.get("fields")),jdbc).toString());
         return row;
     }
     public Map<String,Object> read(SessionAccount actor,UUID project) {
@@ -50,7 +50,7 @@ public class ErpService {
             boolean writable=Boolean.TRUE.equals(scope.get("assignment_enabled")) && "ACTIVE".equals(scope.get("status"));
             List<Map<String,Object>> resources=new ArrayList<>();
             for(var r:jdbc.queryForList("SELECT * FROM sos.erp_resources WHERE release_id=? ORDER BY kind",release))
-                resources.add(Map.of("kind",r.get("kind"),"title",r.get("title"),"fields",ErpConfiguration.liveFields(r.get("kind").toString(),parse(r.get("fields"))),
+                resources.add(Map.of("kind",r.get("kind"),"title",r.get("title"),"fields",ErpConfiguration.effectiveFields(r.get("kind").toString(),parse(r.get("fields")),jdbc),
                     "canCreate",writable&&role(r,"submit_roles",actor.role()),"canManage",writable&&role(r,"manage_roles",actor.role()),
                     "canReview",false,"canReviewOwn",false));
             List<Map<String,Object>> records=new ArrayList<>();
@@ -230,6 +230,8 @@ public class ErpService {
                 jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",d.toString(),inventory);
             }
             jdbc.update("UPDATE sos.erp_inventory_reservations SET state='released' WHERE booking_id=?",id);
+            if(original.get("inventory_id")!=null)
+                RegistrationService.invalidate(jdbc,(UUID)original.get("inventory_id"),"cancelled");
         }
         var legs=jdbc.queryForList("SELECT account_id,ledger_code,debit,credit FROM sos.erp_postings WHERE record_id=? ORDER BY id",id);
         // Reversing a receipt already spent may not make a project account negative.
@@ -600,6 +602,10 @@ public class ErpService {
             jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",updated.toString(),inventory);
             amount=decimal(data.path("advanceReceived"),false);
             }
+            if("plots".equals(item.get("kind"))&&"Registered & Cleared".equals(data.path("paymentMilestone").asText())) {
+                // Explicit agreement completion stops reminders, never a sale transition.
+                RegistrationService.invalidate(jdbc,inventory,"completed");
+            }
         }
         if(amount.signum()==0) return;
         if("reimbursements".equals(kind)) {
@@ -699,6 +705,8 @@ public class ErpService {
         }
         if(input.hasNonNull("officialDocValue")) data.put("officialDocValue",decimal(input.path("officialDocValue"),false));
         jdbc.update("UPDATE sos.erp_records SET data=?::jsonb,revision=revision+1 WHERE id=?",data.toString(),id);
+        if(plot&&("sold".equals(next)||"Registered & Cleared".equals(data.path("paymentMilestone").asText())))
+            RegistrationService.invalidate(jdbc,id,"completed");
         audit(actor,project,id,"INVENTORY_STAGE_UPDATED");
         return ok(id);
     }

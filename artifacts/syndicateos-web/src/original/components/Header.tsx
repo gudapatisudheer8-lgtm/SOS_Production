@@ -34,6 +34,16 @@ export const Header: React.FC<HeaderProps> = ({
   const btnRef = useRef<HTMLButtonElement>(null);
   const isOwner = currentRole === 'super_admin';
   const slot = useHeaderSlotHost();
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () => document.documentElement.style.setProperty('--sos-header-height', `${header.getBoundingClientRect().height}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => { observer.disconnect(); document.documentElement.style.removeProperty('--sos-header-height'); };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -47,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
   const initials = (currentUser?.name || 'U').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
   return (
-    <header className="sticky top-0 z-40 bg-[#FBFAF6]/95 backdrop-blur-md text-slate-900 border-b border-stone-200">
+    <header ref={headerRef} data-testid="shared-header" className="sticky top-0 z-40 bg-[#FBFAF6]/95 backdrop-blur-md text-slate-900 border-b border-stone-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none lg:max-w-[18rem]">
           <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0">

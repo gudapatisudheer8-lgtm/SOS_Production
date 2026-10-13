@@ -71,8 +71,8 @@ def main():
     if "/assets/" not in index or "/syndicateos-web/" in index or "/@vite/" in index or "banner-script.js" in index:
         raise SystemExit("Build the current production frontend at BASE_PATH=/ first.")
     files = sorted(migrations.glob("V*.sql"))
-    if sorted(int(path.name.split("__")[0][1:]) for path in files) != list(range(1, 22)):
-        raise SystemExit("Expected exactly V1–V21.")
+    if sorted(int(path.name.split("__")[0][1:]) for path in files) != list(range(1, 23)):
+        raise SystemExit("Expected exactly V1–V22.")
     baseline = OUT / "sos-fresh-ec2-20261010/migrations"
     for path in baseline.glob("V*.sql"):
         if digest(path) != digest(migrations / path.name):
@@ -88,12 +88,12 @@ def main():
     shutil.copytree(migrations, STAGE / "migrations")
     documentation = guide_source.read_text()
     (STAGE / "README.md").write_text(documentation)
-    meta = {"update": FIX, "base_release": "sos-fresh-ec2-20261010", "schema_version": 21,
+    meta = {"update": FIX, "base_release": "sos-fresh-ec2-20261010", "schema_version": 22,
             "api_sha256": digest(jar), "index_sha256": digest(web / "index.html"),
             "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
     (STAGE / "update.json").write_text(json.dumps(meta, indent=2) + "\n")
     (STAGE / "web/release.json").write_text(json.dumps({
-        "release": meta["base_release"], "schema_version": "21", "frontend_base": "/",
+        "release": meta["base_release"], "schema_version": "22", "frontend_base": "/",
         "frontend_fix": FIX, "api_sha256": meta["api_sha256"],
     }, indent=2) + "\n")
     source_hashes = {}

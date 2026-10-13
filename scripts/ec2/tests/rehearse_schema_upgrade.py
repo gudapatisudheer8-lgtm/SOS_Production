@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rehearse V19 -> V21 on disposable loopback databases, never the customer's DB."""
+"""Rehearse V19 -> V22 on disposable loopback databases, never the customer's DB."""
 import json
 import os
 from pathlib import Path
@@ -99,12 +99,13 @@ def main():
             setup(current, work / "upgrade.log", upgrade=True)
             after = json.loads(sql(PREFIX, SNAPSHOT, DEPLOY))
             assert before == after, "Identity, record or posting data changed during additive upgrade."
-            assert sql(PREFIX, "SELECT max(version::integer) FROM sos.flyway_schema_history WHERE success", DEPLOY) == "21"
+            assert sql(PREFIX, "SELECT max(version::integer) FROM sos.flyway_schema_history WHERE success", DEPLOY) == "22"
             permissions = (ROOT / "scripts/ec2/sql/03_update_runtime_permissions.sql").read_text()
             permissions = permissions.replace("'sos'", "'" + PREFIX + "'").replace("sos_deploy", DEPLOY).replace("sos_runtime", RUNTIME)
             sql(PREFIX, permissions, DEPLOY)
             privileges = sql(PREFIX, f"""SELECT bool_and(has_table_privilege('{RUNTIME}',t,p))
-                FROM unnest(ARRAY['sos.project_blueprints','sos.project_notifications','sos.project_notification_reads']) t,
+                FROM unnest(ARRAY['sos.project_blueprints','sos.project_notifications','sos.project_notification_reads',
+                  'sos.plot_registrations','sos.registration_jobs','sos.browser_push_subscriptions','sos.browser_push_deliveries']) t,
                      unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) p""", DEPLOY)
             assert privileges == "t", "Added tables missing runtime privileges."
             run(["createdb", "--no-password", "-U", "sos_test", "-O", DEPLOY, RESTORE])
@@ -112,7 +113,7 @@ def main():
             run(["pg_restore", "--no-password", "-U", DEPLOY, "-d", RESTORE,
                  "--no-owner", "--no-acl", str(work / "sos.dump")])
             assert json.loads(sql(RESTORE, SNAPSHOT, DEPLOY)) == before
-            print("PASS: V19 -> V21 preserves existing identities, firm and records; legacy pending money stays unposted.")
+            print("PASS: V19 -> V22 preserves existing identities, firm and records; legacy pending money stays unposted.")
             print("PASS: added-table runtime privileges and actual pg_dump/pg_restore recovery verified locally.")
         except Exception:
             for name in ("baseline.log", "upgrade.log"):

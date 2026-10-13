@@ -526,7 +526,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
       {/* ======================================================== */}
       {/* 2. TOP SIDE BARS / NAVIGATION TABS (SPLIT SECTIONS)      */}
       {/* ======================================================== */}
-      <div className="bg-white p-2 sm:p-2.5 rounded-3xl shadow-sm border border-gray-200">
+      <div data-testid="module-navigation" style={{ top: 'var(--sos-header-height, 0px)' }} className="sticky z-30 bg-white p-2 sm:p-2.5 rounded-3xl shadow-sm border border-gray-200">
         <nav aria-label="Syndicate Top Bars" className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
           {/* Bar 1: Dashboard & KPIs */}
           <button

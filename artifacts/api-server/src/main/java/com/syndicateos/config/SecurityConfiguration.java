@@ -39,7 +39,7 @@ public class SecurityConfiguration {
             if (host!=null && host.matches("[a-zA-Z0-9.-]+")) allowed.add("https://"+host);
         }
         cors.setAllowedOrigins(allowed);
-        cors.setAllowedMethods(java.util.List.of("GET", "POST", "OPTIONS"));
+        cors.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         cors.setAllowedHeaders(java.util.List.of("Content-Type", "Authorization", "X-Marketing-Session"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", cors);
@@ -54,7 +54,7 @@ public class SecurityConfiguration {
                 .requestMatchers("/api/healthz", "/api/readyz", "/api/auth/login", "/api/auth/company").permitAll()
                 .requestMatchers("/api/marketing/access/**").permitAll()
                 .requestMatchers("/api/marketing/**").authenticated()
-                .requestMatchers("/api/auth/**", "/api/workspace", "/api/commands/**", "/api/configuration/**", "/api/erp/**").authenticated()
+                .requestMatchers("/api/auth/**", "/api/workspace", "/api/commands/**", "/api/configuration/**", "/api/erp/**", "/api/browser-push/**", "/api/notifications/**").authenticated()
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, exception) -> {
