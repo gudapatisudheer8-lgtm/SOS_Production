@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Export the latest mobile browser frontend for the existing EC2 API."""
+import argparse
 import hashlib
 import html
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -20,6 +22,15 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def main():
+    global NAME, STAGE
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--release-name", default=NAME)
+    parser.add_argument("--guide-source", default="docs/sos-mobile-ec2-update.md")
+    args = parser.parse_args()
+    if not re.fullmatch(r"sos-mobile-[a-z0-9-]{1,60}", args.release_name):
+        raise RuntimeError("Invalid mobile release name.")
+    NAME = args.release_name
+    STAGE = OUT / NAME
     if STAGE.exists():
         raise RuntimeError("Release already staged; use a new release name rather than overwriting.")
     with urllib.request.urlopen("https://sos.krishisetu9.in/release.json", timeout=15) as response:
@@ -52,7 +63,7 @@ def main():
         file.add(STAGE, arcname=NAME)
     checksum = digest(archive)
     (OUT / (archive.name + ".sha256")).write_text(checksum + "  " + archive.name + "\n")
-    guide = (ROOT / "docs/sos-mobile-ec2-update.md").read_text().replace("{{SHA256}}", checksum)
+    guide = (ROOT / args.guide_source).read_text().replace("{{SHA256}}", checksum)
     (OUT / (NAME + "-Instructions.md")).write_text(guide)
     blocks = []
     fence = False

@@ -634,3 +634,31 @@ mtime_ms = 1791893623817
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/500cd399-5ebe-459e-ae2a-148fb613e511/2bfbca92-9212-43f6-8bc4-5078ca3e45c2"
 storage_version_token = "1791893872797393"
 content_type = "text/html"
+
+[[outputs]]
+id = "X4l8hyZ8Tp5Ik_H7ppzOW"
+uri = "file://generated-artifacts/ec2/sos-mobile-20261013-booking-parity.tar.gz"
+type = "unspecified"
+title = "Latest Mobile EC2 Update — Booking Form"
+description = "Includes the web-equivalent booking form, locked pricing, cumulative balances, payment limits, receipts and sign-in cleanup. Preserves the web app and database. 5.8 MB."
+logical_id = "fa5f775f-e2f9-4377-8ba6-15b9711f173b"
+content_hash = "sha256:38cbc3230ab3807423ccf1305916c2dba0944f85d5aedbc7ad8a3704a5c6582a"
+size = 6095499
+mtime_ms = 1791896530547
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/fa5f775f-e2f9-4377-8ba6-15b9711f173b/b62ac3e0-af14-433a-bcb7-a80d4c48f498"
+storage_version_token = "1791896588357148"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "HVjYoOm9fnYSj2-iumto7"
+uri = "file://generated-artifacts/ec2/sos-mobile-20261013-booking-parity-Deployment-Guide.html"
+type = "html"
+title = "EC2 Installation and Rollback Guide"
+description = "New archive upload, inline checksum, installation commands, screen checks and rollback instructions."
+logical_id = "4b85874f-2571-48ac-8e2a-a36969bba4d7"
+content_hash = "sha256:bd3a4dcd528fa8e60303fc6bf61eb7d082bce3158015e5985a2c33963ecd25e8"
+size = 8174
+mtime_ms = 1791896530561
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/4b85874f-2571-48ac-8e2a-a36969bba4d7/61d7b1bd-4af6-49e1-aeb1-119a8ecab5c5"
+storage_version_token = "1791896589796650"
+content_type = "text/html"
