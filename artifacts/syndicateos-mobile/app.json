@@ -16,6 +16,7 @@
       "supportsTablet": false
     },
     "android": {
+      "package": "in.krishisetu9.syndicateos",
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/adaptive-foreground.png",
         "backgroundColor": "#F59E0B"

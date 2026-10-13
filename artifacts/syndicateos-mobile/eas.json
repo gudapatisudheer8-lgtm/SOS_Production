@@ -1,0 +1,19 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "apk": {
+      "distribution": "internal",
+      "developmentClient": false,
+      "credentialsSource": "remote",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "sos.krishisetu9.in"
+      },
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
+      }
+    }
+  }
+}

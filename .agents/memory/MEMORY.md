@@ -16,3 +16,4 @@
 - [Registration scheduling](registration-scheduling.md) — keep appointments inside the existing booking form; appointment actions never create money or automatic sale transitions.
 - [Expo dependency maturity](expo-dependency-maturity.md) — SDK installers can recommend patches newer than the package firewall cutoff; prefer an eligible SDK-compatible patch.
 - [Video browser typings](video-browser-typings.md) — inherited Node-oriented TypeScript libraries can cause widespread browser errors; preserve protected video scaffold.
+- [Native Android build limits](native-android-build-limits.md) — SDK/NDK/Gradle can exceed writable quota despite free host disk; prefer a remote builder.
