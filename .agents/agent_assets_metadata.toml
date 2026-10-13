@@ -520,3 +520,31 @@ mtime_ms = 1791834403717
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/68f8c991-03da-41b9-beeb-65f589ddc028/46d43879-4726-4fa2-ae49-8895834d4b46"
 storage_version_token = "1791834483629751"
 content_type = "text/html"
+
+[[outputs]]
+id = "mjfmmjbPO5JbS2Y6oJjWL"
+uri = "file://generated-artifacts/ec2/sos-consolidated-20261013-registration.tar.gz"
+type = "unspecified"
+title = "EC2 update — registration reminders and sticky navigation"
+description = "Matched production web/API package with migration V22, service worker and secure push-key generator. Retains existing plot-payment and receipt changes."
+logical_id = "9c6883b5-b89f-42cf-aee4-a44de7b01c43"
+content_hash = "sha256:24d10ddfb909fa17dcad9681fa7e6df25ef5b7190b3ea5f5afd8147d8be6f6a7"
+size = 36905936
+mtime_ms = 1791870006993
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/9c6883b5-b89f-42cf-aee4-a44de7b01c43/22e445c0-77fa-46f1-aede-ee86eba6d130"
+storage_version_token = "1791870108426342"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "AEUFupeuyGpt7HVqr27Zq"
+uri = "file://generated-artifacts/ec2/sos-consolidated-20261013-registration-Deployment-Guide.html"
+type = "html"
+title = "Latest EC2 deployment guide"
+description = "Exact upload/install commands, inline checksum, backups, V22 verification, optional browser-push key setup and signed-in acceptance/recovery checklist."
+logical_id = "ab2630b6-df3a-43a0-8a1e-cb53c0a54507"
+content_hash = "sha256:c3f62a7a2e5488c56f8ebd73afca50040e52ca88cf1ca018c44026fff05e340e"
+size = 14420
+mtime_ms = 1791870007119
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/ab2630b6-df3a-43a0-8a1e-cb53c0a54507/d331ca8a-b541-4f39-97dd-eaa757ac05a6"
+storage_version_token = "1791870109637799"
+content_type = "text/html"

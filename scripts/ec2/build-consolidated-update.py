@@ -74,16 +74,21 @@ def main():
     if sorted(int(path.name.split("__")[0][1:]) for path in files) != list(range(1, 23)):
         raise SystemExit("Expected exactly V1–V22.")
     baseline = OUT / "sos-fresh-ec2-20261010/migrations"
-    for path in baseline.glob("V*.sql"):
-        if digest(path) != digest(migrations / path.name):
-            raise SystemExit("An existing migration was changed: " + path.name)
+    for prior in (baseline, OUT / "sos-consolidated-20261013-plot-payments/migrations"):
+        for path in prior.glob("V*.sql"):
+            if digest(path) != digest(migrations / path.name):
+                raise SystemExit("An existing migration was changed: " + path.name)
     with zipfile.ZipFile(jar) as archive:
+        for name in ("BookingPayments", "RegistrationService", "BrowserPushService"):
+            if f"BOOT-INF/classes/com/syndicateos/erp/{name}.class" not in archive.namelist():
+                raise SystemExit("JAR is missing current functionality: " + name)
         for path in files:
             if archive.read("BOOT-INF/classes/db/migration/" + path.name) != path.read_bytes():
                 raise SystemExit("JAR has stale/missing migrations: " + path.name)
     shutil.copytree(web, STAGE / "web")
     shutil.copyfile(jar, STAGE / "sos-api.jar")
     shutil.copyfile(ROOT / "scripts/ec2/consolidated-update.py", STAGE / "update.py")
+    shutil.copyfile(ROOT / "scripts/ec2/generate-web-push-credentials.mjs", STAGE / "generate-web-push-credentials.mjs")
     shutil.copyfile(ROOT / "scripts/ec2/sql/03_update_runtime_permissions.sql", STAGE / "permissions.sql")
     shutil.copytree(migrations, STAGE / "migrations")
     documentation = guide_source.read_text()
@@ -102,7 +107,7 @@ def main():
                       "lib/api-spec", "lib/api-client-react/src", "scripts/ec2"):
         for path in (ROOT / directory).rglob("*"):
             if (path.is_file() and not path.name.startswith(".env")
-                    and path.suffix not in {".pem", ".key", ".p12", ".jks"}
+                    and path.suffix not in {".pem", ".key", ".p12", ".jks", ".env"}
                     and not any(part in {"node_modules", ".expo", "dist", "target", "__pycache__", ".replit-artifact"} for part in path.parts)):
                 source_hashes[str(path.relative_to(ROOT))] = digest(path)
     (STAGE / "SOURCE-FINGERPRINTS.json").write_text(json.dumps(source_hashes, indent=2, sort_keys=True) + "\n")
