@@ -21,6 +21,12 @@ An isolated test gateway verifies application behavior, not actual Replit Previe
 
 **How to apply:** verify same-origin API routing through the actual Preview/shared router as well. Protected-endpoint probes with invalid credentials can confirm API JSON responses without changing customer data. Distinguish platform access redirects from application session failures.
 
+Browser previews must call the API on their own origin, even when native clients need an absolute API origin.
+
+**Why:** A mobile browser preview reached its login screen but its calls to the separate web-preview origin redirected through platform access checks and appeared as CORS failures. Application CORS permissions cannot fix an upstream access redirect.
+
+**How to apply:** Keep browser readiness, authentication and attachment requests same-origin; retain the explicitly configured absolute origin for native clients. Verify a real browser interaction, not just a rendered login screen or server-side curl.
+
 Finish workflow restarts before browser verification. A component harness mounted only in browser memory disappears when Vite reloads the page.
 
 **Why:** A restart interrupted a responsive layout check and removed the temporary harness; that blank harness was not evidence of a persistent application failure.

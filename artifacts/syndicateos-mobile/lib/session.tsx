@@ -9,6 +9,7 @@ import React, {
   useState,
 } from 'react';
 import { AppState, Platform } from 'react-native';
+import { mobileApiBase } from './api-base';
 import * as SecureStore from 'expo-secure-store';
 import { usePathname } from 'expo-router';
 import {
@@ -57,7 +58,7 @@ let memToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
 
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
-if (domain) setBaseUrl(`https://${domain}`);
+setBaseUrl(mobileApiBase(Platform.OS, domain) || null);
 setAuthTokenGetter(() => memToken);
 export const currentToken = () => memToken;
 

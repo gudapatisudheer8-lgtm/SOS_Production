@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { currentToken } from '@/lib/session';
+import { mobileApiBase } from './api-base';
 
 export interface Attachment { id: string; fileName: string; contentType: string; size: number }
 export const MAX_BYTES = 10 * 1024 * 1024;
@@ -7,7 +8,7 @@ export const ALLOWED = ['application/pdf', 'image/png', 'image/jpeg', 'image/web
 export const ACCEPT = ALLOWED.join(',');
 export const attachmentsSupported = Platform.OS === 'web' && typeof document !== 'undefined';
 
-const base = () => (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : '');
+const base = () => mobileApiBase(Platform.OS, process.env.EXPO_PUBLIC_DOMAIN);
 
 export function validateFile(f: { type: string; size: number }): string | null {
   const type = f.type.split(';')[0];
