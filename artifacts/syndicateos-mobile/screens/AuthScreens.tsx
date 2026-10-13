@@ -168,11 +168,6 @@ export function LoginScreen() {
             ) : (
               <PinField label="PIN" value={credential} onChangeText={setCredential} editable={!busy} onSubmit={() => void submit()} testID="input-credential" />
             )}
-            <LinkBtn
-              label={legacy ? 'Use six-digit PIN' : 'Use previous credential'}
-              disabled={busy}
-              onPress={() => { setLegacy(!legacy); setCredential(''); setError(null); }}
-            />
             <View style={{ gap: 8 }}>
               <Btn label={busy ? 'Signing in' : 'Sign in'} icon="log-in" onPress={() => void submit()} loading={busy} testID="button-login" />
               <Btn label="Change company" icon="arrow-left" variant="ghost" disabled={busy} onPress={back} testID="button-back" />
