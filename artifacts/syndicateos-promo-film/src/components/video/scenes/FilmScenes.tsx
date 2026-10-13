@@ -65,7 +65,7 @@ export function FilmScene02() {
       <div className="feature-copy accountant-copy">
         <Eyebrow dark>01 / ACCOUNTANT CONSOLE</Eyebrow>
         <motion.h1 {...rise} transition={{ ...rise.transition, delay: .12 }}>One view.<br /><em>The whole portfolio.</em></motion.h1>
-        <motion.p {...rise} transition={{ ...rise.transition, delay: .25 }}>Projects / Partners / Treasury</motion.p>
+        <motion.p {...rise} transition={{ ...rise.transition, delay: .25 }}>Dashboard / Partners &amp; Equity / Open Plotting / Project Statement</motion.p>
         <div className="data-disclaimer">ILLUSTRATIVE DEMO DATA</div>
       </div>
       <motion.div className="dashboard-tilt" initial={{ x: 125, y: 20, rotateY: -9, opacity: 0 }} animate={{ x: 0, y: 0, rotateY: -3, opacity: 1 }} transition={{ duration: .9, ease }}>
@@ -75,11 +75,11 @@ export function FilmScene02() {
             <div className="stats-row">
               <MiniStat label="ACTIVE VENTURES" value="03" />
               <MiniStat label="CAPITAL TRACKED" value="₹ 8.4 Cr*" mood="stat-amber" />
-              <MiniStat label="TO REVIEW" value="12" mood="stat-slate" />
+              <MiniStat label="NOTIFICATIONS" value="04" mood="stat-slate" />
             </div>
             <div className="ui-section-label">VENTURES AT A GLANCE <span>VIEW ALL ↗</span></div>
             <div className="venture-row"><span className="venture-symbol">01</span><div><b>Northstar Fields</b><small>LAND DEVELOPMENT · 2 PARTNERS</small></div><span className="tag-live">IN PROGRESS</span><div className="venture-bar"><i style={{ width: '68%' }} /></div><small>68%</small></div>
-            <div className="venture-row"><span className="venture-symbol alt">02</span><div><b>Orchard Heights</b><small>RESIDENTIAL · 4 PARTNERS</small></div><span className="tag-watch">REVIEW</span><div className="venture-bar"><i style={{ width: '42%' }} /></div><small>42%</small></div>
+            <div className="venture-row"><span className="venture-symbol alt">02</span><div><b>Orchard Heights</b><small>RESIDENTIAL · 4 PARTNERS</small></div><span className="tag-watch">BOOKINGS</span><div className="venture-bar"><i style={{ width: '42%' }} /></div><small>42%</small></div>
             <div className="ui-footer-label">*SYNTHETIC EXAMPLE · NOT LIVE ACCOUNT DATA</div>
           </div>
         </UIFrame>
@@ -104,7 +104,7 @@ export function FilmScene03() {
         <div className="ledger-transactions">
           <div className="statement-head"><span>PROJECT STATEMENT</span><span>ILLUSTRATIVE RECORDS</span></div>
           <PaperRow title="Customer advance" sub="Booking · Project account" status="CLEARED" />
-          <PaperRow title="Materials outlay" sub="Site expense · Reviewed" status="APPROVED" />
+          <PaperRow title="Materials outlay" sub="Site expense · Enrolled" status="POSTED" />
           <PaperRow title="Partner contribution" sub="Capital · Linked entry" status="RECORDED" />
         </div>
       </motion.div>
@@ -117,32 +117,36 @@ export function FilmScene04() {
   return (
     <Scene tone="paper" className="scene-approval">
       <div className="approval-header">
-        <Eyebrow dark>03 / EXPENSES & APPROVALS</Eyebrow>
-        <motion.h2 {...rise} transition={{ ...rise.transition, delay: .08 }}>From entry<br />to decision.</motion.h2>
-        <motion.p {...rise} transition={{ ...rise.transition, delay: .2 }}>A clear trail for every next step.</motion.p>
+        <Eyebrow dark>03 / POSTING &amp; CORRECTIONS</Eyebrow>
+        <motion.h2 {...rise} transition={{ ...rise.transition, delay: .08 }}>Posted once.<br />Traced always.</motion.h2>
+        <motion.p {...rise} transition={{ ...rise.transition, delay: .2 }}>Entries post directly. Corrections keep the original.</motion.p>
       </div>
       <div className="approval-stage">
         <motion.div className="expense-slip" initial={{ y: 100, rotate: -6, opacity: 0 }} animate={{ y: 0, rotate: -2, opacity: 1 }} transition={{ duration: .65, ease }}>
           <div className="slip-top"><span>FIELD EXPENSE</span><span>DEMO</span></div>
-          <strong>Site materials</strong><small>Submitted by site team</small>
+          <strong>Site materials</strong><small>Enrolled by site team</small>
           <div className="slip-rule" /><div className="slip-line w-80" /><div className="slip-line w-55" /><div className="slip-redaction" />
-          <span className="slip-status">SUBMITTED</span>
+          <span className="slip-status">POSTED</span>
         </motion.div>
         <motion.div className="approval-path" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: .4, duration: .85, ease }} />
-        <motion.div className="review-seal" initial={{ scale: .4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 1.05, type: 'spring', stiffness: 240, damping: 18 }}><span>✓</span><small>REVIEWED</small></motion.div>
-        <motion.div className="drawing-token" initial={{ x: 80, y: 45, opacity: 0 }} animate={{ x: 0, y: 0, opacity: 1 }} transition={{ delay: 1.35, duration: .6, ease }}>
-          <span className="token-mark">↗</span><div><b>Drawing request</b><small>STATUS VISIBLE</small></div>
+        <motion.div className="review-seal referred" initial={{ scale: .4, opacity: 0 }} animate={{ scale: [0.4, 1, 1, 0.9], opacity: [0, 1, 1, 0] }} transition={{ delay: 1.05, duration: 2.6, times: [0, .2, .85, 1] }}><span>↺</span><small>REFERRED BACK</small></motion.div>
+        <motion.div className="review-seal" initial={{ scale: .4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 3.55, type: 'spring', stiffness: 240, damping: 18 }}><span>✓</span><small>RESUBMITTED</small></motion.div>
+        <motion.div className="drawing-token" initial={{ x: 80, y: 45, opacity: 0 }} animate={{ x: 0, y: 0, opacity: 1 }} transition={{ delay: 1.6, duration: .6, ease }}>
+          <span className="token-mark">●</span><div><b>Notification sent</b><small>PARTNERS SEE THE ENTRY</small></div>
         </motion.div>
-        <div className="flow-caption">Illustrative workflow — not live records.</div>
+        <motion.div className="audit-trail" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 4.2, duration: .55, ease }}>
+          <span><i />ORIGINAL KEPT</span><span><i />REASON LOGGED</span><span><i className="ok" />BALANCE RECALCULATED</span>
+        </motion.div>
+        <div className="flow-caption">Illustrative audit trail — not live records.</div>
       </div>
     </Scene>
   );
 }
 
 const plots = [
-  ['01', 'available'], ['02', 'reserved'], ['03', 'available'], ['04', 'review'],
+  ['01', 'available'], ['02', 'reserved'], ['03', 'available'], ['04', 'sold'],
   ['05', 'available'], ['06', 'available'], ['07', 'reserved'], ['08', 'available'],
-  ['09', 'review'], ['10', 'available'], ['11', 'available'], ['12', 'available'],
+  ['09', 'sold'], ['10', 'available'], ['11', 'available'], ['12', 'available'],
 ];
 
 export function FilmScene05() {
@@ -153,7 +157,7 @@ export function FilmScene05() {
         <Eyebrow>04 / OPEN PLOTTING</Eyebrow>
         <motion.h2 {...rise} transition={{ ...rise.transition, delay: .08 }}>See the<br /><i>landscape.</i></motion.h2>
         <div className="plot-filters"><span>ORIENTATION</span><span>STATUS</span><span>AVAILABILITY</span></div>
-        <motion.p {...rise} transition={{ ...rise.transition, delay: .25 }}>A visual view of plot inventory.</motion.p>
+        <motion.p {...rise} transition={{ ...rise.transition, delay: .25 }}>Inventory, collections and registration — per plot.</motion.p>
         <small className="survey-note">ILLUSTRATIVE LAYOUT · NOT A SURVEYED PLAN</small>
       </div>
       <motion.div className="plot-map" initial={{ scale: .8, rotate: -4, x: 90, opacity: 0 }} animate={{ scale: 1, rotate: 0, x: 0, opacity: 1 }} transition={{ duration: .85, ease }}>
@@ -164,7 +168,15 @@ export function FilmScene05() {
         <div className="map-compass">N <span>↑</span></div>
         {plotLines.map((i) => <i key={i} className={`map-contour contour-${i}`} />)}
       </motion.div>
-      <motion.div className="plot-focus" initial={{ scale: .3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 1.55, type: 'spring', stiffness: 250, damping: 18 }}><span>FOCUS</span><b>07</b><small>RESERVED</small></motion.div>
+      <motion.div className="plot-focus" initial={{ scale: .3, opacity: 0 }} animate={{ scale: [0.3, 1, 1, 0.6], opacity: [0, 1, 1, 0] }} transition={{ delay: 1.55, duration: 1.9, times: [0, .25, .8, 1] }}><span>FOCUS</span><b>07</b><small>RESERVED</small></motion.div>
+      <motion.div className="collect-card" initial={{ scale: .6, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} transition={{ delay: 3.1, type: 'spring', stiffness: 240, damping: 20 }}>
+        <div className="collect-top"><span>PLOT 07 · COLLECTIONS</span><em>DEMO</em></div>
+        <div className="collect-rate"><span>RATE</span><b>₹ ••••/sq.yd</b><i>LOCKED AFTER 1ST PAYMENT</i></div>
+        <div className="collect-bar"><motion.i initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 3.8, duration: .9, ease }} /></div>
+        <div className="collect-sums"><span>COLLECTED<b>2 receipts</b></span><span>OUTSTANDING<b>₹ •• L</b></span></div>
+        <motion.div className="collect-block" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 4.7, duration: .4 }}>OVERPAYMENT BLOCKED</motion.div>
+        <motion.div className="collect-reg" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 5.4, duration: .45 }}><b>REGISTRATION</b><span>Date · Time · Location · Reminder</span></motion.div>
+      </motion.div>
     </Scene>
   );
 }
@@ -178,11 +190,12 @@ export function FilmScene06() {
       <motion.div className="partner-device" initial={{ y: 80, rotate: 4, opacity: 0 }} animate={{ y: 0, rotate: 1, opacity: 1 }} transition={{ duration: .75, delay: .16, ease }}>
         <div className="partner-top"><span className="device-dot" /><span>PARTNER PORTAL</span><span className="device-avatar">P</span></div>
         <div className="partner-hello">My venture view.</div>
+        <div className="partner-tabs"><span className="on">Dashboard</span><span>Plots</span><span>Project Statements</span></div>
         <div className="partner-project">Northstar Fields <span>ACTIVE</span></div>
-        <div className="partner-metrics"><MiniStat label="INVESTMENT" value="••••••" /><MiniStat label="DRAWINGS" value="••" /><MiniStat label="TO REVIEW" value="01" mood="stat-amber" /></div>
+        <div className="partner-metrics"><MiniStat label="INVESTMENT" value="••••••" /><MiniStat label="DRAWINGS" value="••" /><MiniStat label="ALERTS" value="02" mood="stat-amber" /></div>
         <div className="partner-history-title">RECENT ACTIVITY <span>DEMO RECORDS</span></div>
         <div className="partner-history"><i /><div><b>Contribution recorded</b><small>Linked to project account</small></div><span>✓</span></div>
-        <div className="partner-history"><i className="history-amber" /><div><b>Site expense submitted</b><small>Awaiting partner review</small></div><span>•••</span></div>
+        <div className="partner-history"><i className="history-amber" /><div><b>Site expense posted</b><small>Notification · in the statement</small></div><span>●</span></div>
       </motion.div>
       <div className="partner-copy">
         <Eyebrow>05 / FOR THE PARTNER</Eyebrow>
