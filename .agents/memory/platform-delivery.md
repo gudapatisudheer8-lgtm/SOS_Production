@@ -11,11 +11,15 @@ Keep both web and mobile versions available. Showing or updating the mobile vers
 
 **How to apply:** Preserve both application artifacts and distinguish the native mobile preview from the responsive web application and its EC2 deployment.
 
-## Current delivery priority: original replica first
+## Current delivery priority: source-faithful dashboards
 
-The user now requests the complete Google AI Studio application's interfaces and connected workflows as they are, before any further changes. Earlier requests for simplification or customized screens are deferred until that replica is complete, not prerequisites for the baseline.
+The user requires the native mobile accountant and partner dashboards to replicate the current web dashboards with the same features. The older mobile implementation is not an acceptable replica. Use the current built web application, including subsequent requested changes, as the mobile requirements source.
 
-The user confirmed that their supplied GitHub SOS repository contains the same version as the linked Google AI Studio application. Use it as the authoritative replica source rather than requesting the screen requirements again.
+The user confirmed that their supplied GitHub SOS repository contains the same version as the linked Google AI Studio application. That remains the historical web baseline, not a reason to omit later web changes from mobile.
+
+**Why:** The user repeated the replica requirement after seeing the older mobile dashboard and explicitly rejected it as another, outdated application.
+
+**How to apply:** Port both current web role workflows into real native screens, not a WebView wrapper or a generic redesign. Do not ask the user to explain existing web features again. Verify functional parity and native-device behavior before describing the mobile app as a replica.
 
 Develop and show the application in the right-side Preview first. The user will review it there and explicitly confirm when to prepare EC2 deployment instructions.
 
@@ -41,7 +45,7 @@ Accountant and partner login should accept the ten-digit Indian mobile number an
 
 **How to apply:** Keep owner management out of client entry and native access. Make accountant web responsive and partner web mobile-first. Preserve distinct sector-specific interfaces for both roles. Native releases remain a later milestone requiring device testing, not an automatic consequence of finishing a browser implementation.
 
-Accountant and partner dashboards must be ported from the user's Google AI Studio GitHub application, not replaced with a newly designed generic workspace or project form. The repository is the requirements source; the user should not have to explain every existing feature again.
+Accountant and partner dashboards must preserve the current web application's recognizable layouts and workflows, not be replaced with a newly designed generic workspace or project form. The current web implementation is the native parity source; the user should not have to explain every existing feature again.
 
 **Why:** The user tried the deployed accountant dashboard and explicitly corrected that the extensive dashboard work already done in Google AI Studio was missing.
 
