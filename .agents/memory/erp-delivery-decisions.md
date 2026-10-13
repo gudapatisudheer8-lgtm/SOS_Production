@@ -38,8 +38,8 @@ The user requests no approval processes throughout the application, replacing th
 **Why:** the user wants to simplify the application and explicitly said approvals must be removed everywhere.
 **How to apply:** valid financial submissions post immediately. Notifications are informational, never a prerequisite for posting. Statutory permits and reviewed blueprint geometry are not financial sign-offs. Background push delivery must be verified separately from a polling bell or foreground browser notifications.
 
-Use Refer Back → Correct & Resubmit for financial mistakes, on the Project Statement screen. Refer Back appends a balanced reversal; the original author resubmits a new linked entry. Preserve originals and reasons.
-**Why:** the user requested same-screen corrections instead of approvals; overwriting a cleared amount would lose audit history and silently corrupt balances.
+Use Refer Back → Correct & Resubmit for financial mistakes, on the Project Statement screen. Refer Back appends a balanced reversal; only the original author can correct and resubmit a new linked entry, not another user acting as accountant. Preserve originals and reasons.
+**Why:** the user requested same-screen corrections instead of approvals and explicitly chose original-author-only correction access rather than allowing the accountant too; overwriting a cleared amount would lose audit history and silently corrupt balances.
 **How to apply:** enforce project access, revisions, idempotency, sufficient funds and linked booking/reimbursement checks. Never edit or delete original posted journal legs.
 
 Do not automatically post historical pending money when retiring approvals. Keep it unposted until the author explicitly corrects and resubmits.
