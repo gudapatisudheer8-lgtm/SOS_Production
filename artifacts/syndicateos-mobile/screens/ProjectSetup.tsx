@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Feather } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import type { Project, WorkspaceInterfacesItem } from '@workspace/api-client-react';
 import { Badge, Banner, Btn, Card, Chips, Confirm, CredentialSheet, Empty, Field, Label, Sheet } from '@/components/ui';
@@ -407,8 +408,8 @@ export function ProjectSetup({ items, initialSectorId, existing, onClose, onSave
 }
 
 /* ---------- project bar: searchable dropdown + add/resume ---------- */
-export function ProjectBar({ projects, selected, onSelect, canAdd, onAdd, onEdit, label, setupDisabled = false }: {
-  projects: Project[]; selected: Project | null; onSelect: (id: string) => void; canAdd: boolean; onAdd: () => void; onEdit?: () => void; label: string; setupDisabled?: boolean;
+export function ProjectBar({ firm, projects, selected, onSelect, canAdd, onAdd, onEdit, label, setupDisabled = false }: {
+  projects: Project[]; selected: Project | null; onSelect: (id: string) => void; canAdd: boolean; onAdd: () => void; onEdit?: () => void; label: string; setupDisabled?: boolean; firm?: React.ReactNode;
 }) {
   const c = useColors();
   const [open, setOpen] = useState(false);
@@ -416,14 +417,20 @@ export function ProjectBar({ projects, selected, onSelect, canAdd, onAdd, onEdit
   const code = (p: Project) => { const x = (p.details as Record<string, unknown> | undefined)?.projectCode ?? (p.details as Record<string, unknown> | undefined)?.code; return typeof x === 'string' && x ? x : ''; };
   const list = projects.filter((p) => `${p.name} ${code(p)}`.toLowerCase().includes(q.trim().toLowerCase()));
   return (
-    <View style={{ gap: 8, marginBottom: 12 }}>
-      <Label>{label}</Label>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        <Pressable onPress={() => setOpen(true)} accessibilityRole="button" style={{ flexGrow: 1, minWidth: 200, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.card }}>
-          <Text style={{ color: c.foreground, fontFamily: 'Inter_600SemiBold' }} numberOfLines={1}>{selected ? `${selected.name}${code(selected) ? ` · ${code(selected)}` : ''}` : 'Select a project'}</Text>
+    <View style={{ gap: 4, marginBottom: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: 6 }}>
+        {firm ? <View style={{ flexBasis: 0, flexGrow: 2, minWidth: 0 }}>{firm}</View> : null}
+        <Pressable testID="project-picker" onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`${label}: ${selected?.name ?? 'none selected'}`} style={{ flexBasis: 0, flexGrow: 3, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.card }}>
+          <View style={{ flex: 1 }}>
+            <Text numberOfLines={1} style={{ color: c.mutedForeground, fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 }}>{label.toUpperCase()}</Text>
+            <Text style={{ color: c.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 13 }} numberOfLines={1}>{selected ? `${selected.name}${code(selected) ? ` · ${code(selected)}` : ''}` : 'Select a project'}</Text>
+          </View>
+          <Feather name="chevron-down" size={14} color={c.mutedForeground} />
         </Pressable>
-        {canAdd ? <Btn label="Add Project" icon="plus" onPress={onAdd} disabled={setupDisabled} /> : null}
-        {onEdit && selected ? <Btn label={setupStateOf(selected) === 'DRAFT' ? 'Resume setup' : 'Edit setup'} variant="ghost" icon="edit-2" onPress={onEdit} disabled={setupDisabled} /> : null}
+        {onEdit && selected ? <Pressable testID="project-edit" onPress={onEdit} disabled={setupDisabled} accessibilityRole="button" accessibilityLabel={setupStateOf(selected) === 'DRAFT' ? 'Resume setup' : 'Edit project setup'} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, opacity: setupDisabled ? 0.5 : 1 }}>
+          <Feather name="edit-2" size={14} color={c.foreground} />
+          <Text style={{ color: c.foreground, fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>{setupStateOf(selected) === 'DRAFT' ? 'Resume' : 'Edit'}</Text>
+        </Pressable> : null}
       </View>
       <Sheet visible={open} title="Projects" onClose={() => setOpen(false)}>
         <Field label="Search by name or code" value={q} onChangeText={setQ} />
@@ -435,8 +442,12 @@ export function ProjectBar({ projects, selected, onSelect, canAdd, onAdd, onEdit
             </Pressable>
           ))}
         </ScrollView>
+        {canAdd ? <View style={{ marginTop: 8 }}><Btn label="Add Project" icon="plus" onPress={() => { setOpen(false); onAdd(); }} disabled={setupDisabled} /></View> : null}
         <Btn label="Close" variant="ghost" onPress={() => setOpen(false)} />
       </Sheet>
+      {canAdd ? <Pressable testID="project-add" onPress={onAdd} disabled={setupDisabled} accessibilityRole="button" accessibilityLabel="Add Project" style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32, paddingHorizontal: 4, opacity: setupDisabled ? 0.5 : 1 }}>
+        <Feather name="plus" size={14} color={c.primary} /><Text style={{ color: c.primary, fontFamily: 'Inter_700Bold', fontSize: 12 }}>Add Project</Text>
+      </Pressable> : null}
     </View>
   );
 }

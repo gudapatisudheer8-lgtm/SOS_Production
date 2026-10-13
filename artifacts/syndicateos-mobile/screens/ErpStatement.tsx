@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import type { ErpField, ErpRecord, FinancialStatementEntry, ProjectErp } from '@workspace/api-client-react';
-import { Badge, Banner, Btn, Card, Chips, Empty, Field, Label } from '@/components/ui';
+import { Banner, Btn, Card, Chips, Empty, Field, Label, Select } from '@/components/ui';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { newRequestId, useErpCommands } from '@/lib/erp';
@@ -25,6 +25,7 @@ export function buildRows(erp: ProjectErp): StmtRow[] {
   }));
 }
 
+const SORT_COLS: [SortCol, string][] = [['date', 'Date'], ['kind', 'Type'], ['account', 'Account'], ['party', 'Party'], ['desc', 'Description'], ['by', 'Enrolled by'], ['amount', 'Amount']];
 const FLOW = [{ value: 'all', label: 'All' }, { value: 'credit', label: 'Inflows' }, { value: 'debit', label: 'Outflows' }];
 const CATS = [{ value: 'all', label: 'All categories' }, { value: 'booking_advances', label: 'Booking advances' }, { value: 'site_expenses', label: 'Site expenses' }, { value: 'partner_capital_draws', label: 'Partner capital / draws' }, { value: 'contractor_vendor', label: 'Contractor / vendor' }];
 const DATES = [{ value: 'all', label: 'All time' }, { value: 'month', label: 'This month' }, { value: 'last30', label: 'Last 30 days' }, { value: 'custom', label: 'Custom range' }];
@@ -53,24 +54,44 @@ export function useRowFilters(rows: StmtRow[]) {
     return list.sort((a, b) => (sort === 'newest' ? b.date.localeCompare(a.date) : sort === 'oldest' ? a.date.localeCompare(b.date) : b.amount - a.amount));
   }, [rows, flow, st, cat, acct, mode, date, from, to, q, sort, col, asc]);
   const sortBy = (k: SortCol) => { if (col === k) setAsc(!asc); else { setCol(k); setAsc(k !== 'amount' && k !== 'date'); } };
-  return { out, rows, state: { flow, cat, acct, st, date, from, to, mode, q, sort, col, asc }, sortBy, set: { setFlow, setCat, setAcct, setSt, setDate, setFrom, setTo, setMode, setQ, setSort } };
+  const clearCol = () => { setCol(null); setAsc(false); };
+  return { out, rows, clearCol, state: { flow, cat, acct, st, date, from, to, mode, q, sort, col, asc }, sortBy, set: { setFlow, setCat, setAcct, setSt, setDate, setFrom, setTo, setMode, setQ, setSort } };
 }
 
 export function Filters({ erp, f }: { erp: ProjectErp; f: ReturnType<typeof useRowFilters> }) {
+  const c = useColors();
   const accts = erp.records.filter((r) => r.kind === 'accounts' && live(r));
   const { state: s, set } = f;
+  const [more, setMore] = useState(false);
+  const bys = Array.from(new Set(f.rows.map((r) => r.by).filter(Boolean)));
+  const active = [s.flow, s.cat, s.acct, s.st, s.mode, s.date].filter((x) => x !== 'all').length;
+  const reset = () => { set.setFlow('all'); set.setCat('all'); set.setAcct('all'); set.setSt('all'); set.setMode('all'); set.setDate('all'); set.setFrom(''); set.setTo(''); set.setQ(''); };
   return (
-    <Card>
-      <Label>STATEMENT FILTERS AND SEARCH</Label>
+    <Card style={{ padding: 12 }}>
       <Field label="Search" value={s.q} onChangeText={set.setQ} placeholder="Description, party, account, amount" />
-      <Chips label="Flow" options={FLOW} value={s.flow} onChange={set.setFlow} />
-      <Chips label="Category" options={CATS} value={s.cat} onChange={set.setCat} />
-      <Chips label="Account" options={[{ value: 'all', label: 'All accounts' }, ...accts.map((a) => ({ value: a.id, label: label(a) }))]} value={s.acct} onChange={set.setAcct} />
-      {(() => { const bys = Array.from(new Set(f.rows.map((r) => r.by).filter(Boolean))); return bys.length ? <Chips label="Enrolled by" options={[{ value: 'all', label: 'Anyone' }, ...bys.map((b) => ({ value: b, label: b }))]} value={s.st} onChange={set.setSt} /> : null; })()}
-      <Chips label="Mode" options={[{ value: 'all', label: 'Any mode' }, ...MODES.map((m) => ({ value: m, label: m }))]} value={s.mode} onChange={set.setMode} />
-      <Chips label="Date" options={DATES} value={s.date} onChange={set.setDate} />
-      {s.date === 'custom' ? <View style={{ flexDirection: 'row', gap: 8 }}><View style={{ flex: 1 }}><Field label="From" value={s.from} onChangeText={set.setFrom} hint="YYYY-MM-DD" /></View><View style={{ flex: 1 }}><Field label="To" value={s.to} onChangeText={set.setTo} hint="YYYY-MM-DD" /></View></View> : null}
-      <Chips label="Sort" options={[{ value: 'newest', label: 'Newest' }, { value: 'oldest', label: 'Oldest' }, { value: 'amount', label: 'Largest' }]} value={s.sort} onChange={set.setSort} />
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+        <Select compact label="Flow" options={FLOW} value={s.flow} onChange={set.setFlow} testID="stmt-flow" />
+        <Select compact label="Category" options={CATS} value={s.cat} onChange={set.setCat} testID="stmt-category" />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+        <Select compact label="Account" options={[{ value: 'all', label: 'All accounts' }, ...accts.map((a) => ({ value: a.id, label: label(a) }))]} value={s.acct} onChange={set.setAcct} testID="stmt-account" />
+        <Select compact label="Sort" testID="stmt-sort" options={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'amount', label: 'Largest amount' }, ...SORT_COLS.map(([k, l]) => ({ value: `col:${k}`, label: `By ${l}` }))]} value={s.col ? `col:${s.col}` : s.sort} onChange={(v) => { if (v.startsWith('col:')) { const k = v.slice(4) as SortCol; if (k !== s.col) f.sortBy(k); } else { f.clearCol(); set.setSort(v); } }} />
+      </View>
+      {more ? <View>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+          {bys.length ? <Select compact label="Enrolled by" options={[{ value: 'all', label: 'Anyone' }, ...bys.map((b) => ({ value: b, label: b }))]} value={s.st} onChange={set.setSt} testID="stmt-enrolled" /> : null}
+          <Select compact label="Mode" options={[{ value: 'all', label: 'Any mode' }, ...MODES.map((m) => ({ value: m, label: m }))]} value={s.mode} onChange={set.setMode} testID="stmt-mode" />
+        </View>
+        <Select label="Date" options={DATES} value={s.date} onChange={set.setDate} />
+        {s.date === 'custom' ? <View style={{ flexDirection: 'row', gap: 8 }}><View style={{ flex: 1 }}><Field label="From" value={s.from} onChangeText={set.setFrom} hint="YYYY-MM-DD" /></View><View style={{ flex: 1 }}><Field label="To" value={s.to} onChangeText={set.setTo} hint="YYYY-MM-DD" /></View></View> : null}
+      </View> : null}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Pressable onPress={() => setMore(!more)} accessibilityRole="button" style={{ minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Feather name={more ? 'chevron-up' : 'sliders'} size={14} color={c.primary} />
+          <Text style={{ color: c.primary, fontFamily: 'Inter_700Bold', fontSize: 12 }}>{more ? 'Fewer filters' : 'More filters (enrolled by, mode, date)'}</Text>
+        </Pressable>
+        {active || s.q ? <Pressable onPress={reset} accessibilityRole="button" style={{ minHeight: 36, justifyContent: 'center' }}><Text style={{ color: c.mutedForeground, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>Clear{active ? ` (${active})` : ''}</Text></Pressable> : null}
+      </View>
     </Card>
   );
 }
@@ -147,24 +168,26 @@ export function ProjectStatement({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx })
   const print = () => void runExport('print', () => printTable(ctx.project?.name ? `${ctx.project.name} — Project Statement` : 'Project Statement', `${f.out.length} entries · generated ${new Date().toLocaleString()}`, head, body(), `Inflows ${money(cr)} · Outflows ${money(dr)} · Net ${money(cr - dr)}`));
   return (
     <View>
-      <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 20 }}>{partner ? t('statementsTitle') : 'Project Statement'}</Text>
-      <Text style={{ color: c.mutedForeground, marginBottom: 10 }}>{partner ? t('statementsSubtitle') : 'Consolidated investments, expenses, bookings, drawings, settlements and transactions.'}</Text>
-      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-        <Btn label="Export CSV" icon="download" variant="ghost" onPress={csv} disabled={!f.out.length} loading={exporting === 'csv'} />
-        <Btn label="Print" icon="printer" variant="ghost" onPress={print} loading={exporting === 'print'} />
-        {!partner ? <Btn label="Tally XML" icon="file-text" onPress={() => setTally(true)} /> : null}
-        {(['investments', 'expenses', 'drawings'] as const).filter((k) => erp.resources.find((x) => x.kind === k)?.canCreate).map((k) => <Btn key={k} icon="plus" label={k === 'investments' ? (partner ? t('enrollInvestmentBtn') : 'Record investment') : k === 'expenses' ? (partner ? t('enrollExpenseBtn') : 'Record expense') : (partner ? t('requestDrawBtn') : 'Record drawing')} onPress={() => setCreating(k)} />)}
+      <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{partner ? t('statementsTitle') : 'Project Statement'}</Text>
+      <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 8 }}>{partner ? t('statementsSubtitle') : 'Consolidated investments, expenses, bookings, drawings, settlements and transactions.'}</Text>
+      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+        {[['Inflow', cr, c.success], ['Outflow', dr, c.destructive], ['Net', cr - dr, c.foreground]].map(([l, v, col]) => <View key={String(l)} style={{ flex: 1, minWidth: 0, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 12, padding: 8 }}><Text style={{ color: c.mutedForeground, fontSize: 9, fontFamily: 'Inter_700Bold' }}>{String(l).toUpperCase()}</Text><Text numberOfLines={1} adjustsFontSizeToFit style={{ color: String(col), fontFamily: 'Inter_700Bold', fontSize: 14 }}>{money(Number(v))}</Text></View>)}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        {(['investments', 'expenses', 'drawings'] as const).filter((k) => erp.resources.find((x) => x.kind === k)?.canCreate).map((k) => <Btn key={k} icon="plus" label={k === 'investments' ? (partner ? t('enrollInvestmentBtn') : 'Investment') : k === 'expenses' ? (partner ? t('enrollExpenseBtn') : 'Expense') : (partner ? t('requestDrawBtn') : 'Drawing')} onPress={() => setCreating(k)} />)}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
+        {[{ k: 'csv', l: 'CSV', i: 'download' as const, on: csv, dis: !f.out.length }, { k: 'print', l: 'Print', i: 'printer' as const, on: print, dis: false }, ...(!partner ? [{ k: 'tally', l: 'Tally', i: 'file-text' as const, on: () => setTally(true), dis: false }] : [])].map((b) => (
+          <Pressable key={b.k} onPress={b.on} disabled={b.dis || !!exporting} accessibilityRole="button" accessibilityLabel={b.k === 'csv' ? 'Export CSV' : b.k === 'tally' ? 'Tally XML export' : 'Print'} style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, opacity: b.dis || exporting === b.k ? 0.5 : 1 }}>
+            <Feather name={b.i} size={13} color={c.foreground} /><Text style={{ color: c.foreground, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>{exporting === b.k ? '...' : b.l}</Text>
+          </Pressable>))}
       </View>
       {note ? <Banner tone="warn" title={note} /> : null}
-      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-        {[['Recorded inflow', cr], ['Recorded outflow', dr], ['Net', cr - dr]].map(([l, v]) => <Card key={String(l)} style={{ flexGrow: 1, minWidth: 110, marginBottom: 0 }}><Text style={{ color: c.mutedForeground, fontSize: 11 }}>{String(l).toUpperCase()}</Text><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{money(v)}</Text></Card>)}
-      </View>
       <Filters erp={erp} f={f} />
       <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 6 }}>{f.out.length} of {all.length} entries</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}><View style={{ flexDirection: 'row', gap: 6 }}>
-        <Text style={{ color: c.mutedForeground, fontSize: 11, alignSelf: 'center' }}>SORT BY</Text>
-        {([['date', 'Date'], ['kind', 'Type'], ['account', 'Account'], ['party', 'Party'], ['desc', 'Description'], ['by', 'Enrolled by'], ['amount', 'Amount']] as [SortCol, string][]).map(([k, l]) => { const on = f.state.col === k; return <Pressable key={k} onPress={() => f.sortBy(k)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, backgroundColor: on ? '#111827' : '#e5e7eb' }}><Text style={{ color: on ? '#fff' : '#111827', fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>{l}</Text>{on ? <Feather name={f.state.asc ? 'arrow-up' : 'arrow-down'} size={12} color="#fff" /> : null}</Pressable>; })}
-      </View></ScrollView>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 8 }}>
+        {f.state.col ? <Pressable onPress={() => f.sortBy(f.state.col as SortCol)} accessibilityRole="button" accessibilityLabel={f.state.asc ? 'Ascending, tap for descending' : 'Descending, tap for ascending'} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.card }}><Feather name={f.state.asc ? 'arrow-up' : 'arrow-down'} size={16} color={c.foreground} /></Pressable> : null}
+      </View>
       <RowList rows={f.out} onOpen={setOpen} />
       {open?.entry && (open.entry.canReferBack || open.entry.canResubmit) ? <CorrectionDialog erp={erp} row={open} ctx={ctx} onClose={() => setOpen(null)} /> : open?.rec && erp.resources.some((res) => res.kind === open.kind) ? <RecordDetail erp={erp}
         res={erp.resources.find((res) => res.kind === open.kind)!} rec={open.rec} ctx={ctx} onClose={() => setOpen(null)} /> : null}

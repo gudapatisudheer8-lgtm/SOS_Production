@@ -4,7 +4,7 @@
 - [Configuration field bindings](configuration-field-bindings.md) — the same API field key can have different meanings across project and partner forms.
 - [Expo static assets](expo-static-assets.md) — pnpm exports can contain hidden-looking paths; serve public assets explicitly without disabling other hidden-file protection.
 - [Expo preview settling](expo-preview-verification.md) — quick mobile captures can stop at font loading; verify the settled page before diagnosing a broken login.
-- [ERP delivery decisions](erp-delivery-decisions.md) — immutable cleared money, independent approvals, and private attachment backups on the existing AWS deployment.
+- [ERP delivery decisions](erp-delivery-decisions.md) — direct posting, immutable money history, linked corrections and private attachment backups on existing AWS.
 - [Database configuration](database-configuration.md) — business choices/forms/policies belong in versioned PostgreSQL; no mock application records or silent firm upgrades.
 - [Simple open plotting](simple-open-plotting.md) — compact forms, project-bounded partner capital, simple project bank entry, and a default Cash ledger per project.
 - [EC2 update handoffs](ec2-update-handoffs.md) — use current package names and inline checksum verification; keep fail-fast checks inside a subshell.

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetProjectErpQueryKey, type ErpResource, type ProjectErp } from '@workspace/api-client-react';
 import { Banner, Btn, Card, CredentialSheet, Field } from '@/components/ui';
@@ -149,10 +149,10 @@ export function PartnerEquityNative({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx
   const resetP = partners.find((p) => p.id === resetFor) ?? null;
 
   const Kpi = ({ t, v, sub, extra }: { t: string; v: string; sub: string; extra?: React.ReactNode }) => (
-    <View style={{ flexGrow: 1, flexBasis: 200, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 18, padding: 14 }}>
+    <View style={{ flexGrow: 1, flexBasis: '46%', minWidth: 140, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 10 }}>
       <Text style={{ color: '#6b7280', fontSize: 10, fontFamily: 'Inter_700Bold', textTransform: 'uppercase', letterSpacing: 0.8 }}>{t}</Text>
-      <Text style={{ color: '#030712', fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 4 }}>{v}</Text>
-      <Text style={{ color: '#6b7280', fontSize: 11 }}>{sub}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#030712', fontSize: 16, fontFamily: 'Inter_700Bold', marginTop: 2 }}>{v}</Text>
+      <Text numberOfLines={2} style={{ color: '#6b7280', fontSize: 10 }}>{sub}</Text>
       {extra}
     </View>
   );
@@ -208,8 +208,8 @@ export function PartnerEquityNative({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx
               </View>
               <Text style={{ color: '#b45309', fontFamily: 'Inter_700Bold', fontSize: 18 }}>{eq.toFixed(2)}%</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-              <View style={{ flexDirection: 'row', gap: 16 }}>
+            <View style={{ marginTop: 10 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                 {[
                   ['Capital Commitment', formatINR(p.initial)],
                   ['Actual Investment', formatINR(p.invested)],
@@ -217,9 +217,9 @@ export function PartnerEquityNative({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx
                   ['Expected Land Allocation', `${Math.round((eq / 100) * sellable).toLocaleString('en-IN')} Sq.Yds`],
                   ['Expected Profit Share', formatINR(Math.round((eq / 100) * expectedProfit))],
                   ['Drawings', formatINR(p.drawings)],
-                ].map(([k, v]) => <View key={k}><Text style={{ color: '#6b7280', fontSize: 10, fontFamily: 'Inter_700Bold', textTransform: 'uppercase' }}>{k}</Text><Text style={{ color: '#111827', fontFamily: 'Inter_600SemiBold', marginTop: 2 }}>{v}</Text></View>)}
+                ].map(([k, v]) => <View key={k} style={{ flexBasis: '48%', flexGrow: 1, backgroundColor: '#f9fafb', borderRadius: 10, paddingVertical: 7, paddingHorizontal: 9 }}><Text numberOfLines={1} style={{ color: '#6b7280', fontSize: 9, fontFamily: 'Inter_700Bold', textTransform: 'uppercase' }}>{k}</Text><Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#111827', fontFamily: 'Inter_600SemiBold', fontSize: 13, marginTop: 2 }}>{v}</Text></View>)}
               </View>
-            </ScrollView>
+            </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, borderTopWidth: 1, borderColor: '#f3f4f6', paddingTop: 8 }}>
               <Text style={{ color: '#6b7280', fontSize: 12 }}>Net Balance</Text>
               <Text style={{ color: nb >= 0 ? '#047857' : '#be123c', fontFamily: 'Inter_700Bold' }}>{formatINR(nb)} · {nb >= 0 ? 'Receivable' : 'Due to Syndicate'}</Text>

@@ -64,7 +64,7 @@ Data must automatically integrate between the relevant tabs and authorized dashb
 
 **Why:** The user corrected the label-only interpretation and explicitly required integration when supplying the partner, banking, booking and expense screenshots.
 
-**How to apply:** Keep one authoritative project-scoped record and reuse its IDs in downstream workflows/views. Saving a bank account must populate that project's receipt/debit choices without re-entry; automatic synchronization never implies bypassing financial approval or permissions.
+**How to apply:** Keep one authoritative project-scoped record and reuse its IDs in downstream workflows/views. Saving a bank account must populate that project's receipt/debit choices without re-entry; automatic synchronization never implies bypassing posting validation or permissions. Use the user's later direct-posting and linked-correction rules, not the retired approval process.
 
 Accountant and partner account actions belong in the clickable user profile menu, rather than repeated Sign out buttons in dashboard headers.
 

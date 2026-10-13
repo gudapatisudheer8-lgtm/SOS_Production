@@ -4,7 +4,7 @@ import { PartnerEquityNative } from '@/screens/PartnerEquityNative';
 import { NativePlotCollections } from '@/screens/NativePlotCollections';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { ErpRecord, ErpResource, ProjectErp } from '@workspace/api-client-react';
-import { Badge, Banner, Btn, Card, Chips, Empty, Field, Label } from '@/components/ui';
+import { Badge, Banner, Btn, Card, Chips, Empty, Field, Label, Select } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { useErpCommands } from '@/lib/erp';
 import { recordStateLabel } from '@/screens/ErpScreens';
@@ -97,14 +97,42 @@ function LayoutCalc({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
 /* ===== Venture layout master grid ===== */
 const pd = (r: ErpRecord) => ({ no: str(r.data.plotNumber || r.data.name), area: nv(r.data.areaSqYards), facing: str(r.data.facing), rate: nv(r.data.ratePerSqYard), status: str(r.data.status), block: str(r.data.blockName), dim: str(r.data.dimensions), road: str(r.data.roadWidthFt), buyer: str(r.data.buyerName) });
 
+/* Web OpenPlottingModule "Project Layout Summary": read-only saved setup values; never invented. */
+const savedVal = (v: unknown) => v !== undefined && v !== null && v !== '';
+export function LayoutSummary({ details: d, count, area }: { details: Record<string, unknown>; count: number; area: number }) {
+  const c = useColors();
+  const NS = 'Not specified';
+  const fmt = (x: unknown) => Number(x).toLocaleString('en-IN', { maximumFractionDigits: 6 });
+  const cells: [string, string, boolean][] = [
+    ['Venture Extent', savedVal(d.extentValue) ? `${fmt(d.extentValue)}${savedVal(d.extentUnit) ? ` ${String(d.extentUnit)}` : ''}` : NS, false],
+    ['Approach Road Width', savedVal(d.roadWidth) ? `${String(d.roadWidth)} ft` : NS, false],
+    ['Planned Open Space', savedVal(d.openSpacePercent) ? `${String(d.openSpacePercent)}%` : NS, false],
+    ['Protected Floor Rate', savedVal(d.floorRatePerSqYard) ? `Rs ${fmt(d.floorRatePerSqYard)}/Sq.Yd` : NS, false],
+    ['Recorded Plots', String(count), true],
+    ['Recorded Plot Area', `${area.toLocaleString('en-IN', { maximumFractionDigits: 6 })} Sq.Yds`, true],
+  ];
+  return (
+    <Card style={{ padding: 12 }}>
+      <Text testID="project-layout-summary" style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 15 }}>Project Layout Summary</Text>
+      <Text style={{ color: c.mutedForeground, fontSize: 11, marginBottom: 8 }}>Read-only values saved in project setup, alongside the plots recorded so far. Edit them from project setup.</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {cells.map(([k, v, hi]) => <View key={k} style={{ flexBasis: '48%', flexGrow: 1, borderRadius: 10, borderWidth: 1, padding: 8, backgroundColor: hi ? '#FFFDF0' : c.muted, borderColor: hi ? '#fcd34d' : c.border }}>
+          <Text numberOfLines={1} style={{ color: c.mutedForeground, fontSize: 9, fontFamily: 'Inter_700Bold', textTransform: 'uppercase' }}>{k}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 13, marginTop: 2 }}>{v}</Text>
+        </View>)}
+      </View>
+    </Card>
+  );
+}
+
 export function LayoutMasterGrid({ erp, ctx, onBook }: { erp: ProjectErp; ctx: ErpCtx; onBook: (id: string) => void }) {
   const c = useColors();
   const { t } = useLang();
   const partner = ctx.account.role === 'PARTNER';
   const res = resOf(erp, 'plots');
   const plots = recsOf(erp, 'plots');
-  const [facing, setFacing] = useState('all'); const [status, setStatus] = useState('all'); const [q, setQ] = useState(''); const [view, setView] = useState<'layout' | 'table'>('layout');
-  const [sel, setSel] = useState<string | null>(null); const [adding, setAdding] = useState(false);
+  const [facing, setFacing] = useState('all'); const [status, setStatus] = useState('all'); const [q, setQ] = useState(''); 
+  const [sel, setSel] = useState<string | null>(null);
   const shown = plots.filter((r) => { const p = pd(r);
     if (facing !== 'all' && p.facing !== facing) return false;
     if (status !== 'all' && p.status !== status) return false;
@@ -119,45 +147,43 @@ export function LayoutMasterGrid({ erp, ctx, onBook }: { erp: ProjectErp; ctx: E
     const registration = p.status === 'reserved' && r.data.registrationState === 'scheduled';
     const bg = registration ? '#faf5ff' : p.status === 'available' ? c.successSurface : p.status === 'sold' ? '#e5e7eb' : p.status === 'blocked' ? '#f6dedb' : c.warningSurface;
     return (
-      <Pressable key={r.id} onPress={() => (p.status !== 'blocked' ? onBook(r.id) : setSel(r.id))} onLongPress={() => setSel(r.id)} accessibilityRole="button" accessibilityLabel={`Plot ${p.no}, ${registration ? 'slot booked for registration' : p.status}`} accessibilityHint="Opens this plot's collections, receipts and registration; long press for details" style={{ width: 160, padding: 10, borderRadius: 14, backgroundColor: bg, borderWidth: 1, borderColor: registration ? '#d8b4fe' : c.border }}>
+      <Pressable key={r.id} onPress={() => (p.status !== 'blocked' ? onBook(r.id) : setSel(r.id))} onLongPress={() => setSel(r.id)} accessibilityRole="button" accessibilityLabel={`Plot ${p.no}, ${registration ? 'slot booked for registration' : p.status}`} accessibilityHint="Opens this plot's collections, receipts and registration; long press for details" style={{ flexBasis: '47%', flexGrow: 1, maxWidth: '50%', padding: 10, borderRadius: 12, backgroundColor: bg, borderWidth: 1, borderColor: registration ? '#d8b4fe' : c.border }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold' }}>#{p.no}</Text>{registration ? <Text style={{ fontSize: 9, fontFamily: 'Inter_700Bold', color: '#7e22ce', backgroundColor: '#f3e8ff', borderRadius: 8, padding: 4 }}>Slot booked for registration</Text> : <Badge text={p.status === 'reserved' ? 'Token booked' : p.status || r.status} tone={tone(p.status)} />}</View>
         <Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 4 }}>{p.area} Sq.Yds{p.dim ? ` · ${p.dim}` : ''}</Text>
         <Text style={{ color: c.mutedForeground, fontSize: 11 }}>{p.facing}{p.road ? ` · ${p.road} ft road` : ''}</Text>
-        <Text style={{ color: c.foreground, fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 4 }}>{formatIndianCompact(p.area * p.rate)}</Text>
+        {p.rate ? <Text style={{ color: c.mutedForeground, fontSize: 11 }}>{money(p.rate)}/Sq.Yd</Text> : null}
+        <Text style={{ color: c.foreground, fontSize: 13, fontFamily: 'Inter_700Bold', marginTop: 4 }}>{formatIndianCompact(p.area * p.rate)}</Text>
         {p.buyer ? <Text numberOfLines={1} style={{ color: c.mutedForeground, fontSize: 11 }}>{p.buyer}</Text> : null}
       </Pressable>
     );
   };
-  const COLS: [string, number][] = [['Plot No', 70], ['Block', 90], ['Facing', 110], ['Dimensions', 90], ['Road (ft)', 70], ['Area (Sq.Yd)', 90], ['Rate/Sq.Yd', 90], ['Total Value', 110], ['Status', 90], ['Buyer', 120]];
   const groups = FACINGS.map((f) => [f, f] as const);
   return (
     <View>
       <Title sub={partner ? t('plotsSubtitle') : 'Directional master layout with live status, dimensions, rates and buyers.'}>{partner ? t('plotsInventory') : 'Venture Layout Master Grid'}</Title>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-        <Stat l={partner ? t('totalPlots') : 'Total plotted inventory'} v={String(plots.length)} sub={`${Math.round(sellable).toLocaleString('en-IN')} Sq.Yds`} />
-        <Stat l="Available" v={String(cnt((p) => p.status === 'available'))} />
-        <Stat l="Reserved" v={String(cnt((p) => p.status === 'reserved'))} />
-        <Stat l="Blocked" v={String(cnt((p) => p.status === 'blocked'))} />
-        <Stat l="Sold" v={String(cnt((p) => p.status === 'sold'))} />
+      {!partner ? <LayoutSummary details={(ctx.project?.details ?? {}) as Record<string, unknown>} count={plots.length} area={sellable} /> : null}
+      <Card style={{ padding: 12 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <View><Text style={{ color: c.mutedForeground, fontSize: 10, fontFamily: 'Inter_700Bold' }}>{(partner ? t('totalPlots') : 'Total plotted inventory').toUpperCase()}</Text><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 22 }}>{plots.length}</Text></View>
+          <Text style={{ color: c.mutedForeground, fontSize: 12 }}>{Math.round(sellable).toLocaleString('en-IN')} Sq.Yds</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+          {([['available', 'Available', c.successSurface], ['reserved', 'Token', c.warningSurface], ['blocked', 'Blocked', '#f6dedb'], ['sold', 'Sold', '#e5e7eb']] as const).map(([k, l, bg]) => (
+            <Pressable key={k} onPress={() => setStatus(status === k ? 'all' : k)} accessibilityRole="button" accessibilityState={{ selected: status === k }} style={{ flex: 1, minHeight: 44, borderRadius: 10, backgroundColor: bg, paddingVertical: 6, alignItems: 'center', borderWidth: 1.5, borderColor: status === k ? c.foreground : 'transparent' }}>
+              <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 15 }}>{cnt((p) => p.status === k)}</Text>
+              <Text style={{ color: c.mutedForeground, fontSize: 10 }}>{l}</Text>
+            </Pressable>))}
+        </View>
+      </Card>
+      <Field label="Search" placeholder="Plot number, buyer, facing, block" value={q} onChangeText={setQ} />
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+        <Select compact label="Facing" options={[{ value: 'all', label: 'All facings' }, ...FACINGS.map((f) => ({ value: f, label: `${f} (${cnt((p) => p.facing === f)})` }))]} value={facing} onChange={setFacing} testID="plots-facing" />
+        <Select compact label="Status" options={['all', ...statusOpts].map((s) => ({ value: s, label: s === 'all' ? 'All statuses' : s === 'reserved' ? 'Token booked' : s.charAt(0).toUpperCase() + s.slice(1) }))} value={status} onChange={setStatus} testID="plots-status" />
       </View>
-      <Chips label="Facing" options={[{ value: 'all', label: 'All' }, ...FACINGS.map((f) => ({ value: f, label: `${f} (${cnt((p) => p.facing === f)})` }))]} value={facing} onChange={setFacing} />
-      <Chips label="Plot status" options={['all', ...statusOpts].map((s) => ({ value: s, label: s }))} value={status} onChange={setStatus} />
-      <Field label="Search plot number, buyer, facing, block" value={q} onChangeText={setQ} />
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-        <Btn label={view === 'layout' ? 'Show table' : 'Show master layout'} variant="ghost" icon={view === 'layout' ? 'list' : 'grid'} onPress={() => setView(view === 'layout' ? 'table' : 'layout')} />
-        {res?.canCreate ? <Btn label="Add plot" icon="plus" onPress={() => setAdding(true)} /> : null}
-      </View>
-      {!shown.length ? <Empty icon="map" title="No plots" text={plots.length ? 'No plot matches the filters.' : 'Plots appear here once added.'} /> : view === 'layout' ? (
+      {!shown.length ? <Empty icon="map" title="No plots" text={plots.length ? 'No plot matches the filters.' : 'Plots appear here once added.'} /> : (
         groups.map(([title, key]) => { const g = shown.filter((r) => pd(r).facing === key); if (!g.length) return null;
           return <View key={key} style={{ marginBottom: 14 }}><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 12, marginBottom: 6, textTransform: 'uppercase' }}>{title} ({g.length})</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{g.map(card)}</View></View>; })
-      ) : (
-        <ScrollView horizontal><View>
-          <View style={{ flexDirection: 'row', backgroundColor: c.muted }}>{COLS.map(([h, w]) => <Text key={h} style={{ width: w, padding: 8, fontSize: 11, fontFamily: 'Inter_700Bold', color: c.foreground }}>{h}</Text>)}</View>
-          {shown.map((r) => { const p = pd(r); const cells = [p.no, p.block || '-', p.facing, p.dim || '-', p.road || '-', String(p.area), money(p.rate), formatINR(p.area * p.rate), p.status, p.buyer || '-'];
-            return <Pressable key={r.id} onPress={() => setSel(r.id)} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: c.border }}>{cells.map((v, i) => <Text key={i} numberOfLines={1} style={{ width: COLS[i][1], padding: 8, fontSize: 12, color: c.foreground }}>{v}</Text>)}</Pressable>; })}
-        </View></ScrollView>
       )}
-      {adding && res ? <Dialog title="New plot" onClose={() => setAdding(false)}><RecordForm erp={erp} res={res} ctx={ctx} onDone={() => setAdding(false)} /></Dialog> : null}
       {cur && res ? <RecordDetail erp={erp} res={res} rec={cur} ctx={ctx} onClose={() => setSel(null)} footer={<View>{pd(cur).status === 'available' && resOf(erp, 'bookings')?.canCreate ? <View style={{ marginTop: 8 }}><Btn label={`Book plot ${pd(cur).no}`} icon="bookmark" onPress={() => { const id = cur.id; setSel(null); onBook(id); }} /></View> : null}{pd(cur).status === 'available' ? <View style={{ marginTop: 8 }}><Btn label="Share availability via WhatsApp" variant="ghost" icon="send" onPress={() => openWa(`Plot ${pd(cur).no}${pd(cur).block ? `, ${pd(cur).block}` : ''}: ${pd(cur).area} Sq.Yds, ${pd(cur).facing} facing${pd(cur).rate ? `, Rs ${pd(cur).rate}/Sq.Yd` : ''}. Available.`)} /></View> : null}<InventoryStage erp={erp} rec={cur} ctx={ctx} /></View>} /> : null}
     </View>
   );
@@ -584,7 +610,7 @@ registerBespoke((key, props, erp, ctx) => {
   switch (key) {
     case 'erp-dashboard': return ctx.account.role === 'PARTNER' ? <PartnerHome erp={erp} ctx={ctx} /> : <AccountantDashboard erp={erp} ctx={ctx} />;
     case 'erp-equity': return <PartnerEquityNative erp={erp} ctx={ctx} />;
-    case 'erp-layout': return <View><LayoutCalc erp={erp} ctx={ctx} />{ctx.project ? <NativeBlueprint projectId={ctx.project.id} erp={erp} /> : null}<Plots erp={erp} ctx={ctx} /></View>;
+    case 'erp-layout': return <View>{ctx.project ? <NativeBlueprint projectId={ctx.project.id} erp={erp} /> : null}<Plots erp={erp} ctx={ctx} /></View>;
     case 'erp-pricing': return <View><PricingEditor erp={erp} ctx={ctx} /><Units erp={erp} ctx={ctx} /></View>;
     case 'erp-statement': return <ProjectStatement erp={erp} ctx={ctx} />;
     case 'erp-settings': return <Settings erp={erp} ctx={ctx} />;

@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -387,3 +388,42 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' },
   secret: { borderWidth: 1, borderRadius: 12, padding: 14 },
 });
+
+/** Compact native dropdown: a field-like trigger that opens a bottom sheet of options. */
+export function Select<T extends string>({
+  options, value, onChange, label, compact, testID,
+}: {
+  options: { value: T; label: string }[]; value: T | ''; onChange: (v: T) => void; label?: string; compact?: boolean; testID?: string;
+}) {
+  const c = useColors();
+  const [open, setOpen] = useState(false);
+  const cur = options.find((o) => o.value === value);
+  return (
+    <View style={{ marginBottom: compact ? 0 : 10, flexGrow: 1, flexBasis: compact ? 0 : undefined, minWidth: compact ? 0 : undefined }}>
+      {label && !compact ? <Label>{label}</Label> : null}
+      <Pressable testID={testID} onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`${label ?? 'Select'}: ${cur?.label ?? 'none'}`}
+        style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.card }}>
+        <View style={{ flex: 1 }}>
+          {compact && label ? <Text numberOfLines={1} style={{ color: c.mutedForeground, fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 }}>{label.toUpperCase()}</Text> : null}
+          <Text numberOfLines={1} style={{ color: c.foreground, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{cur?.label ?? 'Select'}</Text>
+        </View>
+        <Feather name="chevron-down" size={16} color={c.mutedForeground} />
+      </Pressable>
+      <Sheet visible={open} title={label ?? 'Select'} onClose={() => setOpen(false)}>
+        <ScrollView style={{ maxHeight: 360 }}>
+          {options.map((o) => {
+            const on = o.value === value;
+            return (
+              <Pressable key={o.value} onPress={() => { setOpen(false); onChange(o.value); }} accessibilityRole="button" accessibilityState={{ selected: on }}
+                style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: c.border }}>
+                <Text style={{ color: c.foreground, fontFamily: on ? 'Inter_700Bold' : 'Inter_400Regular', flex: 1 }}>{o.label}</Text>
+                {on ? <Feather name="check" size={16} color={c.primary} /> : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <Btn label="Close" variant="ghost" onPress={() => setOpen(false)} />
+      </Sheet>
+    </View>
+  );
+}

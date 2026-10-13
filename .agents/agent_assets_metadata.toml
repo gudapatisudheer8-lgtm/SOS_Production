@@ -583,6 +583,7 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_04_v2.mp3"
 type = "audio"
 title = "vo04"
 description = "Text-to-speech audio: Entries post directly and notify partners. Corrections are referred back and resubmitted, with the original kept on record."
+logical_id = "792d8031-0ba3-4719-9beb-2c6423b27bd2"
 
 [[outputs]]
 id = "vj62bSK8eEfgq94NlzCxH"
@@ -590,3 +591,18 @@ uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_06_v2.mp3"
 type = "audio"
 title = "vo06"
 description = "Text-to-speech audio: Partners follow their dashboard, plots and project statements, and are notified as entries post."
+logical_id = "7f1cff30-231d-4695-8eeb-9ba5be236d00"
+
+[[outputs]]
+id = "My7JTlMJntwqdUTlBK2FW"
+uri = "file://generated-artifacts/syndicateos-promotional-film.mp4"
+type = "video"
+title = "SyndicateOS — Promotional Video"
+description = "Download the 60-second promotional film with narration and music. MP4, 720p, 16:9."
+logical_id = "e99e091d-772d-4642-ad04-e546a44aaf4d"
+content_hash = "sha256:fc4abcb16de3e0f430ae8ea0d8b38925b2bca0c598765b83e931284efaa0164e"
+size = 4733698
+mtime_ms = 1791886430711
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/e99e091d-772d-4642-ad04-e546a44aaf4d/5e79fd8d-efcf-4854-b6bf-0a27166bdb84"
+storage_version_token = "1791886464484695"
+content_type = "video/mp4"

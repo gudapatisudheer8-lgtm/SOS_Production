@@ -72,7 +72,10 @@ export function WorkspaceShell({ mode, bell }: { mode: 'owner' | 'client'; bell?
   );
 
   if (!owner) {
-    const frame: Frame = ({ selectors, nav, content }) => (
+    const frame: Frame = ({ selectors, nav, content, activeFirmId }) => {
+      // Active firm comes from the selected sector/project in SectorWorkspace; account firm is only the fallback.
+      const af = (activeFirmId ? ws?.firms.find((f) => f.id === activeFirmId) : undefined) ?? firm;
+      return (
       <View style={{ flex: 1, backgroundColor: '#F4F4F6' }}>
         <View style={{ backgroundColor: '#FBFAF6', borderBottomWidth: 1, borderBottomColor: '#e7e5e4', paddingTop: Platform.OS === 'web' ? 10 : insets.top + 6, paddingHorizontal: wide ? 28 : 12, paddingBottom: 10, gap: 8, zIndex: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
@@ -82,13 +85,13 @@ export function WorkspaceShell({ mode, bell }: { mode: 'owner' | 'client'; bell?
               </View>
               <View style={{ flexShrink: 1 }}>
                 <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 16, color: '#0f172a' }}>Syndicate<Text style={{ color: '#d97706' }}>OS</Text></Text>
-                <Text numberOfLines={1} style={{ color: '#57534e', fontSize: 11 }}>{firm ? firm.name : 'No active firm assigned'} · {account?.role === 'PARTNER' ? 'Partner' : 'Accountant'}</Text>
+                <Text numberOfLines={1} style={{ color: '#57534e', fontSize: 11 }}>{af ? af.name : 'No active firm assigned'} · {account?.role === 'PARTNER' ? 'Partner' : 'Accountant'}</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {account?.role === 'PARTNER' ? <CompactLang /> : null}
               {bell ?? <NativeNotificationBell />}
-              <ProfileMenu name={account?.displayName ?? ''} role={account?.role === 'PARTNER' ? 'Partner' : 'Accountant'} firm={firm ? `${firm.name} (${firm.clientCode})` : ''} onSignOut={() => void signOut()} />
+              <ProfileMenu name={account?.displayName ?? ''} role={account?.role === 'PARTNER' ? 'Partner' : 'Accountant'} firm={af ? `${af.name} (${af.clientCode})` : ''} onSignOut={() => void signOut()} />
             </View>
           </View>
           {selectors}
@@ -98,7 +101,8 @@ export function WorkspaceShell({ mode, bell }: { mode: 'owner' | 'client'; bell?
           {content}
         </ScrollView>
       </View>
-    );
+      );
+    };
     if (ws && account && !q.isLoading) return <SectorWorkspace ws={ws} account={account} frame={frame} />;
     return <>{frame({ content: body })}</>;
   }
