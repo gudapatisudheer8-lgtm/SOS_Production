@@ -19,7 +19,7 @@ The user confirmed that their supplied GitHub SOS repository contains the same v
 
 **Why:** The user repeated the replica requirement after seeing the older mobile dashboard and explicitly rejected it as another, outdated application.
 
-**How to apply:** Port both current web role workflows into real native screens, not a WebView wrapper or a generic redesign. Do not ask the user to explain existing web features again. Verify functional parity and native-device behavior before describing the mobile app as a replica.
+**How to apply:** Port both current web role workflows into real native screens, not a WebView wrapper or a generic redesign. Do not append inline project-edit or partner-entry forms, standalone booking lists or audit-filter sections beneath the four core mobile tabs; keep the intended actions available through their buttons. The user repeatedly requested removal of these extra sections. Do not ask the user to explain existing web features again. Verify functional parity and native-device behavior before describing the mobile app as a replica.
 
 Develop and show the application in the right-side Preview first. The user will review it there and explicitly confirm when to prepare EC2 deployment instructions.
 

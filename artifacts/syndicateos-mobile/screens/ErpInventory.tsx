@@ -46,7 +46,7 @@ export function InventoryStage({ erp, rec, ctx }: { erp: ProjectErp; rec: ErpRec
   return (
     <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderColor: c.border }}>
       <Label>{isPlot ? 'PLOT LIFECYCLE' : 'APARTMENT LIFECYCLE'}</Label>
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 6 }}><Badge text={status || 'unset'} tone={tone(status)} />{approved ? <Badge text="approved booking" tone="ok" /> : pend ? <Badge text="booking pending review" tone="warn" /> : <Badge text="no booking" tone="muted" />}</View>
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 6 }}><Badge text={status || 'unset'} tone={tone(status)} />{approved ? <Badge text="booking recorded" tone="ok" /> : pend ? <Badge text="booking not posted (historical)" tone="warn" /> : <Badge text="no booking" tone="muted" />}</View>
       {!isPlot ? <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 6 }}>Milestone: {str(rec.data.currentMilestone || rec.data.milestoneStage) || 'not set'}{str(rec.data.paymentMilestone) ? ` · payment milestone ${str(rec.data.paymentMilestone)}` : ''}</Text> : null}
       {!accountant ? <Text style={{ color: c.mutedForeground, fontSize: 12 }}>Stage changes are made by the accountant. This view is read-only for partners.</Text> : (
         <View>
@@ -56,11 +56,11 @@ export function InventoryStage({ erp, rec, ctx }: { erp: ProjectErp; rec: ErpRec
           <View style={{ height: 6 }} />
           {nextStatus ? (
             <View>
-              {!approved ? <Banner tone="warn" title="Approved booking required" text={`${isPlot ? 'Selling' : 'Registering'} needs an approved booking for this ${isPlot ? 'plot' : 'unit'}.`} /> : null}
+              {!approved ? <Banner tone="warn" title="Recorded booking required" text={`${isPlot ? 'Selling' : 'Registering'} needs a recorded booking for this ${isPlot ? 'plot' : 'unit'}.`} /> : null}
               <Btn label={isPlot ? 'Mark plot sold' : 'Mark apartment registered'} loading={busy} disabled={!approved || (!isPlot && !ms)} onPress={() => void go({ status: nextStatus, ...(ms ? { paymentMilestone: ms } : {}) })} />
               {!isPlot && !ms ? <Text style={{ color: c.mutedForeground, fontSize: 12 }}>Choose the registration milestone first.</Text> : null}
             </View>
-          ) : <Text style={{ color: c.mutedForeground, fontSize: 12 }}>{isPlot ? 'Reserved plots with an approved booking can be marked sold.' : 'Booked units with an approved booking can be registered.'}</Text>}
+          ) : <Text style={{ color: c.mutedForeground, fontSize: 12 }}>{isPlot ? 'Reserved plots with a recorded booking can be marked sold.' : 'Booked units with a recorded booking can be registered.'}</Text>}
           {msg ? <Banner tone={msg.ok ? 'ok' : 'error'} title={msg.t} /> : null}
         </View>
       )}
@@ -114,7 +114,7 @@ export function BookingReceipts({ erp, booking, ctx }: { erp: ProjectErp; bookin
           <Field label="Date" value={v.date} onChangeText={set('date')} hint="YYYY-MM-DD" />
           <Field label="Note" value={v.note} onChangeText={set('note')} />
           {err ? <Banner tone="error" title={err} /> : null}
-          <Banner tone="warn" title={`Saved as credit, ${cat}, pending review`} />
+          <Banner tone="ok" title={`Posted immediately as a credit, ${cat}`} />
           <Btn label="Submit receipt" loading={busy} onPress={submit} />
         </View>
       ) : null}

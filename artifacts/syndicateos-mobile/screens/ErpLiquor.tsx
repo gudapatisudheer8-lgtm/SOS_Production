@@ -69,7 +69,7 @@ function SettlementForm({ erp, res, ctx, onDone }: { erp: ProjectErp; res: ErpRe
         <Text style={{ color: m.variance === 0 ? c.success : c.destructive, fontFamily: 'Inter_700Bold' }}>{m.variance > 0 ? `Shortage ${formatINR(m.variance)}` : m.variance < 0 ? `Excess ${formatINR(-m.variance)}` : 'Reconciled: zero variance'}</Text>
       </View> : <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 8 }}>Enter all stock and collection figures to see the reconciliation.</Text>}
       {err ? <Banner tone="error" title={err} /> : null}
-      <Banner tone="warn" title="Saved as pending review" />
+      <Banner tone="ok" title="Posted immediately when recorded; corrections go through refer back." />
       <Btn label="Record evening settlement" loading={busy} onPress={submit} />
     </View>
   );

@@ -401,7 +401,7 @@ function BookingsView({ erp, ctx, preset, clearPreset }: { erp: ProjectErp; ctx:
   );
 }
 
-/* ===== Investments / Expenses / Drawings approvals desk ===== */
+/* ===== Investments / Expenses / Drawings records (direct posting; no approvals) ===== */
 function Reimbursements({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const c = useColors();
   const res = resOf(erp, 'reimbursements');
@@ -426,7 +426,7 @@ function Reimbursements({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
         </Pressable>
       ))}
       {pick ? <Dialog title="Reimburse an expense" onClose={() => setPick(false)}>
-        {!chosen ? (eligible.length ? <View><Label>Approved expense paid individually (paymentSource = individual)</Label>{eligible.map((r) => <Pressable key={r.id} onPress={() => setExp(r.id)} style={{ paddingVertical: 10, borderBottomWidth: 1, borderColor: c.border }}><Text style={{ color: c.foreground, fontFamily: 'Inter_600SemiBold' }}>{formatINR(nv(r.data.amount))} · {str(r.data.category) || label(r)}</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>Already requested {formatINR(paid(r.id))}</Text></Pressable>)}</View> : <Empty icon="inbox" title="Nothing to reimburse" text="Approved expenses paid by an individual appear here." />)
+        {!chosen ? (eligible.length ? <View><Label>Recorded expense paid personally by a partner</Label>{eligible.map((r) => <Pressable key={r.id} onPress={() => setExp(r.id)} style={{ paddingVertical: 10, borderBottomWidth: 1, borderColor: c.border }}><Text style={{ color: c.foreground, fontFamily: 'Inter_600SemiBold' }}>{formatINR(nv(r.data.amount))} · {str(r.data.category) || label(r)}</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>Already requested {formatINR(paid(r.id))}</Text></Pressable>)}</View> : <Empty icon="inbox" title="Nothing to reimburse" text="Approved expenses paid by an individual appear here." />)
           : <RecordForm erp={erp} res={res} ctx={ctx} fixed={{ expenseId: chosen.id }} onDone={() => setPick(false)} />}
       </Dialog> : null}
       {cur ? <RecordDetail erp={erp} res={res} rec={cur} ctx={ctx} onClose={() => setSel(null)} /> : null}
@@ -434,7 +434,7 @@ function Reimbursements({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   );
 }
 
-function ApprovalsDesk({ erp, kind, ctx }: { erp: ProjectErp; kind: string; ctx: ErpCtx }) {
+function RecordsDesk({ erp, kind, ctx }: { erp: ProjectErp; kind: string; ctx: ErpCtx }) {
   const c = useColors();
   const { t } = useLang();
   const partner = ctx.account.role === 'PARTNER';
@@ -619,7 +619,7 @@ registerBespoke((key, props, erp, ctx) => {
       if (kind === 'plots') return <Plots erp={erp} ctx={ctx} />;
       if (kind === 'units') return <Units erp={erp} ctx={ctx} />;
       if (kind === 'accounts') return <AccountsBar erp={erp} ctx={ctx} full />;
-      if (kind === 'investments' || kind === 'expenses' || kind === 'drawings') return <ApprovalsDesk erp={erp} kind={kind} ctx={ctx} />;
+      if (kind === 'investments' || kind === 'expenses' || kind === 'drawings') return <RecordsDesk erp={erp} kind={kind} ctx={ctx} />;
       if (kind === 'bookings') return <Bookings erp={erp} ctx={ctx} />;
       if (kind === 'settlements' || kind === 'stock-draws') return <LiquorModule erp={erp} ctx={ctx} initial={kind} />;
       if (kind === 'documents') return <Documents erp={erp} ctx={ctx} />;

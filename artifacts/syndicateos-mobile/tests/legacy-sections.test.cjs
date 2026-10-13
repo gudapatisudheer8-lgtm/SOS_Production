@@ -7,7 +7,7 @@ const read = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
 test('bespoke screens filter legacy duplicate components', () => {
   const s = read('screens/SectorInterface.tsx');
   assert.match(s, /export function visibleComponents/);
-  assert.match(s, /const LEGACY_DUPES/);
+  assert.match(s, /const LEGACY: Record/);
   assert.ok(!/\(isDraft && hasErp \? \[\] : screen\.components\)/.test(s), 'screen.components must go through visibleComponents');
 });
 test('firm picker is always rendered, beside project picker', () => {
@@ -37,16 +37,42 @@ function loadVisible() {
   const ctx = {}; vm.runInNewContext(code + '\nthis.visibleComponents = visibleComponents;', ctx); return ctx.visibleComponents;
 }
 const C = (key, resource) => ({ key, props: resource ? { resource } : {} });
-test('only known duplicates are removed; unrelated/custom components preserved', () => {
+// Component shapes exactly as V4__original_dashboard_configuration.sql creates them.
+test('core screens hide V4 legacy components (accountant and partner); unrelated/custom kept', () => {
   const vis = loadVisible();
   const keys = (sc) => vis(sc).map((x) => `${x.key}:${x.props.resource ?? ''}`);
-  assert.deepEqual(keys({ key: 'd', components: [C('erp-dashboard'), C('erp-plan'), C('erp-resource', 'documents'), C('custom-widget')] }), ['erp-dashboard:', 'erp-resource:documents', 'custom-widget:']);
-  assert.deepEqual(keys({ key: 'p', components: [C('erp-equity'), C('erp-resource', 'partner-profiles'), C('erp-resource', 'investments'), C('erp-resource', 'budgets')] }), ['erp-equity:', 'erp-resource:budgets']);
-  assert.deepEqual(keys({ key: 'o', components: [C('erp-layout'), C('erp-resource', 'plots'), C('erp-resource', 'bookings')] }), ['erp-layout:', 'erp-resource:bookings']);
-  // Statement and other sectors (no bespoke match) are untouched.
-  assert.deepEqual(keys({ key: 's', components: [C('erp-statement'), C('erp-resource', 'transactions')] }), ['erp-statement:', 'erp-resource:transactions']);
-  assert.deepEqual(keys({ key: 'u', components: [C('erp-pricing'), C('erp-resource', 'units'), C('erp-plan')] }), ['erp-pricing:', 'erp-resource:units', 'erp-plan:']);
-  assert.deepEqual(keys({ key: 'x', components: [C('erp-resource', 'plots'), C('erp-plan')] }), ['erp-resource:plots', 'erp-plan:']);
+  // Accountant dashboard: erp-dashboard, erp-plan, project-form, documents
+  assert.deepEqual(keys({ key: 'dashboard', components: [C('erp-dashboard'), C('erp-plan'), C('project-form'), C('erp-resource', 'documents'), C('custom-widget')] }), ['erp-dashboard:', 'custom-widget:']);
+  // Partner dashboard: erp-dashboard, drawings
+  assert.deepEqual(keys({ key: 'dashboard', components: [C('erp-dashboard'), C('erp-resource', 'drawings')] }), ['erp-dashboard:']);
+  // Partners: erp-equity, partner-profiles, investments, partner-form
+  assert.deepEqual(keys({ key: 'partners', components: [C('erp-equity'), C('erp-resource', 'partner-profiles'), C('erp-resource', 'investments'), C('partner-form'), C('erp-resource', 'budgets')] }), ['erp-equity:', 'erp-resource:budgets']);
+  // Accountant open plotting: plots, erp-layout, bookings
+  assert.deepEqual(keys({ key: 'open-plotting', components: [C('erp-resource', 'plots'), C('erp-layout'), C('erp-resource', 'bookings')] }), ['erp-layout:']);
+  // Partner plots: plots, bookings (no erp-layout, so plots view stays)
+  assert.deepEqual(keys({ key: 'plots', components: [C('erp-resource', 'plots'), C('erp-resource', 'bookings')] }), ['erp-resource:plots']);
+  // Statement (both roles): erp-statement, erp-audit
+  assert.deepEqual(keys({ key: 'project-statement', components: [C('erp-statement'), C('erp-audit'), C('custom-widget')] }), ['erp-statement:', 'custom-widget:']);
+  // Construction / unknown screens untouched.
+  assert.deepEqual(keys({ key: 'construction', components: [C('erp-resource', 'units'), C('erp-pricing'), C('erp-resource', 'bookings')] }), ['erp-resource:units', 'erp-pricing:', 'erp-resource:bookings']);
+  assert.deepEqual(keys({ key: 'x', components: [C('custom-widget'), C('erp-plan')] }), ['custom-widget:', 'erp-plan:']);
+});
+test('statement rows route every entry to the correction dialog with discoverable server-gated actions', () => {
+  const s = read('screens/ErpStatement.tsx');
+  assert.match(s, /\{open\?\.entry \? <CorrectionDialog/);
+  assert.match(s, /r\.entry\?\.canResubmit \?/); assert.match(s, /r\.entry\?\.canReferBack \?/);
+  assert.match(s, /e\.canReferBack \? <View>/); assert.match(s, /e\.canResubmit \? <View/);
+  assert.match(s, /correction-unavailable/);
+  const d = read('screens/ErpScreens.tsx');
+  const detail = d.slice(d.indexOf('export function RecordDetail'));
+  assert.ok(detail.indexOf('detail-refer-back') < detail.indexOf('res.fields.filter'), 'Refer Back must sit above the field list');
+  assert.match(d, /KeyboardAwareScrollViewCompat style=\{\{ flexShrink: 1 \}\}/, 'dialogs scroll on small phones');
+});
+test('no approval UI wording on reachable client screens', () => {
+  const files = ['screens/ErpBespoke.tsx', 'screens/ErpInventory.tsx', 'screens/ErpStatement.tsx', 'screens/ErpScreens.tsx'];
+  for (const f of files) { const s = read(f).replace(/\/\*[\s\S]*?\*\//g, ''); assert.ok(!/['"`>][^'"`<]*\b(Approve|Approval|approved booking|for Approval)\b/.test(s), f); }
+  const i = read('lib/i18nFull.ts'); assert.ok(!/Submit Expense for Approval|Approvals Desk|Pending Approval|approveBtn: 'Approve/.test(i) || /approveBtn/.test(i));
+  assert.match(read('lib/erp.ts'), /Approvals have been removed/);
 });
 test('open plotting keeps saved Project Layout Summary and single sort control', () => {
   const b = read('screens/ErpBespoke.tsx');
@@ -65,4 +91,11 @@ test('shell branding/profile follow the selected active firm via the frame, not 
   assert.match(sh, /\{af \? af\.name : 'No active firm assigned'\}/);
   assert.match(sh, /firm=\{af \? `\$\{af\.name\} \(\$\{af\.clientCode\}\)`/);
   assert.ok(!/firm \? firm\.name : 'No active firm assigned'/.test(sh));
+});
+
+test('reachable Telugu and English financial labels use direct-posting wording', () => {
+  const i = read('lib/i18nFull.ts');
+  const keys = ['tabExpensesApprovals', 'investmentsBannerSubtitle', 'filterInvPending', 'filterInvApproved', 'consensusSignoff', 'expensesBannerTitle', 'expensesBannerSubtitle', 'submitExpenseBtn', 'pendingApprovalsTitle', 'filterPending', 'filterApproved', 'statusPending', 'statusApproved'];
+  for (const k of keys) for (const m of i.matchAll(new RegExp(`${k}: '([^']*)'`, 'g'))) assert.ok(!/ఆమోద|Approv|Sign-off|Clearance|approval/i.test(m[1]), `${k}: ${m[1]}`);
+  assert.match(i, /lpReraNumber: 'Approval & LP \/ RERA No\.'/, 'statutory approval permit label preserved');
 });

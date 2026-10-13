@@ -136,6 +136,9 @@ export function RowList({ rows, onOpen }: { rows: StmtRow[]; onOpen?: (r: StmtRo
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 <Text style={{ color: r.flow === 'credit' ? c.success : c.destructive, fontFamily: 'Inter_700Bold' }}>{r.flow === 'credit' ? '+' : '-'}{money(r.amount)}</Text>
+                {r.entry?.canResubmit ? <Text testID="row-correct" style={{ color: '#92400e', backgroundColor: '#fef3c7', fontSize: 10, fontFamily: 'Inter_700Bold', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' }}>Correct & resubmit</Text>
+                  : r.entry?.canReferBack ? <View testID="row-refer" style={{ flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: c.border, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}><Feather name="corner-up-left" size={10} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 10, fontFamily: 'Inter_700Bold' }}>Refer back</Text></View>
+                  : r.status === 'referred_back' ? <Text style={{ color: '#92400e', fontSize: 10, fontFamily: 'Inter_700Bold' }}>Referred back</Text> : null}
               </View>
             </View>
           </Card>
@@ -189,7 +192,7 @@ export function ProjectStatement({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx })
         {f.state.col ? <Pressable onPress={() => f.sortBy(f.state.col as SortCol)} accessibilityRole="button" accessibilityLabel={f.state.asc ? 'Ascending, tap for descending' : 'Descending, tap for ascending'} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.card }}><Feather name={f.state.asc ? 'arrow-up' : 'arrow-down'} size={16} color={c.foreground} /></Pressable> : null}
       </View>
       <RowList rows={f.out} onOpen={setOpen} />
-      {open?.entry && (open.entry.canReferBack || open.entry.canResubmit) ? <CorrectionDialog erp={erp} row={open} ctx={ctx} onClose={() => setOpen(null)} /> : open?.rec && erp.resources.some((res) => res.kind === open.kind) ? <RecordDetail erp={erp}
+      {open?.entry ? <CorrectionDialog erp={erp} row={open} ctx={ctx} onClose={() => setOpen(null)} /> : open?.rec && erp.resources.some((res) => res.kind === open.kind) ? <RecordDetail erp={erp}
         res={erp.resources.find((res) => res.kind === open.kind)!} rec={open.rec} ctx={ctx} onClose={() => setOpen(null)} /> : null}
       {creating ? <Dialog title={`New ${erp.resources.find((x) => x.kind === creating)?.title ?? creating}`} onClose={() => setCreating(null)}><RecordForm erp={erp} res={erp.resources.find((x) => x.kind === creating)!} ctx={ctx} onDone={() => setCreating(null)} /></Dialog> : null}
       {tally ? <TallyModal erp={erp} rows={f.out} onClose={() => setTally(false)} /> : null}
@@ -230,9 +233,10 @@ function CorrectionDialog({ erp, row, ctx, onClose }: { erp: ProjectErp; row: St
       <Text style={{ color: c.mutedForeground, fontSize: 12 }}>{row.date} · {row.kind} · {row.account}{row.by ? ` · enrolled by ${row.by}` : ''}</Text>
       <Text style={{ color: row.flow === 'credit' ? c.success : c.destructive, fontFamily: 'Inter_700Bold', fontSize: 22, marginVertical: 8 }}>{row.flow === 'credit' ? '+' : '-'}{money(row.amount)}</Text>
       {e.correctionReason ? <Banner tone="warn" title="Referred back" text={e.correctionReason} /> : null}
+      {!e.canReferBack && !e.canResubmit ? <Text testID="correction-unavailable" style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 6 }}>{row.status === 'reversal' ? 'This is a reversal journal kept for audit; it cannot be corrected again.' : 'No correction action is available to you for this entry. Corrections follow your role permissions for this project.'}</Text> : null}
       {e.canReferBack ? <View>
         <Field label="Refer-back reason *" value={reason} onChangeText={setReason} multiline />
-        <Btn label="Refer Back" variant="ghost" loading={busy} disabled={!reason.trim()} onPress={() => void run(() => cmd.referBack(e.id, e.revision, reason.trim(), reqId))} />
+        <Btn testID="stmt-refer-back" label="Refer Back" icon="corner-up-left" loading={busy} disabled={!reason.trim()} onPress={() => void run(() => cmd.referBack(e.id, e.revision, reason.trim(), reqId))} />
       </View> : null}
       {e.canResubmit ? <View style={{ marginTop: 8 }}>
         <Label>CORRECT AND RESUBMIT</Label>

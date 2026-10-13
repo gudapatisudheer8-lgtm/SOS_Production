@@ -16,26 +16,26 @@ export const translations = {
     // Top Bar 5 Tabs
     tabDashboard: 'Dashboard',
     tabInvestments: 'Enroll Investment & History',
-    tabExpensesApprovals: 'Expenses, Approvals & Drawing Request',
+    tabExpensesApprovals: 'Expenses & Drawing Request',
     tabPlots: 'Plots',
     tabStatements: 'Project Statements',
 
     // Investment Tab Specific
     enrollInvestmentBtn: '+ Enroll Investment',
     investmentsBannerTitle: 'Syndicate Capital Enrollment & Investment Records Desk',
-    investmentsBannerSubtitle: 'Record individual partner investments in Cash or Bank, review consensus sign-offs, and inspect historical audit receipts.',
+    investmentsBannerSubtitle: 'Record individual partner investments in Cash or Bank (posted immediately) and inspect the audit history.',
     investmentRecordsHistory: 'Investment Records History',
     filterAllInvestments: 'All Records',
     filterMyInvestments: 'My Contributions',
     filterCashOnly: '💵 Cash Only',
     filterBankOnly: '🏦 Bank Accounts',
-    filterInvPending: '⏳ Pending Sign-off',
-    filterInvApproved: '✓ Verified & Cleared',
+    filterInvPending: 'Historical unposted',
+    filterInvApproved: 'Recorded',
     noInvestmentsFound: 'No investment records matching current filters',
     investedAmount: 'Invested Amount',
     depositAccount: 'Target Vault / Bank',
     paymentChannel: 'Payment Channel',
-    consensusSignoff: 'Consensus Sign-off',
+    consensusSignoff: 'Recorded by',
 
     // Dashboard - Net Share & KPIs
     netShareBalance: 'My Net Share Balance',
@@ -73,8 +73,8 @@ export const translations = {
     viewPassbookBtn: 'Open Project Statements',
 
     // Expenses, Approvals & Drawing Request
-    expensesBannerTitle: 'Expenses, Approvals & Drawing Request Desk',
-    expensesBannerSubtitle: 'Enroll on-site project expenditures, review approval statuses, and request capital/dividend draws.',
+    expensesBannerTitle: 'Expenses & Drawing Request Desk',
+    expensesBannerSubtitle: 'Record on-site project expenditures (posted immediately) and request capital/dividend draws.',
     enrollExpenseTitle: 'Enroll Project Expenses',
     enrollExpenseDesc: 'Instant spot entry with photo receipt attachment and voice narration note',
     expenseAmount: 'Expense Amount (₹)',
@@ -87,11 +87,11 @@ export const translations = {
     voiceNote: 'Record Voice Memo',
     voiceRecorded: 'Voice Memo (14s ✓)',
     recordingVoice: 'Recording voice...',
-    submitExpenseBtn: 'Submit Expense for Approval',
-    pendingApprovalsTitle: 'Approvals Desk & Submitted Claims',
+    submitExpenseBtn: 'Record Expense',
+    pendingApprovalsTitle: 'Expense Records',
     filterAll: 'All Records',
-    filterPending: 'Pending Approval',
-    filterApproved: 'Approved & Cleared',
+    filterPending: 'Historical unposted',
+    filterApproved: 'Recorded',
     approveBtn: 'Approve Voucher',
     noExpenses: 'No expense records found',
 
@@ -106,8 +106,8 @@ export const translations = {
     availableBalance: 'Available Net Balance',
     priorDraws: 'Prior Cumulative Draws',
     recentDraws: 'Drawing Requests History',
-    statusPending: 'Awaiting Clearance',
-    statusApproved: 'Approved / Disbursed',
+    statusPending: 'Historical unposted',
+    statusApproved: 'Recorded / Disbursed',
     noDrawings: 'No drawing requests submitted yet',
 
     // Plots Tab
@@ -146,26 +146,26 @@ export const translations = {
     // Top Bar 5 Tabs
     tabDashboard: 'డాష్‌బోర్డ్',
     tabInvestments: 'పెట్టుబడి నమోదు & రికార్డులు',
-    tabExpensesApprovals: 'ఖర్చులు, ఆమోదాలు & డ్రాయింగ్ అభ్యర్థన',
+    tabExpensesApprovals: 'ఖర్చులు & డ్రాయింగ్ అభ్యర్థన',
     tabPlots: 'ప్లాట్లు',
     tabStatements: 'ప్రాజెక్ట్ స్టేట్‌మెంట్స్',
 
     // Investment Tab Specific
     enrollInvestmentBtn: '+ పెట్టుబడి నమోదు',
     investmentsBannerTitle: 'సిండికేట్ పెట్టుబడి నమోదు & రికార్డుల డెస్క్',
-    investmentsBannerSubtitle: 'నగదు లేదా బ్యాంకు ద్వారా వ్యక్తిగత పెట్టుబడులను నమోదు చేయండి మరియు ఆమోదాల చరిత్రను చూడండి.',
+    investmentsBannerSubtitle: 'నగదు లేదా బ్యాంకు ద్వారా వ్యక్తిగత పెట్టుబడులను నమోదు చేయండి (వెంటనే పోస్ట్ అవుతుంది) మరియు ఆడిట్ చరిత్రను చూడండి.',
     investmentRecordsHistory: 'పెట్టుబడి రికార్డుల చరిత్ర',
     filterAllInvestments: 'అన్ని రికార్డులు',
     filterMyInvestments: 'నా పెట్టుబడులు',
     filterCashOnly: '💵 నగదు మాత్రమే',
     filterBankOnly: '🏦 బ్యాంక్ బదిలీలు',
-    filterInvPending: '⏳ ఆమోదం కోసం వేచి ఉంది',
-    filterInvApproved: '✓ ఆమోదించబడింది',
+    filterInvPending: 'పాత పోస్ట్ కానివి',
+    filterInvApproved: 'నమోదైనవి',
     noInvestmentsFound: 'ఎటువంటి పెట్టుబడి రికార్డులు కనుగొనబడలేదు',
     investedAmount: 'పెట్టుబడి మొత్తం',
     depositAccount: 'ఖాతా / నగదు ఖజానా',
     paymentChannel: 'చెల్లింపు పద్ధతి',
-    consensusSignoff: 'సిండికేట్ ఆమోదం',
+    consensusSignoff: 'నమోదు చేసినవారు',
 
     // Dashboard - Net Share & KPIs
     netShareBalance: 'నా నికర వాటా బ్యాలెన్స్',
@@ -203,8 +203,8 @@ export const translations = {
     viewPassbookBtn: 'ప్రాజెక్ట్ స్టేట్‌మెంట్స్ చూడండి',
 
     // Expenses, Approvals & Drawing Request
-    expensesBannerTitle: 'ఖర్చులు, ఆమోదాలు & డ్రాయింగ్ అభ్యర్థన డెస్క్',
-    expensesBannerSubtitle: 'సైట్ ఖర్చులను నమోదు చేయండి, ఆమోదాల స్థితిని పరిశీలించండి మరియు డ్రాయింగ్ అభ్యర్థనలు పంపండి.',
+    expensesBannerTitle: 'ఖర్చులు & డ్రాయింగ్ అభ్యర్థన డెస్క్',
+    expensesBannerSubtitle: 'సైట్ ఖర్చులను నమోదు చేయండి (వెంటనే పోస్ట్ అవుతుంది) మరియు డ్రాయింగ్ అభ్యర్థనలు పంపండి.',
     enrollExpenseTitle: 'ప్రాజెక్ట్ ఖర్చు నమోదు చేయండి',
     enrollExpenseDesc: 'ఫోటో రసీదు మరియు వాయిస్ నోట్‌తో తక్షణ ఖర్చు నమోదు',
     expenseAmount: 'ఖర్చు మొత్తం (₹)',
@@ -217,11 +217,11 @@ export const translations = {
     voiceNote: 'వాయిస్ నోట్ రికార్డ్ చేయండి',
     voiceRecorded: 'వాయిస్ నోట్ (14 సెకన్లు ✓)',
     recordingVoice: 'వాయిస్ రికార్డ్ అవుతోంది...',
-    submitExpenseBtn: 'ఆమోదం కొరకు సమర్పించండి',
-    pendingApprovalsTitle: 'సమర్పించిన ఖర్చులు & ఆమోదాల స్థితి',
+    submitExpenseBtn: 'ఖర్చు నమోదు చేయండి',
+    pendingApprovalsTitle: 'ఖర్చుల రికార్డులు',
     filterAll: 'అన్ని రికార్డులు',
-    filterPending: 'ఆమోదం పెండింగ్‌లో ఉంది',
-    filterApproved: 'ఆమోదించబడింది',
+    filterPending: 'పాత పోస్ట్ కానివి',
+    filterApproved: 'నమోదైనవి',
     approveBtn: 'ఆమోదించండి',
     noExpenses: 'ఖర్చుల రికార్డులు ఏవీ లేవు',
 
@@ -236,8 +236,8 @@ export const translations = {
     availableBalance: 'అందుబాటులో ఉన్న నికర బ్యాలెన్స్',
     priorDraws: 'గతంలో తీసుకున్న మొత్తం డ్రాయింగ్స్',
     recentDraws: 'డ్రాయింగ్ అభ్యర్థనల చరిత్ర',
-    statusPending: 'ఆమోదం కొరకు వేచి ఉంది',
-    statusApproved: 'ఆమోదించబడింది / చెల్లించబడింది',
+    statusPending: 'పాత పోస్ట్ కానివి',
+    statusApproved: 'నమోదైంది / చెల్లించబడింది',
     noDrawings: 'ఇంకా డ్రాయింగ్ అభ్యర్థనలు ఏవీ లేవు',
 
     // Plots Tab

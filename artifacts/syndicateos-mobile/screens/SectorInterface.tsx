@@ -412,22 +412,29 @@ function screenRole(sc: { key: string; components: ConfigComponent[] }): string 
   if (keys.length && keys.every((k) => k === 'erp-resource') && res.every((r) => ['accounts', 'expenses', 'investments', 'drawings', 'transactions', 'settlements'].includes(r))) return 'removed';
   return null;
 }
-/** Known legacy duplicates that the current web app does not render on these screens (bespoke view already covers them). Anything else configured is kept. */
-const LEGACY_DUPES: Record<string, { bespoke: string; keys?: string[]; resources?: string[] }> = {
-  dashboard: { bespoke: 'erp-dashboard', keys: ['erp-plan'] },
-  partners: { bespoke: 'erp-equity', resources: ['partner-profiles', 'investments'] },
-  open_plotting: { bespoke: 'erp-layout', keys: ['erp-plan'], resources: ['plots'] },
+/**
+ * Legacy components that V4__original_dashboard_configuration.sql attaches to the core screens but the current web app
+ * does not render there (setup/edit/add happen in explicit dialogs; audit and bookings live inside the bespoke views).
+ * Only these exact keys/resources are hidden; any other configured or custom component is kept. Config is untouched.
+ */
+const LEGACY: Record<string, { keys: string[]; resources: string[]; ifBespoke?: { key: string; resources: string[] } }> = {
+  dashboard: { keys: ['erp-plan', 'project-form'], resources: ['documents', 'drawings'] },
+  partners: { keys: ['partner-form'], resources: ['partner-profiles', 'investments'] },
+  open_plotting: { keys: ['erp-plan'], resources: ['bookings'], ifBespoke: { key: 'erp-layout', resources: ['plots'] } },
+  statement: { keys: ['erp-audit'], resources: [] },
 };
-/** Removes only known duplicate legacy renderings from current bespoke screens. Config is untouched. */
 export function visibleComponents(sc: { key: string; components: ConfigComponent[] }): ConfigComponent[] {
   const r = screenRole(sc);
-  const rule = r ? LEGACY_DUPES[r] : undefined;
-  if (!rule || !sc.components.some((x) => x.key === rule.bespoke)) return sc.components;
+  const rule = r ? LEGACY[r] : undefined;
+  if (!rule) return sc.components;
+  const bespoke = !!rule.ifBespoke && sc.components.some((x) => x.key === rule.ifBespoke!.key);
   return sc.components.filter((x) => {
     const k = x.key as string;
-    if (rule.keys?.includes(k)) return false;
-    if (k === 'erp-resource' && rule.resources?.includes(String((x.props as Record<string, unknown> | undefined)?.resource ?? ''))) return false;
-    return true;
+    if (rule.keys.includes(k)) return false;
+    if (k !== 'erp-resource') return true;
+    const res = String((x.props as Record<string, unknown> | undefined)?.resource ?? '');
+    if (rule.resources.includes(res)) return false;
+    return !(bespoke && rule.ifBespoke!.resources.includes(res));
   });
 }
 const ACCT_LABEL: Record<string, string> = { dashboard: 'Dashboard', partners: 'Partners & Equity', open_plotting: 'Open Plotting', construction: 'Apartments & Construction', liquor: 'Liquor Vends', statement: 'Project Statement' };

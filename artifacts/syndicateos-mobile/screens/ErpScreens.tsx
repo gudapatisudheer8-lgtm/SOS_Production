@@ -286,7 +286,7 @@ export function RecordForm({ erp, res, rec, ctx, onDone, fixed }: { erp: Project
 
 const nice = (r: ErpResource) => (r.kind === 'accounts' ? 'project bank account' : r.kind === 'partner-profiles' ? 'partner allocation' : r.title);
 
-/* ---------- record detail with review / delete ---------- */
+/* ---------- record detail with refer-back / correction / delete ---------- */
 export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: ProjectErp; res: ErpResource; rec: ErpRecord; ctx: ErpCtx; onClose: () => void; footer?: React.ReactNode }) {
   const c = useColors();
   const cmd = useErpCommands(erp.projectId);
@@ -317,6 +317,15 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
   return (
     <Dialog title={`${res.title}: ${label(rec)}`} onClose={onClose}>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}><Badge text={recordStateLabel(rec.status)} tone={tone(rec.status)} />{rec.data.status ? <Badge text={str(rec.data.status)} tone={tone(str(rec.data.status))} /> : null}</View>
+      {entry?.correctionReason ? <Banner tone="warn" title="Referred back" text={String(entry.correctionReason)} /> : null}
+      {msg ? <Banner tone="error" title="Action refused" text={msg} /> : null}
+      {entry?.canReferBack ? <Btn testID="detail-refer-back" label="Refer Back" icon="corner-up-left" variant="ghost" onPress={() => setRefer(true)} disabled={busy} /> : null}
+      {refer ? <View>
+        <Banner tone="warn" title="Reverse and return for correction" text="The original journal is preserved. Its balance effect is reversed and the original author can correct and resubmit it." />
+        <Field label="Reason *" value={reason} onChangeText={setReason} multiline />
+        <Btn label="Confirm Refer Back" loading={busy} disabled={!reason.trim()} onPress={() => void act(() => cmd.referBack(rec.id, rec.revision, reason.trim(), requestId))} />
+      </View> : null}
+      {entry?.canResubmit ? <Btn label="Correct & Resubmit" onPress={() => setEdit(true)} disabled={busy} /> : null}
       {res.fields.filter((f) => !/attachmentid$/i.test(f.key) && (f as XField).ui !== 'hidden').map((f) => (
         <View key={f.key} style={{ marginBottom: 10 }}>
           <Label>{f.label}</Label>
@@ -325,14 +334,6 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
       ))}
       {attKeys.map((k) => <AttachmentView key={k} projectId={erp.projectId} id={str(rec.data[k])} label={k === 'voiceAttachmentId' ? 'Voice memo' : k === 'receiptAttachmentId' ? 'Photo voucher / bill' : 'Document'} />)}
       <Text style={{ color: c.mutedForeground, fontSize: 12, marginVertical: 6 }}>Created {rec.createdAt.slice(0, 16).replace('T', ' ')}{creator ? ` by ${creator}` : ''} · revision {rec.revision}</Text>
-      {msg ? <Banner tone="error" title="Action refused" text={msg} /> : null}
-      {entry?.canReferBack ? <Btn label="Refer Back" variant="ghost" onPress={() => setRefer(true)} disabled={busy} /> : null}
-      {refer ? <View>
-        <Banner tone="warn" title="Reverse and return for correction" text="The original journal is preserved. Its balance effect is reversed and the original author can correct and resubmit it." />
-        <Field label="Reason *" value={reason} onChangeText={setReason} multiline />
-        <Btn label="Confirm Refer Back" loading={busy} disabled={!reason.trim()} onPress={() => void act(() => cmd.referBack(rec.id, rec.revision, reason.trim(), requestId))} />
-      </View> : null}
-      {entry?.canResubmit ? <Btn label="Correct & Resubmit" onPress={() => setEdit(true)} disabled={busy} /> : null}
       {res.canManage && rec.status !== 'deleted' && !FINANCIAL.includes(res.kind) ? (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
           <View style={{ flex: 1 }}><Btn label="Edit" variant="ghost" icon="edit-2" onPress={() => setEdit(true)} /></View>
