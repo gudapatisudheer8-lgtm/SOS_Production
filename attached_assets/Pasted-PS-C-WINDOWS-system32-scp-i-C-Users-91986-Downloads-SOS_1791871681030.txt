@@ -1,0 +1,158 @@
+PS C:\WINDOWS\system32> scp -i "C:\Users\91986\Downloads\SOS.pem" "C:\Users\91986\Downloads\sos-consolidated-20261013-registration-label.tar.gz" ubuntu@3.111.185.116:/home/ubuntu/
+sos-consolidated-20261013-registration-label.tar.gz                                   100%   35MB   2.6MB/s   00:13
+PS C:\WINDOWS\system32> ssh -i C:\Users\91986\Downloads\SOS.pem ubuntu@3.111.185.116
+Welcome to Ubuntu 26.04 LTS (GNU/Linux 7.0.0-1014-aws x86_64)
+
+ * Documentation:  https://docs.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Oct 13 06:06:41 UTC 2026
+
+  System load:  0.0               Temperature:           -273.1 C
+  Usage of /:   66.4% of 6.61GB   Processes:             122
+  Memory usage: 49%               Users logged in:       0
+  Swap usage:   0%                IPv4 address for ens5: 172.31.13.52
+
+ * Ubuntu Pro delivers the most comprehensive open source security and
+   compliance features.
+
+   https://ubuntu.com/aws/pro
+
+Expanded Security Maintenance for Applications is not enabled.
+
+49 updates can be applied immediately.
+2 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Tue Oct 13 05:43:29 2026 from 49.206.43.18
+ubuntu@ip-172-31-13-52:~$ (
+  set -eu
+  cd /home/ubuntu
+
+  printf '%s  %s\n' \
+    'b4cd104a25de882aea94e622483eb6dd179cba4e38a0e8c8678cdaaa806f9c7b' \
+    'sos-consolidated-20261013-registration-label.tar.gz' | sha256sum -c -
+
+  WORK=$(mktemp -d /home/ubuntu/sos-consolidated-20261013-registration-label.XXXXXX)
+
+  tar -xzf sos-consolidated-20261013-registration-label.tar.gz -C "$WORK"
+  cd "$WORK/sos-consolidated-20261013-registration-label"
+
+  sha256sum -c FILES.sha256
+  sudo python3 update.py inspect
+  sudo python3 update.py install
+)
+sos-consolidated-20261013-registration-label.tar.gz: OK
+README.md: OK
+SOURCE-FINGERPRINTS.json: OK
+generate-web-push-credentials.mjs: OK
+migrations/V10__web_business_masters.sql: OK
+migrations/V11__reconcile_extent_unit_masters.sql: OK
+migrations/V12__subscription_plan_masters.sql: OK
+migrations/V13__project_cash_accounts.sql: OK
+migrations/V14__project_bank_institutions.sql: OK
+migrations/V15__project_layout_utility_areas.sql: OK
+migrations/V16__personal_marketing_access.sql: OK
+migrations/V17__expense_payment_mode_bindings.sql: OK
+migrations/V18__financial_payment_bindings.sql: OK
+migrations/V19__no_partner_self_approval_policy.sql: OK
+migrations/V1__onboarding_and_configuration.sql: OK
+migrations/V20__reviewed_project_blueprints.sql: OK
+migrations/V21__direct_posting_and_corrections.sql: OK
+migrations/V22__registration_reminders.sql: OK
+migrations/V2__initial_sector_configuration.sql: OK
+migrations/V3__project_erp_core.sql: OK
+migrations/V4__original_dashboard_configuration.sql: OK
+migrations/V5__private_project_attachments.sql: OK
+migrations/V6__complete_project_setup.sql: OK
+migrations/V7__reconcile_booking_reservations.sql: OK
+migrations/V8__simple_open_plotting_forms.sql: OK
+migrations/V9__business_masters_and_profile_metadata.sql: OK
+permissions.sql: OK
+sos-api.jar: OK
+update.json: OK
+update.py: OK
+web/assets/index-BIRQFXvO.css: OK
+web/assets/index-CyCfHk9Z.js: OK
+web/favicon.svg: OK
+web/index.html: OK
+web/registration-push-sw.js: OK
+web/release.json: OK
+web/robots.txt: OK
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Package, existing installation, runtime target, Java, Nginx and setup port verified.
+Database credentials/history and pg_dump compatibility are checked before install stops anything.
+No service, credential, upload or database changes made.
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Existing sos_deploy database password (hidden):
+Brief downtime; back up lowercase sos and uploads, then upgrade to V22. Type UPDATE SOS: update sos
+Private recovery directory: /opt/syndicateos-update-backups/sos-consolidated-20261013-registration-label-20261013T060720050860Z
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.16)
+
+2026-10-13T06:07:22.806Z  INFO 8237 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Starting SosApplication v0.1.0 using Java 21.0.12.1 with PID 8237 (/opt/syndicateos/releases/sos-consolidated-20261013-registration-label/sos-api.jar started by root in /opt/syndicateos/releases/sos-consolidated-20261013-registration-label)
+2026-10-13T06:07:22.814Z  INFO 8237 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-10-13T06:07:25.313Z  INFO 8237 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8091 (http)
+2026-10-13T06:07:25.336Z  INFO 8237 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-10-13T06:07:25.337Z  INFO 8237 --- [syndicateos-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-10-13T06:07:25.375Z  INFO 8237 --- [syndicateos-api] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-10-13T06:07:25.377Z  INFO 8237 --- [syndicateos-api] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2439 ms
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+2026-10-13T06:07:28.136Z  INFO 8237 --- [syndicateos-api] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8091 (http) with context path '/'
+2026-10-13T06:07:28.169Z  INFO 8237 --- [syndicateos-api] [           main] com.syndicateos.SosApplication           : Started SosApplication in 6.39 seconds (process running for 7.341)
+2026-10-13T06:07:29.131Z  INFO 8237 --- [syndicateos-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://krishisetu-db.cpmomccww28x.ap-south-1.rds.amazonaws.com:5432/sos?sslmode=verify-full&sslrootcert=/opt/syndicateos/current/certs/aws-rds-global-bundle.pem&connectTimeout=3&socketTimeout=5&ApplicationName=SOS (PostgreSQL 16.12)
+2026-10-13T06:07:29.240Z  INFO 8237 --- [syndicateos-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 23 migrations (execution time 00:00.073s)
+2026-10-13T06:07:29.382Z  INFO 8237 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "sos": 22
+2026-10-13T06:07:29.394Z  INFO 8237 --- [syndicateos-api] [           main] o.f.core.internal.command.DbMigrate      : Schema "sos" is up to date. No migration necessary.
+2026-10-13T06:07:30.339Z  INFO 8237 --- [syndicateos-api] [           main] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-13T06:07:30.341Z  INFO 8237 --- [syndicateos-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+BEGIN
+DO
+GRANT
+GRANT
+GRANT
+REVOKE
+GRANT
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+COMMIT
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Verified sos-consolidated-20261013-registration-label: correct API binary, readiness and HTTPS frontend.
+Schema V22 verified. Existing owner, firm assignments, credentials and uploads preserved.
+Original checksummed deployment preserved. Complete README.md signed-in acceptance checks.
+Permanent verifier: /opt/syndicateos/releases/sos-consolidated-20261013-registration-label/update.py
+ubuntu@ip-172-31-13-52:~$ sudo python3 /opt/syndicateos/releases/sos-consolidated-20261013-registration-label/update.py verify
+
+sudo systemctl is-active syndicateos-api
+
+curl --fail --silent --show-error https://sos.krishisetu9.in/release.json
+
+curl --fail --silent --show-error https://sos.krishisetu9.in/api/readyz
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Verified sos-consolidated-20261013-registration-label: correct API binary, readiness and HTTPS frontend.
+active
+{
+  "release": "sos-fresh-ec2-20261010",
+  "schema_version": "22",
+  "frontend_base": "/",
+  "frontend_fix": "sos-consolidated-20261013-registration-label",
+  "api_sha256": "33e2b33ab621a2802728e8cc13a9fb2add77da259e281b083ff9b490dd4f882d"
+}
+{"status":"ready","databaseReachable":true,"targetVerified":true,"reason":"READY"}ubuntu@ip-172-31-13-52:~$
