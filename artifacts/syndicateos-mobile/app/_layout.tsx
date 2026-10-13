@@ -15,7 +15,7 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, queryClient } from '@/lib/session';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Image, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -45,9 +45,9 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.hero, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <ActivityIndicator color={colors.heroForeground} size="large" />
-        <Text style={{ color: colors.heroForeground, fontSize: 16 }}>Preparing SyndicateOS…</Text>
+      <View accessible accessibilityLabel="Loading SyndicateOS" style={{ flex: 1, backgroundColor: '#f6f4ec', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+        <Image source={require('@/assets/brand/logo-stacked.png')} resizeMode="contain" style={{ width: 220, height: 131 }} />
+        <ActivityIndicator color="#d97706" size="small" />
       </View>
     );
   }

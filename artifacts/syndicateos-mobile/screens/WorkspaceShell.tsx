@@ -61,7 +61,7 @@ export function WorkspaceShell({ mode, bell }: { mode: 'owner' | 'client'; bell?
 
   const head = (
     <View>
-      <BrandLogo width={wide ? 150 : 116} />
+      <BrandLogo layout="horizontal" width={wide ? 150 : 116} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
         <Text numberOfLines={1} style={{ color: c.heroForeground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{firm ? firm.name : owner ? 'Owner console' : 'Workspace'}</Text>
       </View>

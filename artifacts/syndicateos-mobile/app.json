@@ -9,19 +9,33 @@
     "userInterfaceStyle": "automatic",
     "splash": {
       "backgroundColor": "#f6f4ec",
-      "image": "./assets/brand/icon.png",
+      "image": "./assets/brand/logo-stacked.png",
       "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": false
     },
-    "android": {},
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/adaptive-foreground.png",
+        "backgroundColor": "#F59E0B"
+      }
+    },
     "web": {
-      "favicon": "./assets/brand/icon.png"
+      "favicon": "./assets/brand/mark.png"
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand/logo-stacked.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#f6f4ec"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

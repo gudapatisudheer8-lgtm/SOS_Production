@@ -5,26 +5,28 @@ import { View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
 const horizontal = require('@/assets/brand/logo-horizontal.png');
-const icon = require('@/assets/brand/icon.png');
+const stacked = require('@/assets/brand/logo-stacked.png');
+const mark = require('@/assets/brand/mark.png');
 
-/** Official horizontal logo on a pale backplate (navy wordmark needs a light surface, also in dark mode). */
-export function BrandLogo({ width = 220, plate = true }: { width?: number; plate?: boolean }) {
+/** Official orange/black SyndicateOS logo (static PNG rendered from Inter Black, identical on web and native).
+ *  Default is the stacked welcome lockup; pass layout="horizontal" for constrained header slots. */
+export function BrandLogo({ width = 220, plate = true, layout = 'stacked' }: { width?: number; plate?: boolean; layout?: 'stacked' | 'horizontal' }) {
   const pad = plate ? Math.round(width * 0.06) : 0;
   return (
     <View
       accessible
       accessibilityRole="image"
       accessibilityLabel="SyndicateOS"
-      style={plate ? { backgroundColor: '#f6f4ec', borderRadius: 14, padding: pad, paddingHorizontal: pad * 1.5 } : undefined}
+      style={plate ? { backgroundColor: '#f6f4ec', borderRadius: 14, padding: pad, paddingHorizontal: pad * 1.5, alignSelf: layout === 'stacked' ? 'center' : 'flex-start' } : undefined}
     >
-      <Image source={horizontal} contentFit="contain" style={{ width, aspectRatio: 1399 / 364 }} accessibilityLabel="SyndicateOS" />
+      <Image source={layout === 'stacked' ? stacked : horizontal} contentFit="contain" style={{ width, aspectRatio: layout === 'stacked' ? 1180 / 703 : 1086 / 224 }} accessibilityLabel="SyndicateOS" />
     </View>
   );
 }
 
-/** Icon-only mark for compact headers. */
+/** Icon-only orange SOS mark for compact headers. */
 export function BrandMark({ size = 32 }: { size?: number }) {
-  return <Image source={icon} contentFit="contain" style={{ width: size, height: size, borderRadius: size * 0.22 }} accessibilityLabel="SyndicateOS" />;
+  return <Image source={mark} contentFit="contain" style={{ width: size, height: size }} accessibilityLabel="SyndicateOS" />;
 }
 
 /** Soft ivory to pale blue backdrop with restrained decoration. */
