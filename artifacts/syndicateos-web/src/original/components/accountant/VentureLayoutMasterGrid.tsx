@@ -142,6 +142,7 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
     const isAvailable = plot.status === 'available';
     const isBlocked = plot.status === 'blocked';
     const isReserved = plot.status === 'reserved';
+    const registrationBooked = isReserved && plot.registrationState === 'scheduled';
     const isSold = plot.status === 'sold';
     const hasPendingProposal = plot.marketingRequest && plot.marketingRequest.status === 'pending';
     const currentRate = isBlocked && plot.blockedRate ? plot.blockedRate : plot.ratePerSqYard;
@@ -187,17 +188,19 @@ export const VentureLayoutMasterGrid: React.FC<VentureLayoutMasterGridProps> = (
           </div>
 
           <span
-            className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+            className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full text-center leading-tight max-w-[145px] ${
               isAvailable
                 ? 'bg-emerald-100 text-emerald-800'
                 : isBlocked
                 ? 'bg-amber-400 text-slate-950'
+                : registrationBooked
+                ? 'bg-violet-100 text-violet-900 border border-violet-300'
                 : isReserved
                 ? 'bg-amber-100 text-amber-900'
                 : 'bg-red-100 text-red-800'
             }`}
           >
-            {isAvailable ? 'Available' : isBlocked ? '🔒 Blocked' : isReserved ? 'Token Booked' : 'Sold'}
+            {isAvailable ? 'Available' : isBlocked ? '🔒 Blocked' : registrationBooked ? 'Slot booked for registration' : isReserved ? 'Token Booked' : 'Sold'}
           </span>
         </div>
 

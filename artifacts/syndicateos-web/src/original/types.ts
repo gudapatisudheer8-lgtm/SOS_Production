@@ -235,6 +235,7 @@ export interface Plot {
   paymentRefNumber?: string;
   bookedAt?: string;
   paymentMilestone?: 'Token Advance' | 'Sale Agreement' | 'Registration Pending' | 'Registered & Cleared';
+  registrationState?: 'none' | 'scheduled' | 'cancelled' | 'completed';
   notes?: string;
   officialDocValue?: number; // Stamp duty guideline value for official tax book
   discountApprovedBy?: string; // If sold below floor price

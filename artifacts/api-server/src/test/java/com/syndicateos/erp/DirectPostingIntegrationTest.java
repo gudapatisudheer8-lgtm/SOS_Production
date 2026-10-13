@@ -295,6 +295,12 @@ class DirectPostingIntegrationTest {
             "location","District sub-registrar office","reminderMinutes",List.of(1440,60)));
     }
     private int count(String table,UUID project) { return jdbc.queryForObject("SELECT count(*) FROM sos."+table+" WHERE project_id=?",Integer.class,project); }
+    @SuppressWarnings("unchecked")
+    private String projectedRegistrationState(Fixture f,UUID plot,SessionAccount actor) {
+        var records=(List<Map<String,Object>>)service.read(actor,f.project).get("records");
+        var record=records.stream().filter(r->plot.equals(r.get("id"))).findFirst().orElseThrow();
+        return ((JsonNode)record.get("data")).path("registrationState").asText();
+    }
     @Test void registrationIsIndependentIdempotentScopedAndRestartSafe() {
         var f=fixture(); UUID plot=paymentPlot(f);
         UUID booking=save(f,"bookings",plotPayment(f,plot,100000),UUID.randomUUID(),f.accountant);
@@ -302,6 +308,8 @@ class DirectPostingIntegrationTest {
         String money=paymentSummary(f,plot).toString();
         var input=registrationInput(0,java.time.Instant.now().plusSeconds(3*86400),"save");
         JsonNode slot=(JsonNode)registrations.save(f.partner,f.project,plot,input).get("appointment");
+        assertEquals("scheduled",projectedRegistrationState(f,plot,f.partner));
+        assertEquals("scheduled",projectedRegistrationState(f,plot,f.accountant));
         assertEquals(1,slot.path("revision").asInt());
         assertEquals("scheduled",slot.path("state").asText());
         assertEquals(slot,registrations.save(f.partner,f.project,plot,input).get("appointment"));
@@ -332,6 +340,8 @@ class DirectPostingIntegrationTest {
         registrations.save(f.partner,f.project,plot,registrationInput(2,java.time.Instant.now().plusSeconds(2*3600),"cancel"));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sos.registration_jobs WHERE inventory_id=? AND state='pending'",Integer.class,plot));
         assertEquals("cancelled",((JsonNode)registrations.read(f.partner,f.project,plot).get("appointment")).path("state").asText());
+        assertEquals("cancelled",projectedRegistrationState(f,plot,f.partner));
+        assertEquals("cancelled",projectedRegistrationState(f,plot,f.accountant));
         assertEquals(records,count("erp_records",f.project)); assertEquals(postings,count("erp_postings",f.project)); balance(f,"101000");
     }
     @Autowired com.syndicateos.configuration.ConfigurationService configuration;

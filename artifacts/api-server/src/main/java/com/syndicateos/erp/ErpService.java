@@ -54,8 +54,12 @@ public class ErpService {
                     "canCreate",writable&&role(r,"submit_roles",actor.role()),"canManage",writable&&role(r,"manage_roles",actor.role()),
                     "canReview",false,"canReviewOwn",false));
             List<Map<String,Object>> records=new ArrayList<>();
-            for(var r:jdbc.queryForList("SELECT e.*,i.display_name AS creator_name FROM sos.erp_records e JOIN sos.identities i ON i.id=e.created_by WHERE e.project_id=? AND e.status<>'deleted' ORDER BY e.created_at DESC",project)) {
+            for(var r:jdbc.queryForList("SELECT e.*,i.display_name AS creator_name,pr.state AS registration_state FROM sos.erp_records e JOIN sos.identities i ON i.id=e.created_by LEFT JOIN sos.plot_registrations pr ON pr.inventory_id=e.id WHERE e.project_id=? AND e.status<>'deleted' ORDER BY e.created_at DESC",project)) {
                 ObjectNode recordData=(ObjectNode)parse(r.get("data"));
+                // Read-only projection of the saved appointment, not the payment milestone.
+                // Cancellation can leave that milestone unchanged; it must still clear the badge.
+                if("plots".equals(r.get("kind"))) recordData.put("registrationState",
+                    r.get("registration_state")==null?"none":r.get("registration_state").toString());
                 if("accounts".equals(r.get("kind"))) recordData.put("isDefaultCash",cash.isDefault((UUID)r.get("id")));
                 if("PARTNER".equals(actor.role())&&"accounts".equals(r.get("kind"))&&recordData.hasNonNull("accountNumber")) {
                     String number=recordData.path("accountNumber").asText();

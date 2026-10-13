@@ -47,6 +47,27 @@ const render = (project, inputPlots = plots) => renderToStaticMarkup(
   }),
 );
 
+test('saved registration slots replace only the reserved plot badge with purple', () => {
+  const booked = { ...plots[0], status: 'reserved', registrationState: 'scheduled' };
+  const badgeArea = (p) => {
+    const html = render(projectA, [p]);
+    const start = html.indexOf('data-testid="venture-plot-card"');
+    return html.slice(start, html.indexOf('Plot road width:', start));
+  };
+  const scheduled = badgeArea(booked);
+  assert.ok(scheduled.includes('Slot booked for registration'));
+  assert.ok(scheduled.includes('bg-violet-100 text-violet-900'));
+  assert.ok(!scheduled.includes('Token Booked'));
+  for (const state of ['none', 'cancelled', 'completed', undefined]) {
+    const html = badgeArea({ ...booked, registrationState: state, paymentMilestone: 'Registration Pending' });
+    assert.ok(html.includes('Token Booked'));
+    assert.ok(!html.includes('Slot booked for registration'));
+  }
+  for (const status of ['available', 'blocked', 'sold']) {
+    assert.ok(!badgeArea({ ...booked, status }).includes('Slot booked for registration'));
+  }
+});
+
 test('switching A → B → A keeps approach and plot widths project-specific', () => {
   for (const project of [projectA, projectB, projectA]) {
     const html = render(project);
