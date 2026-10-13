@@ -1,12 +1,14 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useMemo, useState, useSyncExternalStore } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Image, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import type { ErpField, ErpRecord, ErpResource, Project, ProjectErp, SessionAccount } from '@workspace/api-client-react';
 import { Badge, Banner, Btn, Card, Chips, Confirm, Empty, Field, Label, Skeleton } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
+import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { T, type Lang, type TKey } from '@/lib/i18n';
 import { newRequestId, useErp, useErpCommands } from '@/lib/erp';
 import { errMessage } from '@/lib/session';
+import { exportText, printTable } from '@/lib/exportFile';
 import { attachmentsSupported, fetchAttachmentBlob, pickFile, saveBlob, startRecording, uploadAttachment, type Recorder } from '@/lib/attachments';
 
 /* ---------- language store (partner en/te) ---------- */
@@ -63,26 +65,45 @@ export function recLabel(recs: ErpRecord[], id: unknown): string {
 export function csvOf(rows: string[][]): string {
   return rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
 }
-export function downloadText(name: string, text: string, mime: string): string | null {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') return 'File export is available on web only in this build.';
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type: mime }));
-  a.download = name;
-  a.click();
-  return null;
+/** Device-supported text export (browser download on web, share sheet on native). Resolves to an error note or null. */
+export async function downloadText(name: string, text: string, mime: string): Promise<string | null> {
+  try { await exportText(name, text, mime); return null; } catch (e) { return `Export failed: ${errMessage(e)}`; }
+}
+
+const DialogCtx = createContext<{ set: (n: React.ReactNode) => void; close: () => void } | null>(null);
+
+/** Renders its children in the enclosing Dialog's pinned footer (outside the scroll area), with a Cancel button. */
+export function DialogFooter({ children }: { children: React.ReactNode }) {
+  const ctx = useContext(DialogCtx);
+  const c = useColors();
+  const node = useMemo(() => (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      {ctx ? <View style={{ flex: 1 }}><Btn label="Cancel" variant="ghost" onPress={ctx.close} /></View> : null}
+      <View style={{ flex: ctx ? 2 : 1 }}>{children}</View>
+    </View>
+  ), [ctx, children]);
+  useEffect(() => { ctx?.set(node); }, [ctx, node]);
+  useEffect(() => () => ctx?.set(null), [ctx]);
+  if (ctx) return null;
+  return <View style={{ borderTopWidth: 1, borderColor: c.border, paddingTop: 10 }}>{node}</View>;
 }
 
 export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const c = useColors();
+  const [footer, setFooter] = useState<React.ReactNode>(null);
+  const ctx = useMemo(() => ({ set: setFooter, close: onClose }), [onClose]);
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 12 }}>
-        <View style={{ backgroundColor: c.card, borderRadius: 18, maxHeight: '92%', width: '100%', maxWidth: 560, alignSelf: 'center', borderWidth: 1, borderColor: c.border }}>
+        <View style={{ backgroundColor: c.card, borderRadius: 18, maxHeight: '92%', width: '100%', maxWidth: 560, alignSelf: 'center', borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingBottom: 8 }}>
-            <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 17, flex: 1 }}>{title}</Text>
-            <Pressable onPress={onClose} accessibilityLabel="Close" hitSlop={10}><Feather name="x" size={20} color={c.foreground} /></Pressable>
+            <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 17, flex: 1 }} accessibilityRole="header">{title}</Text>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10}><Feather name="x" size={20} color={c.foreground} /></Pressable>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 8 }} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+          <DialogCtx.Provider value={ctx}>
+            <KeyboardAwareScrollViewCompat style={{ flexShrink: 1 }} contentContainerStyle={{ padding: 16, paddingTop: 8, paddingBottom: 20 }} bottomOffset={footer ? 90 : 24} keyboardShouldPersistTaps="handled">{children}</KeyboardAwareScrollViewCompat>
+          </DialogCtx.Provider>
+          {footer ? <View style={{ borderTopWidth: 1, borderColor: c.border, padding: 12, backgroundColor: c.card }}>{footer}</View> : null}
         </View>
       </View>
     </Modal>
@@ -258,7 +279,7 @@ export function RecordForm({ erp, res, rec, ctx, onDone, fixed }: { erp: Project
       {needsConfirm ? <Field label="Confirm account number *" value={confirmNo} onChangeText={setConfirmNo} error={errs.confirmAccountNumber} hint="Used only to check for typing mistakes; it is not stored." /> : null}
       {res.kind === 'expenses' && vals.accountId && !hidden({ key: 'accountId', visibleWhen: fields.find((f) => f.key === 'accountId')?.visibleWhen } as ErpField) ? (() => { const b = erp.balances.find((x) => x.accountId === vals.accountId); return <Banner tone="warn" title={`Available balance: ${b ? money(Number(b.balance)) : 'not available'}`} text="This expense debits the selected account as soon as it is recorded." />; })() : null}
       {msg ? <Banner tone="error" title="Not saved" text={msg} /> : null}
-      <Btn label={rec && FINANCIAL.includes(res.kind) ? 'Correct & Resubmit' : rec ? 'Save changes' : `Create ${res.title}`} onPress={submit} loading={busy} />
+      <DialogFooter><Btn label={rec && FINANCIAL.includes(res.kind) ? 'Correct & Resubmit' : rec ? 'Save changes' : `Create ${res.title}`} onPress={submit} loading={busy} /></DialogFooter>
     </View>
   );
 }
@@ -341,12 +362,12 @@ export function ResourceView({ erp, kind, ctx }: { erp: ProjectErp; kind: string
     return !q.trim() || JSON.stringify(r.data).toLowerCase().includes(q.trim().toLowerCase());
   }), [erp.records, kind, q, st, inventory]);
   if (!res) return <Empty icon="slash" title="Not available" text={`"${kind}" is not exposed to your role for this project.`} />;
-  const statuses = inventory ? (res.fields.find((f) => f.key === 'status')?.options ?? Array.from(new Set(erp.records.filter((r) => r.kind === kind).map((r) => str(r.data.status)).filter(Boolean)))) : ['pending', 'approved', 'rejected'];
+  const statuses = inventory ? (res.fields.find((f) => f.key === 'status')?.options ?? Array.from(new Set(erp.records.filter((r) => r.kind === kind).map((r) => str(r.data.status)).filter(Boolean)))) : [];
   const cur = rows.find((r) => r.id === sel) ?? erp.records.find((r) => r.id === sel) ?? null;
   const exportCsv = () => {
     const head = ['id', 'status', ...res.fields.map((f) => f.label)];
     const body = rows.map((r) => [r.id, r.status, ...res.fields.map((f) => (f.kind === 'account' || f.kind === 'inventory' ? recLabel(erp.records, r.data[f.key]) : f.kind === 'partner' ? erp.partners.find((p) => p.id === r.data[f.key])?.name ?? str(r.data[f.key]) : str(r.data[f.key])))]);
-    setNote(downloadText(`${kind}.csv`, csvOf([head, ...body]), 'text/csv'));
+    void downloadText(`${kind}.csv`, csvOf([head, ...body]), 'text/csv').then(setNote);
   };
   return (
     <View>
@@ -361,7 +382,7 @@ export function ResourceView({ erp, kind, ctx }: { erp: ProjectErp; kind: string
       {note ? <Banner tone="warn" title={note} /> : null}
       {!res.canCreate && !res.canManage && !res.canReview ? <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 8 }}>View only for your role.</Text> : null}
       <Field label="Search" value={q} onChangeText={setQ} placeholder="Filter records" />
-      <Chips label="Status" options={[{ value: 'all', label: 'All' }, ...statuses.map((s) => ({ value: s, label: s }))]} value={st} onChange={setSt} />
+      {statuses.length ? <Chips label="Status" options={[{ value: 'all', label: 'All' }, ...statuses.map((s) => ({ value: s, label: s }))]} value={st} onChange={setSt} /> : null}
       {rows.length === 0 ? <Empty icon="inbox" title={`No ${res.title.toLowerCase()} found`} text={erp.records.some((r) => r.kind === kind && live(r)) ? 'No record matches the filters.' : res.canCreate ? 'Use Add to create the first record.' : 'Nothing has been recorded yet.'} /> : grid ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {rows.map((r) => {
@@ -467,8 +488,10 @@ function Statement({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const c = useColors();
   const [note, setNote] = useState<string | null>(null);
   const tx = erp.statement || [];
-  const exportCsv = () => setNote(downloadText('project-statement.csv', csvOf([['Date', 'Account', 'Type', 'Description', 'Amount', 'Posted account movement'], ...tx.map((r) => [r.date, r.accountName, r.type, r.description, r.amount, r.affectsCash ? 'yes' : 'no'])]), 'text/csv'));
-  const print = () => { if (Platform.OS === 'web' && typeof window !== 'undefined') window.print(); else setNote('Printing is available on web only in this build.'); };
+  const sHead = ['Date', 'Account', 'Type', 'Description', 'Amount', 'Posted account movement'];
+  const sBody = () => tx.map((r) => [r.date, r.accountName, r.type, r.description, r.affectsCash ? 'yes' : 'no', String(r.amount)]);
+  const exportCsv = () => void downloadText('project-statement.csv', csvOf([sHead, ...tx.map((r) => [r.date, r.accountName, r.type, r.description, String(r.amount), r.affectsCash ? 'yes' : 'no'])]), 'text/csv').then(setNote);
+  const print = () => void printTable('Project Statement', `${tx.length} entries · generated ${new Date().toLocaleString()}`, ['Date', 'Account', 'Type', 'Description', 'Posted account movement', 'Amount'], sBody()).then(() => setNote(null), (e) => setNote(`Print failed: ${errMessage(e)}`));
   void ctx;
   return (
     <View>

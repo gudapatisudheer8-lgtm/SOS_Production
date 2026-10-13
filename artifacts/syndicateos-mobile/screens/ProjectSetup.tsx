@@ -5,7 +5,9 @@ import { Badge, Banner, Btn, Card, Chips, Confirm, CredentialSheet, Empty, Field
 import { AccountCards, FacingMatrix, PartnerCards, inr, optLabel } from '@/components/SetupSimple';
 import { useColors } from '@/hooks/useColors';
 import { attachmentsSupported, pickFile, uploadAttachment, validateFile } from '@/lib/attachments';
-import { newRequestId } from '@/lib/erp';
+import { newRequestId, useErp } from '@/lib/erp';
+import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
+import { LiveAccountsEditor, LiveMatrixEditor, livePayload, seedAccounts, seedMatrix, type AcctDraft, type Matrix } from '@/screens/ProjectLiveEdit';
 import {
   CONFIRM_KEY, applyDefaults, buildSetup, emptyDraft, hydrate, isVisible, readAccess, readEntity, readSetupConfig, readSetupState,
   equalShares, inventoryPreview, updatePartnerAllocation, reconcilePartnerCapital, num0, rowErrors, validateAll, type NewAccess, type Row, type SetupConfig, type SetupDraft, type SetupField,
@@ -106,6 +108,13 @@ export function ProjectSetup({ items, initialSectorId, existing, onClose, onSave
   const [doneId, setDoneId] = useState<string | null>(null);
   const finalReq = useRef<string | null>(null);
   const lbl = (k: string, d: string) => cfg?.labels[k] ?? d;
+  const erpQ = useErp(existing && readSetupState(existing).state === 'READY' ? existing.id : null);
+  const erp = erpQ.data;
+  const [matrix, setMatrix] = useState<Matrix | null>(null);
+  const [matrixDirty, setMatrixDirty] = useState(false);
+  const [accts, setAccts] = useState<AcctDraft[] | null>(null);
+  useEffect(() => { if (erp && !matrix) setMatrix(seedMatrix(erp)); if (erp && !accts) setAccts(seedAccounts(erp)); }, [erp, matrix, accts]);
+  const hasPlots = !!erp?.resources.some((r) => r.kind === 'plots');
 
   const edit = (fn: (d: SetupDraft) => SetupDraft) => { setDraft(fn); setDirty(true); finalReq.current = null; setMsg(null); };
   const setRow = (key: 'groups' | 'partners' | 'accounts' | 'documents', i: number, k: string, v: unknown) =>
@@ -121,6 +130,7 @@ export function ProjectSetup({ items, initialSectorId, existing, onClose, onSave
     ...(cfg.partnerFields.length ? [{ key: 'partners', title: lbl('partners', 'Partners & equity') }] : []),
     ...(cfg.accountFields.length ? [{ key: 'accounts', title: lbl('accounts', 'Project accounts') }] : []),
     ...(cfg.settingsFields.some((f) => (f as SetupField & { ui?: string }).ui !== 'hidden') ? [{ key: 'settings', title: 'Settings' }] : []),
+    ...(existing && state === 'READY' ? [{ key: 'live', title: 'Plots & bank accounts' }] : []),
     { key: 'review', title: 'Review' },
   ] : [];
 
@@ -171,9 +181,11 @@ export function ProjectSetup({ items, initialSectorId, existing, onClose, onSave
       const snapshot = previous && typeof previous === 'object' ? previous as Record<string, unknown> : {};
       for (const key of ['groups', 'partners', 'accounts', 'documents']) payload[key] = Array.isArray(snapshot[key]) ? snapshot[key] : [];
     }
+    const live = ready && existing && erp ? livePayload(erp, hasPlots && matrixDirty ? matrix : null, accts ?? []) : {};
     const res = await run('project.setup-save', {
-      sectorId, reviewedReleaseId: item?.releaseId, ...(projectId ? { projectId, revision } : {}), requestId: newRequestId(), setup: payload,
+      sectorId, reviewedReleaseId: item?.releaseId, ...(projectId ? { projectId, revision } : {}), requestId: newRequestId(), setup: payload, ...live,
     });
+    if (ready && erp) { setMatrixDirty(false); setMatrix(null); setAccts(null); void erpQ.refetch(); }
     const ent = readEntity(res);
     setProjectId(ent.id); setRevision(ent.revision); setState((ent.setupState as 'DRAFT' | 'READY' | undefined) ?? state); setDirty(false);
     return ent;
@@ -309,6 +321,15 @@ export function ProjectSetup({ items, initialSectorId, existing, onClose, onSave
     if (key === 'settings') {
       return <Card>{cfg.settingsFields.filter((f) => (f as SetupField & { ui?: string }).ui !== 'hidden').map((f) => <SField key={f.key} f={f} row={draft.settings} error={errs[`settings.${f.key}`]} onChange={(v) => edit((d) => ({ ...d, settings: { ...d.settings, [f.key]: v } }))} />)}</Card>;
     }
+    if (key === 'live') {
+      if (!erp) return <Banner tone={erpQ.isError ? 'error' : 'warn'} title={erpQ.isError ? 'Saved plots and accounts could not load' : 'Loading saved plots and accounts'} text={erpQ.isError ? errMessage(erpQ.error) : undefined} />;
+      return (
+        <View>
+          {hasPlots && matrix ? <LiveMatrixEditor matrix={matrix} onChange={(m) => { setMatrix(m); setMatrixDirty(true); setDirty(true); }} /> : null}
+          {accts ? <LiveAccountsEditor erp={erp} accts={accts} onChange={(a) => { setAccts(a); setDirty(true); }} /> : null}
+        </View>
+      );
+    }
     if (key === 'review') {
       const list = Object.entries(errs);
       return (
@@ -358,7 +379,7 @@ export function ProjectSetup({ items, initialSectorId, existing, onClose, onSave
             </ScrollView>
           ) : null}
         </View>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollViewCompat style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} bottomOffset={90} keyboardShouldPersistTaps="handled">
           {!cfg ? <Banner tone="error" title="Project setup is not configured" text={parsed.error ?? ''} /> : null}
           {shown.map((k) => (
             <View key={k} style={{ marginBottom: 16 }}>
@@ -366,7 +387,7 @@ export function ProjectSetup({ items, initialSectorId, existing, onClose, onSave
               {body(k)}
             </View>
           ))}
-        </ScrollView>
+        </KeyboardAwareScrollViewCompat>
         <View style={{ padding: 12, borderTopWidth: 1, borderColor: c.border, gap: 8 }}>
           {msg ? <Banner tone={msg.ok ? 'ok' : 'error'} title={msg.text} /> : null}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

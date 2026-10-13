@@ -1,20 +1,23 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/Brand';
-import { Banner, Btn, Skeleton } from '@/components/ui';
+import { Banner, Btn, Field, Skeleton } from '@/components/ui';
+import { changeCredential } from '@workspace/api-client-react';
+import { setLang, useLang } from '@/screens/ErpScreens';
 import { useColors } from '@/hooks/useColors';
 import { errMessage, isUnavailable, useAuth } from '@/lib/session';
 import { useWorkspace } from '@/lib/workspace';
 import { OwnerFirms } from '@/screens/OwnerFirms';
 import { OwnerSectors } from '@/screens/OwnerSectors';
-import { SectorWorkspace } from '@/screens/SectorInterface';
+import { SectorWorkspace, type Frame } from '@/screens/SectorInterface';
+import { NativeNotificationBell } from '@/screens/NativeNotificationBell';
 
 type Tab = 'firms' | 'sectors' | 'work';
 
 /** mode 'owner' renders management only; 'client' renders only the sector workspace. */
-export function WorkspaceShell({ mode }: { mode: 'owner' | 'client' }) {
+export function WorkspaceShell({ mode, bell }: { mode: 'owner' | 'client'; bell?: React.ReactNode }) {
   const c = useColors();
   const { account, signOut } = useAuth();
   const { width } = useWindowDimensions();
@@ -69,24 +72,35 @@ export function WorkspaceShell({ mode }: { mode: 'owner' | 'client' }) {
   );
 
   if (!owner) {
-    return (
+    const frame: Frame = ({ selectors, nav, content }) => (
       <View style={{ flex: 1, backgroundColor: '#F4F4F6' }}>
-        <View style={{ backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingTop: Platform.OS === 'web' ? 16 : insets.top + 8, paddingHorizontal: wide ? 32 : 16, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <View style={{ flexShrink: 1, gap: 6 }}>
-            <BrandLogo width={wide ? 150 : 110} />
-            <Text numberOfLines={1} style={{ color: '#111827', fontFamily: 'Inter_700Bold', fontSize: wide ? 18 : 15 }}>{firm ? firm.name : 'Workspace'}</Text>
-            <Text numberOfLines={1} style={{ color: '#6b7280', fontSize: 12 }}>{account?.displayName} · {account?.role === 'PARTNER' ? 'Partner' : 'Accountant'}{firm ? ` · ${firm.clientCode}` : ''}</Text>
+        <View style={{ backgroundColor: '#FBFAF6', borderBottomWidth: 1, borderBottomColor: '#e7e5e4', paddingTop: Platform.OS === 'web' ? 10 : insets.top + 6, paddingHorizontal: wide ? 28 : 12, paddingBottom: 10, gap: 8, zIndex: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 15, color: '#0f172a', letterSpacing: -1 }}>S<Text style={{ color: '#451a03' }}>OS</Text></Text>
+              </View>
+              <View style={{ flexShrink: 1 }}>
+                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 16, color: '#0f172a' }}>Syndicate<Text style={{ color: '#d97706' }}>OS</Text></Text>
+                <Text numberOfLines={1} style={{ color: '#57534e', fontSize: 11 }}>{firm ? firm.name : 'No active firm assigned'} · {account?.role === 'PARTNER' ? 'Partner' : 'Accountant'}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {account?.role === 'PARTNER' ? <CompactLang /> : null}
+              {bell ?? <NativeNotificationBell />}
+              <ProfileMenu name={account?.displayName ?? ''} role={account?.role === 'PARTNER' ? 'Partner' : 'Accountant'} firm={firm ? `${firm.name} (${firm.clientCode})` : ''} onSignOut={() => void signOut()} />
+            </View>
           </View>
-          <Pressable onPress={() => void signOut()} accessibilityRole="button" accessibilityLabel="Sign out" style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, borderRadius: 12, backgroundColor: '#f3f4f6' }}>
-            <Feather name="log-out" size={16} color="#111827" />
-            {wide ? <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#111827' }}>Sign Out</Text> : null}
-          </Pressable>
+          {selectors}
+          {nav}
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: wide ? 28 : 12, paddingBottom: 60, maxWidth: 1240, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
-          {body}
+          {content}
         </ScrollView>
       </View>
     );
+    if (ws && account && !q.isLoading) return <SectorWorkspace ws={ws} account={account} frame={frame} />;
+    return <>{frame({ content: body })}</>;
   }
 
   return (
@@ -112,5 +126,66 @@ export function WorkspaceShell({ mode }: { mode: 'owner' | 'client' }) {
         {body}
       </ScrollView>
     </View>
+  );
+}
+
+function CompactLang() {
+  const { lang } = useLang();
+  return (
+    <View style={{ flexDirection: 'row', borderRadius: 10, backgroundColor: '#f3f4f6', padding: 2 }}>
+      {(['en', 'te'] as const).map((l) => (
+        <Pressable key={l} onPress={() => setLang(l)} accessibilityRole="button" accessibilityLabel={l === 'en' ? 'English' : 'Telugu'} style={{ paddingVertical: 6, paddingHorizontal: 9, borderRadius: 8, backgroundColor: lang === l ? '#FFB800' : 'transparent' }}>
+          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#111827' }}>{l === 'en' ? 'En' : 'తె'}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function ProfileMenu({ name, role, firm, onSignOut }: { name: string; role: string; firm: string; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [pin, setPin] = useState(false);
+  const [cur, setCur] = useState(''); const [next, setNext] = useState(''); const [conf, setConf] = useState('');
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
+  const save = async () => {
+    if (!cur || !next) return setMsg({ ok: false, t: 'Enter your current and new PIN.' });
+    if (next !== conf) return setMsg({ ok: false, t: 'New PINs do not match.' });
+    setBusy(true); setMsg(null);
+    try { await changeCredential({ currentCredential: cur, newCredential: next }); setMsg({ ok: true, t: 'PIN changed.' }); setCur(''); setNext(''); setConf(''); }
+    catch (e) { setMsg({ ok: false, t: errMessage(e) }); } finally { setBusy(false); }
+  };
+  return (
+    <>
+      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Profile menu" style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#FFB800', fontFamily: 'Inter_700Bold', fontSize: 13 }}>{initials}</Text>
+      </Pressable>
+      {open ? (
+        <Modal transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+          <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(17,24,39,0.25)' }}>
+            <Pressable onPress={() => undefined} style={{ position: 'absolute', top: 64, right: 12, width: 290, backgroundColor: '#ffffff', borderRadius: 18, borderWidth: 1, borderColor: '#e5e7eb', padding: 14 }}>
+              <Text style={{ fontFamily: 'Inter_700Bold', color: '#111827', fontSize: 15 }}>{name}</Text>
+              <Text style={{ color: '#6b7280', fontSize: 12, marginBottom: 10 }}>{role}{firm ? ` · ${firm}` : ''}</Text>
+              {pin ? (
+                <View>
+                  <Field label="Current PIN" value={cur} onChangeText={setCur} secure keyboardType="numeric" />
+                  <Field label="New PIN" value={next} onChangeText={setNext} secure keyboardType="numeric" />
+                  <Field label="Confirm new PIN" value={conf} onChangeText={setConf} secure keyboardType="numeric" />
+                  {msg ? <Text style={{ color: msg.ok ? '#15803d' : '#b91c1c', fontSize: 12, marginBottom: 8 }}>{msg.t}</Text> : null}
+                  <Btn label="Save PIN" loading={busy} onPress={() => void save()} />
+                  <View style={{ height: 6 }} />
+                  <Btn label="Back" variant="ghost" onPress={() => { setPin(false); setMsg(null); }} />
+                </View>
+              ) : (
+                <View style={{ gap: 6 }}>
+                  <Btn label="Change PIN" variant="ghost" icon="lock" onPress={() => setPin(true)} />
+                  <Btn label="Sign out" variant="ghost" icon="log-out" onPress={() => { setOpen(false); onSignOut(); }} />
+                </View>
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+    </>
   );
 }

@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { NativeBlueprint } from '@/screens/NativeBlueprint';
+import { PartnerEquityNative } from '@/screens/PartnerEquityNative';
+import { NativePlotCollections } from '@/screens/NativePlotCollections';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { ErpRecord, ErpResource, ProjectErp } from '@workspace/api-client-react';
 import { Badge, Banner, Btn, Card, Chips, Empty, Field, Label } from '@/components/ui';
@@ -12,6 +15,7 @@ import { LiquorModule } from '@/screens/ErpLiquor';
 import { PlanBuilder } from '@/screens/ErpPlan';
 import { BookingReceipts, InventoryStage, milestonesOf, openWa, stagePct as stagePct0 } from '@/screens/ErpInventory';
 import { AttachmentView, Dashboard, Dialog, Equity, LangToggle, RecordDetail, RecordForm, ResourceView, Stat, label, live, money, recLabel, navTo, registerBespoke, str, takeIntent, tone, useLang, type ErpCtx } from '@/screens/ErpScreens';
+import { AccountantDashboard, PartnerHome } from '@/screens/ParityDashboards';
 import { Filters, ProjectStatement, RowList, buildRows, useRowFilters } from '@/screens/ErpStatement';
 
 const AMBER = '#FFB800';
@@ -112,10 +116,11 @@ export function LayoutMasterGrid({ erp, ctx, onBook }: { erp: ProjectErp; ctx: E
   const statusOpts = (res?.fields.find((f) => f.key === 'status')?.options ?? Array.from(new Set(plots.map((r) => pd(r).status).filter(Boolean))));
   const card = (r: ErpRecord) => {
     const p = pd(r);
-    const bg = p.status === 'available' ? c.successSurface : p.status === 'sold' ? '#e5e7eb' : p.status === 'blocked' ? '#f6dedb' : c.warningSurface;
+    const registration = p.status === 'reserved' && r.data.registrationState === 'scheduled';
+    const bg = registration ? '#faf5ff' : p.status === 'available' ? c.successSurface : p.status === 'sold' ? '#e5e7eb' : p.status === 'blocked' ? '#f6dedb' : c.warningSurface;
     return (
-      <Pressable key={r.id} onPress={() => (p.status === 'available' && resOf(erp, 'bookings')?.canCreate ? onBook(r.id) : setSel(r.id))} onLongPress={() => setSel(r.id)} accessibilityRole="button" accessibilityHint="Opens booking for an available plot; long press for details" style={{ width: 150, padding: 10, borderRadius: 14, backgroundColor: bg, borderWidth: 1, borderColor: c.border }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold' }}>#{p.no}</Text><Badge text={p.status || r.status} tone={tone(p.status)} /></View>
+      <Pressable key={r.id} onPress={() => (p.status !== 'blocked' ? onBook(r.id) : setSel(r.id))} onLongPress={() => setSel(r.id)} accessibilityRole="button" accessibilityLabel={`Plot ${p.no}, ${registration ? 'slot booked for registration' : p.status}`} accessibilityHint="Opens this plot's collections, receipts and registration; long press for details" style={{ width: 160, padding: 10, borderRadius: 14, backgroundColor: bg, borderWidth: 1, borderColor: registration ? '#d8b4fe' : c.border }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold' }}>#{p.no}</Text>{registration ? <Text style={{ fontSize: 9, fontFamily: 'Inter_700Bold', color: '#7e22ce', backgroundColor: '#f3e8ff', borderRadius: 8, padding: 4 }}>Slot booked for registration</Text> : <Badge text={p.status === 'reserved' ? 'Token booked' : p.status || r.status} tone={tone(p.status)} />}</View>
         <Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 4 }}>{p.area} Sq.Yds{p.dim ? ` · ${p.dim}` : ''}</Text>
         <Text style={{ color: c.mutedForeground, fontSize: 11 }}>{p.facing}{p.road ? ` · ${p.road} ft road` : ''}</Text>
         <Text style={{ color: c.foreground, fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 4 }}>{formatIndianCompact(p.area * p.rate)}</Text>
@@ -241,66 +246,6 @@ function ResourceViewDetail({ erp, res, rec, ctx, onClose }: { erp: ProjectErp; 
   const [open, setOpen] = useState(false);
   if (!res) return null;
   return <View><Btn label="Details & corrections" variant="ghost" onPress={() => setOpen(true)} />{open ? <RecordDetail erp={erp} res={res} rec={rec} ctx={ctx} onClose={() => { setOpen(false); onClose(); }} /> : null}</View>;
-}
-
-/* ===== Syndicate equity module ===== */
-function EquityModule({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
-  const c = useColors();
-  const s = useSettingsSave(erp);
-  const mode = str(erp.settings.equitySplitMode) || 'proportional';
-  const profiles = recsOf(erp, 'partner-profiles');
-  const pres = resOf(erp, 'partner-profiles');
-  const [pool, setPool] = useState('');
-  const [extra, setExtra] = useState<Record<string, string>>({});
-  const [editing, setEditing] = useState<string | null>(null); const [adding, setAdding] = useState(false);
-  const prof = (pid: string) => profiles.find((r) => r.data.partnerId === pid);
-  const rows = erp.partners.map((p) => {
-    const pr = prof(p.id);
-    const inv = nv(p.invested) + nv(extra[p.id]);
-    return { p, pr, inv, fixed: nv(pr?.data.fixedEquityPercent, nv(p.equityPercent)), initial: nv(pr?.data.initialCapital) };
-  });
-  const totalInv = rows.reduce((n, r) => n + r.inv, 0);
-  const totalFixed = rows.reduce((n, r) => n + r.fixed, 0);
-  const calc = rows.map((r) => ({ ...r, pct: mode === 'fixed' ? r.fixed : totalInv > 0 ? (r.inv / totalInv) * 100 : 0 }));
-  const poolN = nv(pool);
-  const canSet = ctx.account.role === 'ACCOUNTANT';
-  const curP = profiles.find((r) => r.id === editing) ?? null;
-  return (
-    <View>
-      <Title sub="Equity split mode, partner profiles and an illustrative what-if. Server percentages remain the record.">Syndicate Equity</Title>
-      <Card>
-        <Chips label="Equity split mode" options={[{ value: 'fixed', label: 'Fixed equity %' }, { value: 'proportional', label: 'Proportional to investment' }]} value={mode} onChange={(v) => canSet && void s.save({ equitySplitMode: v })} />
-        {!canSet ? <Text style={{ color: c.mutedForeground, fontSize: 12 }}>Only the accountant can change the split mode.</Text> : null}
-        {mode === 'fixed' && Math.abs(totalFixed - 100) > 0.01 && erp.partners.length ? <Banner tone="warn" title={`Fixed equity totals ${totalFixed.toFixed(2)}%, not 100%`} text="Adjust partner profiles before relying on the split." /> : null}
-        {s.msg ? <Banner tone={s.msg.ok ? 'ok' : 'error'} title={s.msg.t} /> : null}
-      </Card>
-      <Equity erp={erp} />
-      <Card>
-        <Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 16, marginBottom: 6 }}>What-if calculator</Text>
-        <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 8 }}>Illustrative only. Nothing here is saved.</Text>
-        <Field label="Projected profit / sale pool (Rs)" value={pool} onChangeText={setPool} keyboardType="numeric" />
-        {calc.length === 0 ? <Text style={{ color: c.mutedForeground }}>No partners yet.</Text> : calc.map((r) => (
-          <View key={r.p.id} style={{ borderTopWidth: 1, borderColor: c.border, paddingVertical: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: c.foreground, fontFamily: 'Inter_600SemiBold' }}>{r.p.name}</Text><Text style={{ color: c.primary, fontFamily: 'Inter_700Bold' }}>{r.pct.toFixed(2)}%</Text></View>
-            <Text style={{ color: c.mutedForeground, fontSize: 12 }}>Invested {formatINR(r.inv)} · Drawings {formatINR(nv(r.p.drawings))} · Expenses {formatINR(nv(r.p.expenses))}</Text>
-            <Text style={{ color: c.foreground, fontSize: 13 }}>Projected share {formatINR((poolN * r.pct) / 100)} · Net after drawings {formatINR((poolN * r.pct) / 100 - nv(r.p.drawings))}</Text>
-            <Field label="Additional investment (what-if)" value={extra[r.p.id] ?? ''} onChangeText={(x) => setExtra((o) => ({ ...o, [r.p.id]: x }))} keyboardType="numeric" />
-          </View>
-        ))}
-      </Card>
-      <Card>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><Text style={{ color: c.foreground, fontFamily: 'Inter_700Bold', fontSize: 16 }}>Partner profiles</Text>{pres?.canCreate ? <Btn label="Add" icon="plus" onPress={() => setAdding(true)} /> : null}</View>
-        {profiles.length === 0 ? <Text style={{ color: c.mutedForeground }}>No partner profiles yet.</Text> : profiles.map((r) => (
-          <Pressable key={r.id} onPress={() => setEditing(r.id)} style={{ paddingVertical: 8, borderTopWidth: 1, borderColor: c.border }}>
-            <Text style={{ color: c.foreground, fontFamily: 'Inter_600SemiBold' }}>{erp.partners.find((p) => p.id === r.data.partnerId)?.name ?? str(r.data.partnerId)}</Text>
-            <Text style={{ color: c.mutedForeground, fontSize: 12 }}>{str(r.data.roleDescription)}{r.data.roleDescription ? ' · ' : ''}equity {str(r.data.fixedEquityPercent)}% · capital {formatINR(nv(r.data.initialCapital))} · {(() => { const f = pres?.fields.find((x) => x.key === 'userRole') as ({ optionLabels?: Record<string, string> } | undefined); return f?.optionLabels?.[str(r.data.userRole)] ?? str(r.data.userRole).replace(/_/g, ' '); })()}</Text>
-          </Pressable>
-        ))}
-      </Card>
-      {adding && pres ? <Dialog title="Partner allocation" onClose={() => setAdding(false)}><RecordForm erp={erp} res={pres} ctx={ctx} onDone={() => setAdding(false)} /></Dialog> : null}
-      {curP && pres ? <RecordDetail erp={erp} res={pres} rec={curP} ctx={ctx} onClose={() => setEditing(null)} /> : null}
-    </View>
-  );
 }
 
 /* ===== Firm accounts bar and account ledger ===== */
@@ -606,7 +551,7 @@ function Host({ children }: { children: React.ReactNode }) { return <View>{child
 
 function Plots({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const [book, setBook] = useState<string | undefined>();
-  return <Host><LayoutMasterGrid erp={erp} ctx={ctx} onBook={setBook} />{book ? <BookingWizard erp={erp} ctx={ctx} initial={book} onClose={() => setBook(undefined)} /> : null}</Host>;
+  return <Host><LayoutMasterGrid erp={erp} ctx={ctx} onBook={setBook} />{book ? <NativePlotCollections erp={erp} ctx={ctx} initial={book} onClose={() => setBook(undefined)} /> : null}</Host>;
 }
 function Units({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
   const [book, setBook] = useState<string | undefined>();
@@ -626,7 +571,7 @@ function Settings({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
         <Chips label="Ledger mode" options={[{ value: 'internal_syndicate', label: 'Internal syndicate book' }, { value: 'official_tax', label: 'Official tax book' }]} value={mode} onChange={(v) => ctx.account.role === 'ACCOUNTANT' && void s.save({ ledgerMode: v })} />
         {s.msg ? <Banner tone={s.msg.ok ? 'ok' : 'error'} title={s.msg.t} /> : null}
       </Card>
-      <EquityModule erp={erp} ctx={ctx} />
+      <PartnerEquityNative erp={erp} ctx={ctx} />
       <LayoutCalc erp={erp} ctx={ctx} />
       <PricingEditor erp={erp} ctx={ctx} />
       <PlanBuilder erp={erp} ctx={ctx} />
@@ -637,9 +582,9 @@ function Settings({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx }) {
 registerBespoke((key, props, erp, ctx) => {
   const kind = str(props.resource);
   switch (key) {
-    case 'erp-dashboard': return ctx.account.role === 'PARTNER' ? <PartnerDashboard erp={erp} ctx={ctx} /> : <View><AccountsBar erp={erp} ctx={ctx} /><Dashboard erp={erp} /></View>;
-    case 'erp-equity': return <EquityModule erp={erp} ctx={ctx} />;
-    case 'erp-layout': return <View><LayoutCalc erp={erp} ctx={ctx} /><Plots erp={erp} ctx={ctx} /></View>;
+    case 'erp-dashboard': return ctx.account.role === 'PARTNER' ? <PartnerHome erp={erp} ctx={ctx} /> : <AccountantDashboard erp={erp} ctx={ctx} />;
+    case 'erp-equity': return <PartnerEquityNative erp={erp} ctx={ctx} />;
+    case 'erp-layout': return <View><LayoutCalc erp={erp} ctx={ctx} />{ctx.project ? <NativeBlueprint projectId={ctx.project.id} erp={erp} /> : null}<Plots erp={erp} ctx={ctx} /></View>;
     case 'erp-pricing': return <View><PricingEditor erp={erp} ctx={ctx} /><Units erp={erp} ctx={ctx} /></View>;
     case 'erp-statement': return <ProjectStatement erp={erp} ctx={ctx} />;
     case 'erp-settings': return <Settings erp={erp} ctx={ctx} />;

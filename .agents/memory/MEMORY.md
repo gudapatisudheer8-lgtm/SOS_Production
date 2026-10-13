@@ -14,3 +14,4 @@
 - [Promotional video authorization](promotional-video-authorization.md) — keep the film on hold; resume only when the user explicitly asks.
 - [Blueprint review](blueprint-review.md) — original plan → reviewed AI/manual geometry → illustrative 3D; no invented measurements or changes to bookings/money.
 - [Registration scheduling](registration-scheduling.md) — keep appointments inside the existing booking form; appointment actions never create money or automatic sale transitions.
+- [Expo dependency maturity](expo-dependency-maturity.md) — SDK installers can recommend patches newer than the package firewall cutoff; prefer an eligible SDK-compatible patch.

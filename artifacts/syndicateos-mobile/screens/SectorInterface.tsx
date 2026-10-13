@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import type {
   ConfigComponent,
   ConfigField,
@@ -9,11 +9,11 @@ import type {
   Workspace,
   WorkspaceInterfacesItem,
 } from '@workspace/api-client-react';
-import { Badge, Btn, Banner, Card, Chips, CredentialSheet, Empty, Field, H1, Label } from '@/components/ui';
+import { Badge, Btn, Banner, Card, Chips, CredentialSheet, Empty, Field, H1, Label, Sheet } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { errMessage, useAuth } from '@/lib/session';
 import '@/screens/ErpBespoke';
-import { ERP_KEYS, ErpComponent, LangToggle, registerNav, useLang } from '@/screens/ErpScreens';
+import { ERP_KEYS, ErpComponent, registerNav, useLang } from '@/screens/ErpScreens';
 import type { TKey } from '@/lib/i18n';
 import { useRun } from '@/lib/workspace';
 import { ProjectBar, ProjectSetup, setupStateOf } from '@/screens/ProjectSetup';
@@ -395,8 +395,26 @@ function Render({ comp, ctx }: { comp: ConfigComponent; ctx: Ctx }) {
   }
 }
 
-function InterfaceView({ item, projects, role, mode, setupItems = [], allProjects, selectedId, onPick }: { item: WorkspaceInterfacesItem; projects: Project[]; role: SessionAccount['role']; mode: Mode; setupItems?: WorkspaceInterfacesItem[]; allProjects?: Project[]; selectedId?: string | null; onPick?: (id: string) => void }) {
-  const c = useColors();
+export type Frame = (p: { selectors?: React.ReactNode; nav?: React.ReactNode; content: React.ReactNode }) => React.ReactNode;
+const defaultFrame: Frame = ({ selectors, nav, content }) => <View>{selectors}{nav}{content}</View>;
+
+/** Exact current web top-bar labels, derived from the screen's ERP components (AccountantDashboard TopBarTab). */
+function screenRole(sc: { key: string; components: ConfigComponent[] }): string | null {
+  const keys = sc.components.map((x) => x.key as string);
+  const res = sc.components.map((x) => String((x.props as Record<string, unknown> | undefined)?.resource ?? ''));
+  if (keys.includes('erp-dashboard')) return 'dashboard';
+  if (keys.includes('erp-equity')) return 'partners';
+  if (keys.includes('erp-statement')) return 'statement';
+  if (keys.includes('erp-pricing') || res.includes('units')) return 'construction';
+  if (keys.includes('erp-layout') || res.includes('plots')) return 'open_plotting';
+  if (keys.some((k) => /liquor/.test(k)) || res.some((r) => /liquor|vend/.test(r))) return 'liquor';
+  if (keys.length && keys.every((k) => k === 'erp-resource') && res.every((r) => ['accounts', 'expenses', 'investments', 'drawings', 'transactions', 'settlements'].includes(r))) return 'removed';
+  return null;
+}
+const ACCT_LABEL: Record<string, string> = { dashboard: 'Dashboard', partners: 'Partners & Equity', open_plotting: 'Open Plotting', construction: 'Apartments & Construction', liquor: 'Liquor Vends', statement: 'Project Statement' };
+const PARTNER_LABEL: Record<string, TKey> = { dashboard: 'tabDashboard', open_plotting: 'tabPlots', statement: 'tabStatements' };
+
+function InterfaceView({ item, projects, role, mode, setupItems = [], allProjects, selectedId, onPick, frame = defaultFrame, firmSelector }: { item: WorkspaceInterfacesItem; projects: Project[]; role: SessionAccount['role']; mode: Mode; setupItems?: WorkspaceInterfacesItem[]; allProjects?: Project[]; selectedId?: string | null; onPick?: (id: string) => void; frame?: Frame; firmSelector?: React.ReactNode }) {
   const iface = item.configuration.interfaces.find((i) => i.role === role);
   const [screenKey, setScreenKey] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
@@ -409,55 +427,88 @@ function InterfaceView({ item, projects, role, mode, setupItems = [], allProject
   const isAcct = role === 'ACCOUNTANT' && mode === 'live';
   const setupDefinition = readSetupConfig(item.configuration);
   const isDraft = !!selected && setupStateOf(selected) === 'DRAFT';
-  const tabLabel = (key: string, fallback: string) => {
-    const map: Record<string, TKey> = { dashboard: 'tabDashboard', investments: 'tabInvestments', 'expenses-approvals': 'tabExpensesApprovals', plots: 'tabPlots', statements: 'tabStatements' };
-    return role === 'PARTNER' && map[key] ? t(map[key]) : fallback;
+  // Approval queues and standalone accounts/expense tabs were removed from the current web app.
+  const screens = (iface?.screens ?? []).filter((sc) => {
+    const r = screenRole(sc);
+    if (r === 'removed' || /approval/i.test(sc.label) || /approval/i.test(sc.key)) return false;
+    if (role === 'PARTNER' && hasErp) return r === 'dashboard' || r === 'open_plotting' || r === 'statement';
+    return true;
+  });
+  const tabLabel = (sc: { key: string; label: string; components: ConfigComponent[] }) => {
+    const r = screenRole(sc);
+    if (role === 'PARTNER' && r && PARTNER_LABEL[r]) return t(PARTNER_LABEL[r]);
+    return (r && ACCT_LABEL[r]) || sc.label;
   };
   useEffect(() => {
     registerNav((i) => {
-      const hit = iface?.screens.find((sc) => sc.components.some((x) => (i.kind === 'statement' ? (x.key as string) === 'erp-statement' : (x.key as string) === 'erp-resource' && (x.props as Record<string, unknown>)?.resource === i.kind)));
+      const hit = screens.find((sc) => sc.components.some((x) => (i.kind === 'statement' || ['investments', 'expenses', 'drawings'].includes(i.kind) ? (x.key as string) === 'erp-statement' : i.kind === 'partner-profiles' ? (x.key as string) === 'erp-equity' : i.kind === 'plots' ? (x.key as string) === 'erp-layout' || ((x.key as string) === 'erp-resource' && (x.props as Record<string, unknown>)?.resource === 'plots') : (x.key as string) === 'erp-resource' && (x.props as Record<string, unknown>)?.resource === i.kind)));
       if (!hit) return false;
       setScreenKey(hit.key);
       return true;
     });
     return () => registerNav(null);
-  }, [iface]);
+  });
   if (!iface || iface.screens.length === 0)
-    return <Empty icon="layout" title="No screens configured" text={`Release "${item.configuration.label}" defines no ${role.toLowerCase()} interface.`} />;
-  const screen = iface.screens.find((s) => s.key === screenKey) ?? iface.screens[0];
+    return <>{frame({ selectors: firmSelector, content: <Empty icon="layout" title="No screens configured" text={`Release "${item.configuration.label}" defines no ${role.toLowerCase()} interface.`} /> })}</>;
+  const screen = screens.find((s) => s.key === screenKey) ?? screens[0] ?? iface.screens[0];
   const ctx: Ctx = { item, projects, selected, select: setSelId, role, mode };
-  return (
+  const selectors = (
+    <View style={{ gap: 6 }}>
+      {firmSelector}
+      {hasErp ? <ProjectBar label={role === 'PARTNER' ? t('selectProject') : 'Project / Venture'} projects={pool} selected={selected} onSelect={pick} canAdd={isAcct && setupItems.length > 0} onAdd={() => setSetupOpen('new')} onEdit={isAcct ? () => setSetupOpen('edit') : undefined} setupDisabled={!!setupDefinition.error} /> : null}
+    </View>
+  );
+  const nav = (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+      {screens.map((s) => {
+        const on = s.key === screen.key;
+        return (
+          <Pressable key={s.key} onPress={() => setScreenKey(s.key)} accessibilityRole="tab" accessibilityState={{ selected: on }}
+            style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, backgroundColor: on ? '#111827' : '#e5e7eb' }}>
+            <Text style={{ color: on ? '#FFFFFF' : '#1f2937', fontFamily: 'Inter_700Bold', fontSize: 13 }}>{tabLabel(s)}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+  const content = (
     <View>
-      <H1 sub={`${selected ? `Selected: ${selected.name} · ` : ''}${projects.length} project${projects.length === 1 ? '' : 's'}`}>{iface.title}</H1>
-      {hasErp ? (
-        <View style={{ marginBottom: 4 }}>
-          {role === 'PARTNER' ? <LangToggle /> : null}
-          {isAcct && setupDefinition.error ? <Banner tone="warn" title="Project setup unavailable in the assigned release" text={`Assigned release: ${item.configuration.label}. ${setupDefinition.error} Review this firm's sector assignment in the owner portal, then sign out and sign in again.`} /> : null}
-          <ProjectBar label={role === 'PARTNER' ? t('selectProject') : 'Project / Venture'} projects={pool} selected={selected} onSelect={pick} canAdd={isAcct && setupItems.length > 0} onAdd={() => setSetupOpen('new')} onEdit={isAcct ? () => setSetupOpen('edit') : undefined} setupDisabled={!!setupDefinition.error} />
-          {isAcct && projects.length === 0 ? <Empty icon="folder-plus" title="No projects yet" text="Add the first project to start recording partners, accounts and inventory." /> : null}
-        </View>
-      ) : null}
+      {mode === 'preview' ? <H1 sub={`${projects.length} project${projects.length === 1 ? '' : 's'}`}>{iface.title}</H1> : null}
+      {hasErp && isAcct && setupDefinition.error ? <Banner tone="warn" title="Project setup unavailable in the assigned release" text={`Assigned release: ${item.configuration.label}. ${setupDefinition.error} Review this firm's sector assignment in the owner portal, then sign out and sign in again.`} /> : null}
+      {hasErp && isAcct && projects.length === 0 ? <Empty icon="folder-plus" title="No projects yet" text="Add the first project to start recording partners, accounts and inventory." /> : null}
       {setupOpen && isAcct ? <ProjectSetup items={setupItems} initialSectorId={item.sectorId} existing={setupOpen === 'edit' ? selected : null} onClose={() => setSetupOpen(null)} onSaved={(id) => { pick(id); setSetupOpen(null); }} /> : null}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-        {iface.screens.map((s) => {
-          const on = s.key === screen.key;
-          return (
-            <Pressable key={s.key} onPress={() => setScreenKey(s.key)} accessibilityRole="tab"
-              style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: on ? '#FFB800' : '#e5e7eb' }}>
-              <Text style={{ color: on ? '#111827' : '#374151', fontFamily: 'Inter_700Bold' }}>{tabLabel(s.key, s.label)}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
       {isDraft && hasErp ? <Banner tone="warn" title="Setup not finished" text="This project is a draft. Partners, accounts, inventory and money views appear after Create Project & Load Data. Use Resume setup above." /> : null}
       {screen.components.length === 0 ? <Empty icon="box" title="This screen has no components" /> : null}
       {(isDraft && hasErp ? [] : screen.components).map((comp, i) => <Render key={`${screen.key}-${i}`} comp={comp} ctx={ctx} />)}
     </View>
   );
+  return <>{frame({ selectors, nav: screens.length > 1 ? nav : null, content })}</>;
 }
 
-export function SectorWorkspace({ ws, account }: { ws: Workspace; account: SessionAccount }) {
+function FirmPicker({ firms, value, onChange }: { firms: { id: string; name: string; code: string }[]; value: string; onChange: (id: string) => void }) {
   const c = useColors();
+  const [open, setOpen] = useState(false);
+  const cur = firms.find((f) => f.id === value);
+  if (firms.length <= 1) return null;
+  return (
+    <View>
+      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Select firm" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.card }}>
+        <Text style={{ color: '#6b7280', fontSize: 11, fontFamily: 'Inter_700Bold' }}>FIRM</Text>
+        <Text numberOfLines={1} style={{ color: '#111827', fontFamily: 'Inter_600SemiBold', flex: 1 }}>{cur ? `${cur.name} (${cur.code})` : 'Select a firm'}</Text>
+      </Pressable>
+      <Sheet visible={open} title="Firms" onClose={() => setOpen(false)}>
+        {firms.map((f) => (
+          <Pressable key={f.id} onPress={() => { setOpen(false); onChange(f.id); }} accessibilityRole="button" style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: c.border }}>
+            <Text style={{ color: c.foreground, fontFamily: f.id === value ? 'Inter_700Bold' : 'Inter_400Regular' }}>{f.name} ({f.code})</Text>
+          </Pressable>
+        ))}
+        <Btn label="Close" variant="ghost" onPress={() => setOpen(false)} />
+      </Sheet>
+    </View>
+  );
+}
+
+export function SectorWorkspace({ ws, account, frame = defaultFrame }: { ws: Workspace; account: SessionAccount; frame?: Frame }) {
   const role = account.role;
   const projectsOf = (i: WorkspaceInterfacesItem) => ws.projects.filter((p) => p.firmId === i.firmId && p.sectorId === i.sectorId);
   // Disabled assignments stay visible (read-only) while they still hold historical projects.
@@ -465,33 +516,23 @@ export function SectorWorkspace({ ws, account }: { ws: Workspace; account: Sessi
   const [sel, setSel] = useState<string | null>(null);
   const [want, setWant] = useState<string | null>(null);
   if (items.length === 0)
-    return <Empty icon="inbox" title="No interface assigned" text="Your firm has no enabled sector interface for your role yet. The owner assigns sectors to firms." />;
+    return <>{frame({ content: <Empty icon="inbox" title="No interface assigned" text="Your firm has no enabled sector interface for your role yet. The owner assigns sectors to firms." /> })}</>;
   const keyOf = (i: WorkspaceInterfacesItem) => `${i.firmId}:${i.sectorId}`;
   const wantProj = want ? ws.projects.find((p) => p.id === want) ?? null : null;
   const wantItem = wantProj ? items.find((i) => i.firmId === wantProj.firmId && i.sectorId === wantProj.sectorId) : undefined;
   const item = wantItem ?? items.find((i) => keyOf(i) === sel) ?? items[0];
   const firmPool = ws.projects.filter((p) => p.firmId === item.firmId && items.some((i) => i.firmId === p.firmId && i.sectorId === p.sectorId));
-  const firmName = (id: string) => ws.firms.find((f) => f.id === id)?.name ?? 'Firm';
-  return (
-    <View>
-      {items.length > 1 ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-          {items.map((i) => {
-            const on = keyOf(i) === keyOf(item);
-            return (
-              <Pressable key={keyOf(i)} onPress={() => { setSel(keyOf(i)); setWant(null); }} accessibilityRole="button"
-                style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: on ? c.primary : c.border, backgroundColor: on ? c.primary : c.card }}>
-                <Text style={{ color: on ? c.primaryForeground : c.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>{i.sectorName}{i.enabled ? '' : ' · Disabled'}</Text>
-                <Text style={{ color: on ? c.primaryForeground : c.mutedForeground, fontSize: 11 }}>{firmName(i.firmId)} · {i.configuration.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : (
-        <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 8 }}>{firmName(item.firmId)} · {item.sectorName} · {item.configuration.label}{item.enabled ? '' : ' · Disabled, read-only'}</Text>
-      )}
-      <InterfaceView key={keyOf(item) + item.releaseId} item={item} projects={projectsOf(item)} allProjects={firmPool} selectedId={want} onPick={(id) => { const pr = ws.projects.find((x) => x.id === id); if (pr) setSel(`${pr.firmId}:${pr.sectorId}`); setWant(id); }} role={role} mode={item.enabled ? 'live' : 'readonly'} setupItems={ws.interfaces.filter((i) => i.enabled && i.firmId === item.firmId && i.configuration.interfaces.some((x) => x.role === role))} />
+  const firmIds = Array.from(new Set(items.map((i) => i.firmId)));
+  const firms = firmIds.map((id) => { const f = ws.firms.find((x) => x.id === id); return { id, name: f?.name ?? 'Firm', code: f?.clientCode ?? '' }; });
+  const sectorsHere = items.filter((i) => i.firmId === item.firmId);
+  const firmSelector = (
+    <View style={{ gap: 6 }}>
+      <FirmPicker firms={firms} value={item.firmId} onChange={(id) => { const first = items.find((i) => i.firmId === id); if (first) { setSel(keyOf(first)); setWant(null); } }} />
+      {sectorsHere.length > 1 ? <Chips options={sectorsHere.map((i) => ({ value: keyOf(i), label: `${i.sectorName}${i.enabled ? '' : ' (read-only)'}` }))} value={keyOf(item)} onChange={(v) => { setSel(v); setWant(null); }} /> : null}
     </View>
+  );
+  return (
+    <InterfaceView key={keyOf(item) + item.releaseId} item={item} projects={projectsOf(item)} allProjects={firmPool} selectedId={want} onPick={(id) => { const pr = ws.projects.find((x) => x.id === id); if (pr) setSel(`${pr.firmId}:${pr.sectorId}`); setWant(id); }} role={role} mode={item.enabled ? 'live' : 'readonly'} setupItems={ws.interfaces.filter((i) => i.enabled && i.firmId === item.firmId && i.configuration.interfaces.some((x) => x.role === role))} frame={frame} firmSelector={firmSelector} />
   );
 }
 

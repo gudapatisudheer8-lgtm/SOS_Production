@@ -57,8 +57,8 @@ export function Btn({
   testID?: string;
 }) {
   const c = useColors();
-  const bg = variant === 'primary' ? c.primary : variant === 'danger' ? c.destructive : 'transparent';
-  const fg = variant === 'ghost' ? c.primary : c.primaryForeground;
+  const bg = variant === 'primary' ? '#FFB800' : variant === 'danger' ? c.destructive : 'transparent';
+  const fg = variant === 'primary' ? '#111827' : variant === 'ghost' ? c.primary : c.primaryForeground;
   const off = disabled || loading;
   return (
     <Pressable
