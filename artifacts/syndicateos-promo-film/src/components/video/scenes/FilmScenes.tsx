@@ -137,6 +137,7 @@ export function FilmScene04() {
         <motion.div className="audit-trail" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 4.2, duration: .55, ease }}>
           <span><i />ORIGINAL KEPT</span><span><i />REASON LOGGED</span><span><i className="ok" />BALANCE RECALCULATED</span>
         </motion.div>
+        <motion.div className="audit-push" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 5.7, duration: 1.4, ease }} />
         <div className="flow-caption">Illustrative audit trail — not live records.</div>
       </div>
     </Scene>
@@ -187,7 +188,7 @@ export function FilmScene06() {
       <motion.div className="share-ring" initial={{ rotate: -80, scale: .75, opacity: 0 }} animate={{ rotate: 0, scale: 1, opacity: 1 }} transition={{ duration: .9, ease }}>
         <i /><i /><i /><span className="ring-center"><b>YOUR</b><strong>VENTURE</strong><small>PARTNER VIEW</small></span>
       </motion.div>
-      <motion.div className="partner-device" initial={{ y: 80, rotate: 4, opacity: 0 }} animate={{ y: 0, rotate: 1, opacity: 1 }} transition={{ duration: .75, delay: .16, ease }}>
+      <motion.div className="partner-device" initial={{ y: 80, rotate: 4, opacity: 0, scale: 1 }} animate={{ y: [80, 0, 0, -8], rotate: [4, 1, 1, 0], opacity: [0, 1, 1, 1], scale: [1, 1, 1, 1.05] }} transition={{ duration: 6.8, times: [0, .12, .78, 1], ease }}>
         <div className="partner-top"><span className="device-dot" /><span>PARTNER PORTAL</span><span className="device-avatar">P</span></div>
         <div className="partner-hello">My venture view.</div>
         <div className="partner-tabs"><span className="on">Dashboard</span><span>Plots</span><span>Project Statements</span></div>
@@ -196,6 +197,7 @@ export function FilmScene06() {
         <div className="partner-history-title">RECENT ACTIVITY <span>DEMO RECORDS</span></div>
         <div className="partner-history"><i /><div><b>Contribution recorded</b><small>Linked to project account</small></div><span>✓</span></div>
         <div className="partner-history"><i className="history-amber" /><div><b>Site expense posted</b><small>Notification · in the statement</small></div><span>●</span></div>
+        <motion.div className="partner-history" initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 3.6, duration: .45, ease }}><i className="history-amber" /><div><b>Entry corrected &amp; resubmitted</b><small>Original kept on record</small></div><span>↺</span></motion.div>
       </motion.div>
       <div className="partner-copy">
         <Eyebrow>05 / FOR THE PARTNER</Eyebrow>

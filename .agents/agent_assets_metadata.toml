@@ -576,3 +576,17 @@ mtime_ms = 1791871510000
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/80bd22d3-1e0b-4323-a815-a5b5e103f944/aa14d71c-db77-4c45-ab3a-b38b9abc04b0"
 storage_version_token = "1791871546724767"
 content_type = "text/html"
+
+[[outputs]]
+id = "hmvbOySvOM2FsU6mlEvzD"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_04_v2.mp3"
+type = "audio"
+title = "vo04"
+description = "Text-to-speech audio: Entries post directly and notify partners. Corrections are referred back and resubmitted, with the original kept on record."
+
+[[outputs]]
+id = "vj62bSK8eEfgq94NlzCxH"
+uri = "file://artifacts/syndicateos-promo-film/public/audio/vo_06_v2.mp3"
+type = "audio"
+title = "vo06"
+description = "Text-to-speech audio: Partners follow their dashboard, plots and project statements, and are notified as entries post."

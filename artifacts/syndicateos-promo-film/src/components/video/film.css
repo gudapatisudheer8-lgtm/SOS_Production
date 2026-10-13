@@ -183,3 +183,4 @@
 .collect-block { margin-top: 1vmin; padding: .55vmin .8vmin; border-radius: .5vmin; background: #f8ece9; color: #a2483a; font: 600 .95vmin var(--font-mono); }
 .collect-reg { margin-top: .8vmin; padding: .7vmin .8vmin; border-radius: .5vmin; background: #f1eefa; color: #5e5390; }.collect-reg b { display: block; font: 600 .95vmin var(--font-mono); }.collect-reg span { font-size: 1.1vmin; }
 .partner-tabs { display: flex; gap: .6vmin; margin: .8vmin 0 1vmin; }.partner-tabs span { padding: .45vmin .8vmin; border-radius: 5vmin; border: 1px solid rgba(244,241,233,.2); font: .95vmin var(--font-mono); opacity: .75; }.partner-tabs span.on { background: var(--amber); color: var(--ink); border-color: transparent; opacity: 1; }
+.audit-push { position: absolute; left: 34%; top: 76%; width: 52%; height: .25vmin; background: linear-gradient(90deg,#7eab91,#d4b35d); transform-origin: left; }
