@@ -99,3 +99,19 @@ test('reachable Telugu and English financial labels use direct-posting wording',
   for (const k of keys) for (const m of i.matchAll(new RegExp(`${k}: '([^']*)'`, 'g'))) assert.ok(!/ఆమోద|Approv|Sign-off|Clearance|approval/i.test(m[1]), `${k}: ${m[1]}`);
   assert.match(i, /lpReraNumber: 'Approval & LP \/ RERA No\.'/, 'statutory approval permit label preserved');
 });
+
+test('correction dialog and detail title the reason by actual posting state', () => {
+  const ts2 = require('typescript'); const vm2 = require('node:vm');
+  const src = read('screens/ErpScreens.tsx'); const a = src.indexOf('export function postingStateInfo'); const b = src.indexOf('export const money');
+  const ctx = {}; vm2.runInNewContext(ts2.transpileModule(src.slice(a, b).replace(/export /g, ''), { compilerOptions: { target: ts2.ScriptTarget.ES2020 } }).outputText + '\nthis.f = postingStateInfo;', ctx);
+  const R = 'Correcting a historical unposted entry';
+  const m = (postingState, canReferBack = false, canResubmit = false) => ctx.f({ postingState, correctionReason: R, canReferBack, canResubmit });
+  assert.equal(m('posted', true).badge, 'Recorded'); assert.equal(m('posted', true).reasonTitle, 'Correction history');
+  assert.equal(m('referred_back', false, true).reasonTitle, 'Referred back'); assert.match(m('referred_back').text, /Only the enrolled author/);
+  assert.match(m('referred_back', false, true).text, /resubmit/);
+  assert.equal(m('superseded').badge, 'Replaced by correction'); assert.notEqual(m('superseded').reasonTitle, 'Referred back'); assert.match(m('superseded').text, /cannot be referred back again/);
+  assert.equal(m('reversal').badge, 'Reversal'); assert.match(m('reversal').text, /cannot be corrected/);
+  assert.equal(m('legacy_unposted').badge, 'Historical unposted'); assert.match(m('legacy_unposted', true).text, /shown below/); assert.match(m('legacy_unposted').text, /No correction action/);
+  const st = read('screens/ErpStatement.tsx'); assert.ok(!/title="Referred back"/.test(st)); assert.ok(!/title="Referred back"/.test(src));
+  assert.match(st, /e\.canReferBack \? <View>/); assert.match(st, /e\.canResubmit \? <View/);
+});

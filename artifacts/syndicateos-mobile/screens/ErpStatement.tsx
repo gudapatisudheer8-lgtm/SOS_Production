@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import type { ErpField, ErpRecord, FinancialStatementEntry, ProjectErp } from '@workspace/api-client-react';
-import { Banner, Btn, Card, Chips, Empty, Field, Label, Select } from '@/components/ui';
+import { Badge, Banner, Btn, Card, Chips, Empty, Field, Label, Select } from '@/components/ui';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { newRequestId, useErpCommands } from '@/lib/erp';
 import { errMessage } from '@/lib/session';
-import { csvOf, Dialog, label, live, money, recLabel, str, tone, useLang, RecordDetail, RecordForm, takeIntent, type ErpCtx } from '@/screens/ErpScreens';
+import { csvOf, Dialog, label, live, money, recLabel, str, tone, useLang, RecordDetail, RecordForm, takeIntent, postingStateInfo, type ErpCtx } from '@/screens/ErpScreens';
 import { exportText, printTable } from '@/lib/exportFile';
 import { generateTallyCSV, generateTallyXML, type Voucher } from '@/lib/sourceCalc';
 
@@ -226,14 +226,16 @@ function CorrectionDialog({ erp, row, ctx, onClose }: { erp: ProjectErp; row: St
     }
     void run(() => cmd.resubmit(e.id, e.revision, data, reqId));
   };
+  const st = postingStateInfo(e);
   const res = erp.resources.find((x) => x.kind === row.kind);
   if (detail && row.rec && res) return <RecordDetail erp={erp} res={res} rec={row.rec} ctx={ctx} onClose={onClose} />;
   return (
     <Dialog title={`${row.desc || row.kind}`} onClose={onClose}>
       <Text style={{ color: c.mutedForeground, fontSize: 12 }}>{row.date} · {row.kind} · {row.account}{row.by ? ` · enrolled by ${row.by}` : ''}</Text>
       <Text style={{ color: row.flow === 'credit' ? c.success : c.destructive, fontFamily: 'Inter_700Bold', fontSize: 22, marginVertical: 8 }}>{row.flow === 'credit' ? '+' : '-'}{money(row.amount)}</Text>
-      {e.correctionReason ? <Banner tone="warn" title="Referred back" text={e.correctionReason} /> : null}
-      {!e.canReferBack && !e.canResubmit ? <Text testID="correction-unavailable" style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 6 }}>{row.status === 'reversal' ? 'This is a reversal journal kept for audit; it cannot be corrected again.' : 'No correction action is available to you for this entry. Corrections follow your role permissions for this project.'}</Text> : null}
+      <View testID="stmt-posting-state" style={{ flexDirection: 'row', marginBottom: 6 }}><Badge text={st.badge} tone={st.tone} /></View>
+      <Text testID={!e.canReferBack && !e.canResubmit ? 'correction-unavailable' : 'correction-state'} style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 6 }}>{st.text}</Text>
+      {e.correctionReason ? <Banner tone={st.bannerTone} title={st.reasonTitle} text={e.correctionReason} /> : null}
       {e.canReferBack ? <View>
         <Field label="Refer-back reason *" value={reason} onChangeText={setReason} multiline />
         <Btn testID="stmt-refer-back" label="Refer Back" icon="corner-up-left" loading={busy} disabled={!reason.trim()} onPress={() => void run(() => cmd.referBack(e.id, e.revision, reason.trim(), reqId))} />

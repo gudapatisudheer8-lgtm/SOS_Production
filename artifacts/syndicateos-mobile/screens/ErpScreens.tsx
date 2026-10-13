@@ -51,6 +51,18 @@ export const live = (r: ErpRecord) => r.status !== 'deleted';
 export const recordStateLabel = (s: string) => ({ approved: 'Recorded', pending: 'Not posted (historical)',
   referred_back: 'Referred back', superseded: 'Replaced by correction', rejected: 'Withdrawn (historical)' }[s] || s);
 export const tone = (s: string): 'ok' | 'warn' | 'bad' | 'muted' => (s === 'approved' || s === 'available' || s === 'registered' ? 'ok' : s === 'pending' || s === 'reserved' || s === 'booked' ? 'warn' : s === 'rejected' || s === 'blocked' || s === 'deleted' ? 'bad' : 'muted');
+/* Actual posting state of a statement entry: badge, explanation and how to title any stored correction reason. No replacement link is exposed by the API, so none is inferred. */
+export function postingStateInfo(e: { postingState: string; correctionReason?: string; canReferBack: boolean; canResubmit: boolean }): { badge: string; tone: 'ok' | 'warn' | 'bad' | 'muted'; text: string; reasonTitle: string; bannerTone: 'ok' | 'warn' | 'error' } {
+  switch (e.postingState) {
+    case 'posted': return { badge: 'Recorded', tone: 'ok', bannerTone: 'ok', reasonTitle: 'Correction history', text: e.correctionReason ? 'Posted to the ledger. This entry was created by a correction; the reason below is history, not an open referral.' : 'Posted to the ledger and counted in balances.' };
+    case 'referred_back': return { badge: 'Referred back', tone: 'warn', bannerTone: 'warn', reasonTitle: 'Referred back', text: e.canResubmit ? 'Its balance effect is reversed. Correct the fields below and resubmit to post it again.' : 'Its balance effect is reversed. Only the enrolled author can correct and resubmit this entry.' };
+    case 'superseded': return { badge: 'Replaced by correction', tone: 'muted', bannerTone: 'warn', reasonTitle: 'Historical referral reason', text: 'This original was referred back and replaced by a corrected entry. It is kept for audit and cannot be referred back again.' };
+    case 'reversal': return { badge: 'Reversal', tone: 'muted', bannerTone: 'warn', reasonTitle: 'Reversal reason', text: 'Reversal journal kept for audit. It cannot be corrected or referred back.' };
+    case 'legacy_unposted': return { badge: 'Historical unposted', tone: 'warn', bannerTone: 'warn', reasonTitle: 'Correction history', text: e.canReferBack || e.canResubmit ? 'Historical entry that was never posted and is not counted in balances. Available corrections are shown below.' : 'Historical entry that was never posted and is not counted in balances. No correction action is available to you for it.' };
+    case 'rejected': return { badge: 'Withdrawn (historical)', tone: 'bad', bannerTone: 'warn', reasonTitle: 'Historical reason', text: 'Withdrawn historical entry kept for audit. No actions are available.' };
+    default: return { badge: e.postingState, tone: 'muted', bannerTone: 'warn', reasonTitle: 'Correction reason', text: 'No correction action is available to you for this entry.' };
+  }
+}
 export const money = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : str(v); };
 
 export function label(r: ErpRecord): string {
@@ -317,7 +329,11 @@ export function RecordDetail({ erp, res, rec, ctx, onClose, footer }: { erp: Pro
   return (
     <Dialog title={`${res.title}: ${label(rec)}`} onClose={onClose}>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}><Badge text={recordStateLabel(rec.status)} tone={tone(rec.status)} />{rec.data.status ? <Badge text={str(rec.data.status)} tone={tone(str(rec.data.status))} /> : null}</View>
-      {entry?.correctionReason ? <Banner tone="warn" title="Referred back" text={String(entry.correctionReason)} /> : null}
+      {entry ? (() => { const st = postingStateInfo(entry); return <View testID="detail-posting-state" style={{ marginBottom: 10 }}>
+        <View style={{ flexDirection: 'row', marginBottom: 6 }}><Badge text={st.badge} tone={st.tone} /></View>
+        <Text style={{ color: c.mutedForeground, fontSize: 12, marginBottom: 6 }}>{st.text}</Text>
+        {entry.correctionReason ? <Banner tone={st.bannerTone} title={st.reasonTitle} text={String(entry.correctionReason)} /> : null}
+      </View>; })() : null}
       {msg ? <Banner tone="error" title="Action refused" text={msg} /> : null}
       {entry?.canReferBack ? <Btn testID="detail-refer-back" label="Refer Back" icon="corner-up-left" variant="ghost" onPress={() => setRefer(true)} disabled={busy} /> : null}
       {refer ? <View>
