@@ -69,6 +69,9 @@ export const translations = {
     quickActions: 'Quick Navigation',
     enrollExpenseBtn: 'Enroll Project Expenses',
     requestDrawBtn: 'Place Drawing Request',
+    shortInvestment: 'Investment',
+    shortExpenses: 'Expenses',
+    shortDrawing: 'Drawing Request',
     viewPlotsBtn: 'Browse Venture Plots',
     viewPassbookBtn: 'Open Project Statements',
 
@@ -199,6 +202,9 @@ export const translations = {
     quickActions: 'శీఘ్ర చర్యలు',
     enrollExpenseBtn: 'ప్రాజెక్ట్ ఖర్చు నమోదు',
     requestDrawBtn: 'డ్రాయింగ్ అభ్యర్థన',
+    shortInvestment: 'పెట్టుబడి',
+    shortExpenses: 'ఖర్చులు',
+    shortDrawing: 'డ్రాయింగ్ అభ్యర్థన',
     viewPlotsBtn: 'ప్లాట్లు చూడండి',
     viewPassbookBtn: 'ప్రాజెక్ట్ స్టేట్‌మెంట్స్ చూడండి',
 

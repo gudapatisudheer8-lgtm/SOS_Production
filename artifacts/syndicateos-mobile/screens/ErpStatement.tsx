@@ -176,9 +176,15 @@ export function ProjectStatement({ erp, ctx }: { erp: ProjectErp; ctx: ErpCtx })
       <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
         {[['Inflow', cr, c.success], ['Outflow', dr, c.destructive], ['Net', cr - dr, c.foreground]].map(([l, v, col]) => <View key={String(l)} style={{ flex: 1, minWidth: 0, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 12, padding: 8 }}><Text style={{ color: c.mutedForeground, fontSize: 9, fontFamily: 'Inter_700Bold' }}>{String(l).toUpperCase()}</Text><Text numberOfLines={1} adjustsFontSizeToFit style={{ color: String(col), fontFamily: 'Inter_700Bold', fontSize: 14 }}>{money(Number(v))}</Text></View>)}
       </View>
-      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+      {partner ? <View testID="partner-create-row" style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+        {(['investments', 'expenses', 'drawings'] as const).filter((k) => erp.resources.find((x) => x.kind === k)?.canCreate).map((k) => (
+          <Pressable key={k} testID={`partner-create-${k}`} onPress={() => setCreating(k)} accessibilityRole="button" accessibilityLabel={k === 'investments' ? t('enrollInvestmentBtn').replace(/^\+\s*/, '') : k === 'expenses' ? t('enrollExpenseBtn') : t('requestDrawBtn')} style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 6, borderRadius: 10, backgroundColor: '#FFB800', opacity: pressed ? 0.85 : 1 })}>
+            <Feather name="plus" size={14} color="#111827" />
+            <Text numberOfLines={2} style={{ flexShrink: 1, color: '#111827', fontFamily: 'Inter_700Bold', fontSize: 12, lineHeight: 15, textAlign: 'center' }}>{t(k === 'investments' ? 'shortInvestment' : k === 'expenses' ? 'shortExpenses' : 'shortDrawing')}</Text>
+          </Pressable>))}
+      </View> : <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
         {(['investments', 'expenses', 'drawings'] as const).filter((k) => erp.resources.find((x) => x.kind === k)?.canCreate).map((k) => <Btn key={k} icon="plus" label={k === 'investments' ? (partner ? t('enrollInvestmentBtn') : 'Investment') : k === 'expenses' ? (partner ? t('enrollExpenseBtn') : 'Expense') : (partner ? t('requestDrawBtn') : 'Drawing')} onPress={() => setCreating(k)} />)}
-      </View>
+      </View>}
       <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
         {[{ k: 'csv', l: 'CSV', i: 'download' as const, on: csv, dis: !f.out.length }, { k: 'print', l: 'Print', i: 'printer' as const, on: print, dis: false }, ...(!partner ? [{ k: 'tally', l: 'Tally', i: 'file-text' as const, on: () => setTally(true), dis: false }] : [])].map((b) => (
           <Pressable key={b.k} onPress={b.on} disabled={b.dis || !!exporting} accessibilityRole="button" accessibilityLabel={b.k === 'csv' ? 'Export CSV' : b.k === 'tally' ? 'Tally XML export' : 'Print'} style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, opacity: b.dis || exporting === b.k ? 0.5 : 1 }}>
