@@ -11,6 +11,12 @@ Keep both web and mobile versions available. Showing or updating the mobile vers
 
 **How to apply:** Preserve both application artifacts and distinguish the native mobile preview from the responsive web application and its EC2 deployment.
 
+Deploy the mobile browser version to the existing EC2 installation alongside the web application before preparing the Android APK through Expo.
+
+**Why:** The user explicitly chose EC2 deployment first and Expo APK preparation afterward.
+
+**How to apply:** Keep the existing web application and shared API available; an EC2 static mobile frontend is not the native APK. Do not describe native icon/splash or background push behavior as verified by a browser deployment.
+
 ## Current delivery priority: source-faithful dashboards
 
 The user requires the native mobile accountant and partner dashboards to replicate the current web dashboards with the same features. The older mobile implementation is not an acceptable replica. Use the current built web application, including subsequent requested changes, as the mobile requirements source.

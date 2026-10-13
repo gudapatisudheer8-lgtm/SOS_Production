@@ -606,3 +606,31 @@ mtime_ms = 1791886430711
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/e99e091d-772d-4642-ad04-e546a44aaf4d/5e79fd8d-efcf-4854-b6bf-0a27166bdb84"
 storage_version_token = "1791886464484695"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "IT_HuHIVs6PXdrOHDdxwI"
+uri = "file://generated-artifacts/ec2/sos-mobile-20261013.tar.gz"
+type = "unspecified"
+title = "SyndicateOS — Latest Mobile EC2 Package"
+description = "Mobile-only public web export with checksum validation, safe Nginx routing backup and rollback. Preserves the existing web app, API and database. About 5.8 MB."
+logical_id = "b69bcf4e-1cd0-49d1-80e1-67d3651fd7ab"
+content_hash = "sha256:0134ff51072c0c327819dea44e49b4ca67709aa281bfb3d0cda1e2a4a95b53fa"
+size = 6094071
+mtime_ms = 1791893623803
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/b69bcf4e-1cd0-49d1-80e1-67d3651fd7ab/905e68b8-b51d-4e45-9f71-357222c38b20"
+storage_version_token = "1791893871489509"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "i1DzMefrpGyRurt52fBr7"
+uri = "file://generated-artifacts/ec2/sos-mobile-20261013-Deployment-Guide.html"
+type = "html"
+title = "Mobile EC2 Deployment Instructions"
+description = "Windows upload commands, EC2 installation, inline checksum, verification, rollback and the next APK step."
+logical_id = "500cd399-5ebe-459e-ae2a-148fb613e511"
+content_hash = "sha256:faf3273145a6041bdaa5af133adfef794501c345f02387485823448baf9454a7"
+size = 7318
+mtime_ms = 1791893623817
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:1009d9c2-b863-401d-baa1-ced63916b66e/500cd399-5ebe-459e-ae2a-148fb613e511/2bfbca92-9212-43f6-8bc4-5078ca3e45c2"
+storage_version_token = "1791893872797393"
+content_type = "text/html"
